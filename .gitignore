@@ -1,0 +1,42 @@
+# 📦 Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+*.log
+
+# 🔒 Секреты и env
+.env
+*.env
+.env.*
+
+# 🐍 Virtualenv
+venv/
+ENV/
+env/
+
+# Alembic
+migrations/versions/*.pyc
+
+# VS Code / Cursor
+.vscode/
+.cursor/
+
+# 🔍 Test/coverage/cache
+.cache/
+.coverage
+htmlcov/
+pytest_cache/
+
+# 💡 Misc
+.DS_Store
+.idea/
+*.swp
+*.bak
+
+# DB (если SQLite используется локально)
+db.sqlite3
+
+# Exported OpenAPI clients
+client/

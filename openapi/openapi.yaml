@@ -1,0 +1,333 @@
+openapi: 3.0.3
+
+info:
+  title: Agronom Bot Internal API
+  version: 1.2.1
+  description: |
+    Telegram-бот «Карманный агроном» — API v1.2.1.
+    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
+
+servers:
+  - url: https://api.agronom.local
+    description: Production
+  - url: https://staging.agronom.local
+    description: Staging
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    HmacAuth:
+      type: apiKey
+      in: header
+      name: X-Sign
+
+  parameters:
+    ApiVersionHeader:
+      name: X-API-Ver
+      in: header
+      required: true
+      schema:
+        type: string
+        enum: [v1]
+
+  schemas:
+    DiagnoseRequestMultipart:
+      type: object
+      required: [image]
+      properties:
+        image:
+          type: string
+          format: binary
+        prompt_id:
+          type: string
+          enum: [v1]
+
+    DiagnoseRequestBase64:
+      type: object
+      required: [image_base64, prompt_id]
+      properties:
+        image_base64:
+          type: string
+          description: Base64-JPEG/PNG ≤ 2 MB
+        prompt_id:
+          type: string
+          enum: [v1]
+
+    DiagnoseResponse:
+      type: object
+      required: [crop, disease, confidence]
+      properties:
+        crop:
+          type: string
+          example: apple
+        disease:
+          type: string
+          example: powdery_mildew
+        confidence:
+          type: number
+          format: float
+          example: 0.87
+
+    ProtocolResponse:
+      type: object
+      required: [product, dosage_value, dosage_unit, phi, buy_url]
+      properties:
+        product:
+          type: string
+          example: Скор 250 ЭК
+        dosage_value:
+          type: number
+          example: 2
+        dosage_unit:
+          type: string
+          enum: [ml_10l, g_per_l]
+          example: ml_10l
+        phi:
+          type: integer
+          example: 30
+        buy_url:
+          type: string
+          format: uri
+          example: https://partner.shop/product/123
+
+    PhotoItem:
+      allOf:
+        - $ref: '#/components/schemas/DiagnoseResponse'
+        - type: object
+          required: [id, ts]
+          properties:
+            id:
+              type: integer
+              example: 42
+            ts:
+              type: string
+              format: date-time
+              example: "2025-07-20T12:34:56Z"
+
+    ListPhotosResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PhotoItem'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Передайте значение в ?cursor=… для следующей страницы
+
+    PaymentWebhook:
+      type: object
+      required: [payment_id, amount, currency, status, signature]
+      properties:
+        payment_id:
+          type: string
+        amount:
+          type: integer
+          description: value in kopeks
+        currency:
+          type: string
+          example: RUB
+        status:
+          type: string
+          enum: [success, fail]
+        signature:
+          type: string
+          description: HMAC-SHA256 of payload
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            [NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, NOT_FOUND, BAD_REQUEST, UNAUTHORIZED]
+        message:
+          type: string
+
+paths:
+  /v1/ai/diagnose:
+    post:
+      summary: Diagnose plant disease
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DiagnoseRequestMultipart'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagnoseRequestBase64'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnoseResponse'
+        '400':
+          description: Bad image / bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Free quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: GPT timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      x-rateLimit:
+        limit: 30
+        window: second
+
+  /v1/photos:
+    get:
+      summary: List user’s photos (history)
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Отдаётся в ответе как `next_cursor`
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPhotosResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/limits:
+    get:
+      summary: Возвращает текущие лимиты пользователя
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+      responses:
+        '200':
+          description: Текущие лимиты
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [limit_monthly_free, used_this_month]
+                properties:
+                  limit_monthly_free:
+                    type: integer
+                    example: 5
+                  used_this_month:
+                    type: integer
+                    example: 3
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/payments/sbp/webhook:
+    post:
+      summary: SBP payment webhook
+      security:
+        - HmacAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhook'
+      responses:
+        '200':
+          description: Accepted
+
+  /v1/partner/orders:
+    post:
+      summary: Order deep-link callback (AgroStore)
+      security:
+        - HmacAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, user_tg_id, protocol_id, price_kopeks, signature]
+              properties:
+                order_id:
+                  type: string
+                user_tg_id:
+                  type: integer
+                protocol_id:
+                  type: integer
+                price_kopeks:
+                  type: integer
+                signature:
+                  type: string
+                  description: HMAC-SHA256 по телу запроса
+      responses:
+        '202':
+          description: Queued
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: diagnose
+    description: Disease recognition
+  - name: photos
+    description: Photo history
+  - name: payments
+    description: SBP integration
+  - name: partner
+    description: External partner callbacks
+
+
+
