@@ -24,7 +24,7 @@ Header `X‑Sign` (HMAC‑SHA256) вычисляется по сырому те�
 
 ### 4.1 Payload schema (excerpt)
 
-```json
+
 {
   "order_id": "string",
   "user_tg_id": 123456789,
@@ -35,15 +35,12 @@ Header `X‑Sign` (HMAC‑SHA256) вычисляется по сырому те�
 4.2 Error examples
 400 Bad request:
 
-json
-Copy
-Edit
+
 { "code": "BAD_REQUEST", "message": "price_kopeks must be >0" }
 401 Unauthorized:
 
-json
-Copy
-Edit
+
+
 { "code": "UNAUTHORIZED", "message": "Invalid signature" }
 §5 QA & Monitoring
 Тест‑кейс TC‑028 добавлен в QA Test Plan v1.1 (позитивное)
@@ -52,16 +49,13 @@ TC‑029 — негативный (неверная подпись)
 
 Метрика в Prometheus:
 
-lua
-Copy
-Edit
+
 partner_orders_total{status="fail"}
 Алерт: P2 > 5 ошибок / 5 мин
 
 §6 Deep‑link Schema (v1)
 text
-Copy
-Edit
+
 https://agrostore.ru/agronom?
   pid={product_id}&
   src=bot&
@@ -70,9 +64,6 @@ https://agrostore.ru/agronom?
   utm_campaign=agrobot
 Пример:
 
-arduino
-Copy
-Edit
 https://agrostore.ru/agronom?pid=12345&src=bot&uid=07ab...ef&dis=5&utm_campaign=agrobot
 После перехода купон AGRO5 применяется автоматически.
 
@@ -138,5 +129,3 @@ Edit
 
 ## 🧾 Как вставить на сервере:
 
-```bash
-nano ~/agronom-bot/docs/partner_agrostore.md

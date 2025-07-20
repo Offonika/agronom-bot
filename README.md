@@ -70,15 +70,11 @@ agronom-bot/
 ├── .env.template # Пример переменных окружения
 └── README.md # Этот файл
 
-yaml
-Copy
-Edit
 
----
 
 ## 🛠️ Установка (локально)
 
-```bash
+
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload
