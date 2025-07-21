@@ -2,11 +2,19 @@ from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException, F
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
 from typing import Optional
+from datetime import datetime
+
+from app.db import SessionLocal
+from app.models import Photo, PhotoQuota
+
+
 
 app = FastAPI(
     title="Agronom Bot Internal API",
     version="1.2.1"
 )
+
+HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
@@ -32,6 +40,12 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
 
+
+class LimitsResponse(BaseModel):
+    limit_monthly_free: int
+    used_this_month: int
+
+
 # -------------------------------
 # Middleware / Dependency
 # -------------------------------
@@ -44,7 +58,35 @@ async def verify_headers(
         raise HTTPException(status_code=400, detail="Invalid API version")
     # Здесь можно добавить валидацию ключа
     if x_api_key != "test-api-key":
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")):
+    if x_api_ver != "v1":
+        raise HTTPException(status_code=400, detail="Invalid API version")
+
+HMAC_SECRET = "hmac-secret"
+
+def verify_hmac(body: bytes, provided: str) -> str:
+    expected = hmac.new(HMAC_SECRET.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, provided):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    return expected
+
+def compute_signature(secret: str, body: bytes) -> str:
+    return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+async def verify_hmac(request: Request, x_sign: str):
+    raw_body = await request.body()
+    calculated = compute_signature(HMAC_SECRET, raw_body)
+    if calculated != x_sign:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    try:
+        data = json.loads(raw_body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    if data.get("signature") != calculated:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    return data, calculated
 
 # -------------------------------
 # Diagnose Endpoint
@@ -68,6 +110,21 @@ async def diagnose(
 ):
     await verify_headers(x_api_key, x_api_ver)
 
+    user_id = 1  # в MVP ключ привязан к одному пользователю
+
+    db = SessionLocal()
+    month = datetime.utcnow().strftime("%Y-%m")
+    quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+    if not quota:
+        quota = PhotoQuota(user_id=user_id, used_count=0, month_year=month)
+        db.add(quota)
+        db.commit()
+        db.refresh(quota)
+
+    if quota.used_count >= 5:
+        db.close()
+        raise HTTPException(status_code=429, detail="LIMIT_EXCEEDED")
+
     # Определяем формат (multipart vs json)
     if image:
         if prompt_id != "v1":
@@ -75,14 +132,17 @@ async def diagnose(
             return JSONResponse(status_code=400, content=err.model_dump())
         contents = await image.read()
         if len(contents) > 2 * 1024 * 1024:
+
             err = ErrorResponse(code="BAD_REQUEST", message="image too large")
             return JSONResponse(status_code=400, content=err.model_dump())
+
         # заглушка: обрабатываем изображение
-        return DiagnoseResponse(crop="apple", disease="powdery_mildew", confidence=0.92)
+        crop, disease, conf = "apple", "powdery_mildew", 0.92
     else:
         try:
             json_data = await request.json()
         except Exception:
+
             err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
             return JSONResponse(status_code=400, content=err.model_dump())
         try:
@@ -90,5 +150,3 @@ async def diagnose(
         except ValidationError:
             err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
             return JSONResponse(status_code=400, content=err.model_dump())
-        # заглушка: обработка base64
-        return DiagnoseResponse(crop="apple", disease="scab", confidence=0.88)
