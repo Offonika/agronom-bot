@@ -70,9 +70,6 @@ https://agrostore.ru/agronom?pid=12345&src=bot&uid=07ab...ef&dis=5&utm_campaign=
 §7 SLA
 Партнёр предоставляет health‑endpoint:
 
-bash
-Copy
-Edit
 GET /status → 200 OK
 {
   "status": "up"
@@ -121,11 +118,5 @@ created_at
 Документ хранится в: /docs/partner_agrostore.md
 Новые партнёры — копируем и адаптируем.
 
-yaml
-Copy
-Edit
 
----
-
-## 🧾 Как вставить на сервере:
 

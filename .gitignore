@@ -9,7 +9,7 @@ __pycache__/
 # 🔒 Секреты и env
 .env
 *.env
-.env.*
+!.env.template
 
 # 🐍 Virtualenv
 venv/
