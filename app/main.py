@@ -94,7 +94,7 @@ async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")):
     if x_api_ver != "v1":
         raise HTTPException(status_code=400, detail="Invalid API version")
 
-def verify_hmac(body: bytes, provided: str) -> str:
+def verify_hmac_signature(body: bytes, provided: str) -> str:
     expected = hmac.new(HMAC_SECRET.encode(), body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, provided):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
