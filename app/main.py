@@ -1,16 +1,18 @@
 from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime
-import hashlib
+from typing import Optional
+import os
 import hmac
+import hashlib
 import json
 
 app = FastAPI(
     title="Agronom Bot Internal API",
     version="1.2.1"
 )
+
+HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
@@ -29,13 +31,6 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
 
-class PhotoItem(DiagnoseResponse):
-    id: int
-    ts: datetime
-
-class ListPhotosResponse(BaseModel):
-    items: List[PhotoItem]
-    next_cursor: Optional[str] | None = None
 
 class PaymentWebhook(BaseModel):
     payment_id: str
@@ -51,28 +46,6 @@ class PartnerOrderRequest(BaseModel):
     price_kopeks: int
     signature: str
 
-# -------------------------------
-# Exception Handling
-# -------------------------------
-
-ERROR_CODE_MAP = {
-    400: "BAD_REQUEST",
-    401: "UNAUTHORIZED",
-    404: "NOT_FOUND",
-    429: "LIMIT_EXCEEDED",
-    502: "GPT_TIMEOUT",
-}
-
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """Return errors using ErrorResponse schema."""
-    error_code = ERROR_CODE_MAP.get(exc.status_code, "BAD_REQUEST")
-    message = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"code": error_code, "message": message},
-    )
 
 # -------------------------------
 # Middleware / Dependency
@@ -99,6 +72,22 @@ def verify_hmac(body: bytes, provided: str) -> str:
     if not hmac.compare_digest(expected, provided):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
     return expected
+
+def compute_signature(secret: str, body: bytes) -> str:
+    return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+async def verify_hmac(request: Request, x_sign: str):
+    raw_body = await request.body()
+    calculated = compute_signature(HMAC_SECRET, raw_body)
+    if calculated != x_sign:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    try:
+        data = json.loads(raw_body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    if data.get("signature") != calculated:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    return data, calculated
 
 # -------------------------------
 # Diagnose Endpoint
@@ -137,106 +126,36 @@ async def diagnose(
         # заглушка: обработка base64
         return DiagnoseResponse(crop="apple", disease="scab", confidence=0.88)
 
-# ---------------------------------
-# In-memory stubs for demo purpose
-# ---------------------------------
 
-_PHOTOS: List[PhotoItem] = [
-    PhotoItem(id=1, ts=datetime.utcnow(), crop="apple", disease="scab", confidence=0.9),
-    PhotoItem(id=2, ts=datetime.utcnow(), crop="tomato", disease="blight", confidence=0.85),
-]
 
-# -------------------------------
-# Photos history
-# -------------------------------
-
-@app.get(
-    "/v1/photos",
-    response_model=ListPhotosResponse,
-    responses={401: {"model": ErrorResponse}},
-)
-async def list_photos(
-    limit: int = 10,
-    cursor: Optional[str] = None,
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
-):
-    await verify_headers(x_api_key, x_api_ver)
-
-    start = int(cursor) if cursor else 0
-    end = start + min(limit, 50)
-    items = _PHOTOS[start:end]
-    next_cursor = str(end) if end < len(_PHOTOS) else None
-    return ListPhotosResponse(items=items, next_cursor=next_cursor)
-
-# -------------------------------
-# Limits endpoint
-# -------------------------------
-
-@app.get(
-    "/v1/limits",
-    responses={401: {"model": ErrorResponse}},
-)
-async def get_limits(
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
-):
-    await verify_headers(x_api_key, x_api_ver)
-    used = len(_PHOTOS)
-    return {"limit_monthly_free": 5, "used_this_month": used}
-
-# -------------------------------
-# SBP webhook
 # -------------------------------
 
 @app.post(
     "/v1/payments/sbp/webhook",
-    status_code=200,
+
+    responses={
+        200: {"description": "Accepted"},
+        401: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+    },
 )
-async def sbp_webhook(
+async def payments_webhook(
     request: Request,
-    x_sign: str = Header(..., alias="X-Sign"),
+    x_api_key: str = Header(..., alias="X-API-Key"),
     x_api_ver: str = Header(..., alias="X-API-Ver"),
+    x_sign: str = Header(..., alias="X-Sign"),
 ):
-    await verify_version(x_api_ver)
-    body = await request.body()
-    verify_hmac(body, x_sign)
-    try:
-        payload = PaymentWebhook.model_validate_json(body)
-    except Exception:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
-    if payload.signature != verify_hmac(body, x_sign):
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-    # заглушка: сохранить платёж
+    await verify_headers(x_api_key, x_api_ver)
+    data, _ = await verify_hmac(request, x_sign)
+    PaymentWebhook(**data)  # validate fields
     return JSONResponse(status_code=200, content={"status": "accepted"})
 
+
 # -------------------------------
-# Partner order callback
+# Partner Order Webhook
+=======
+
 # -------------------------------
 
 @app.post(
     "/v1/partner/orders",
-    status_code=202,
-    responses={
-        400: {"model": ErrorResponse},
-        401: {"model": ErrorResponse},
-    },
-)
-async def partner_order(
-    request: Request,
-    x_sign: str = Header(..., alias="X-Sign"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
-):
-    await verify_version(x_api_ver)
-    body = await request.body()
-    verify_hmac(body, x_sign)
-    try:
-        data = json.loads(body.decode())
-        order = PartnerOrderRequest(**data)
-    except Exception:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
-    expected = verify_hmac(body, x_sign)
-    if order.signature != expected:
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-    # заглушка: сохранить заказ
-    return JSONResponse(status_code=202, content={"status": "queued"})
