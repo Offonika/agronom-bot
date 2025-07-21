@@ -26,6 +26,11 @@ CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');CREA
 graph TDPENDING[photos.status=pending] -->|predict| OK[status=ok]PENDING -->|retry| RETRY[status=retrying]RETRY -->|predict| OKPhotos auto-delete from S3 after 90d. DB rows soft-deleted 30d later. Quota resets monthly.
 6 · API ↔ DB Mapping (extract)
 /v1/ai/diagnose → insert photos/v1/limits → read photo_quota + count from photos/v1/payments/sbp/webhook → insert payments/v1/partner/orders → insert partner_orders (with signature)
+
+6.1 · /v1/ai/diagnose
+Принимает фото в multipart (`image`) или JSON (`image_base64`). Возвращает
+`{crop, disease, confidence}` и создаёт запись в `photos`, увеличивая счётчик
+`photo_quota.used_count`.
 7 · Ownership & Lineage
 Airflow DAG: export_daily_metrics → S3 → Metabase. См. Data_Lineage.xlsx.
 8 · Privacy & Compliance

@@ -72,14 +72,49 @@ agronom-bot/
 
 
 
-## 🛠️ Установка (локально)
+## 🛠️ Установка и запуск локально
 
+1. Скопируйте `.env.template` в `.env` и укажите параметры подключения к БД и S3. Минимально нужны:
 
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload
-npm install --prefix bot
-node bot/index.js
+   ```env
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=postgres
+   POSTGRES_DB=agronom
+   POSTGRES_HOST=localhost
+   POSTGRES_PORT=5432
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
+
+   S3_BUCKET=agronom
+   S3_ENDPOINT=http://localhost:9000
+   S3_ACCESS_KEY=minio
+   S3_SECRET_KEY=minio123
+   ```
+
+2. Установите зависимости и примените миграции:
+
+   ```bash
+   pip install -r requirements.txt
+   alembic upgrade head
+   ```
+
+3. Запустите API:
+
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+4. Запустите Telegram‑бота:
+
+   ```bash
+   npm install --prefix bot
+   node bot/index.js
+   ```
+
+5. Тесты запускаются командой:
+
+   ```bash
+   pytest
+   ```
 📖 Документация
 Смотри в папке docs/:
 

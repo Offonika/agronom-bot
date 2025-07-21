@@ -157,6 +157,10 @@ paths:
   /v1/ai/diagnose:
     post:
       summary: Diagnose plant disease
+      description: |
+        Upload a leaf photo and get back the predicted crop,
+        disease and confidence score. Supports multipart uploads
+        via `image` field or JSON body with `image_base64`.
       security:
         - ApiKeyAuth: []
       parameters:
