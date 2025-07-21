@@ -11,7 +11,7 @@ users 1—n photosusers 1—n paymentsusers 1—n partner_ordersusers 1—1 phot
 3.1 users
 id PK, tg_id BIGINT, pro_expires_at TIMESTAMP, created_at TIMESTAMP
 3.2 photos
-id PK, user_id FK, file_id TEXT, crop TEXT, disease TEXT, confidence NUMERIC, status TEXT, ts TIMESTAMP, deleted BOOLEAN
+id PK, user_id FK, file_id TEXT, file_unique_id TEXT, width INT, height INT, file_size INT, crop TEXT, disease TEXT, confidence NUMERIC, status TEXT, ts TIMESTAMP, deleted BOOLEAN
 3.3 protocols
 Без изменений
 3.4 payments

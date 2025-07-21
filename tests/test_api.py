@@ -203,3 +203,14 @@ def test_partner_order_bad_payload():
         json=payload,
     )
     assert resp.status_code in {400, 422}
+
+
+def test_photos_table_has_meta():
+    from app.db import SessionLocal
+    import sqlalchemy as sa
+
+    session = SessionLocal()
+    insp = sa.inspect(session.bind)
+    cols = {c['name'] for c in insp.get_columns('photos')}
+    session.close()
+    assert {'file_unique_id', 'width', 'height', 'file_size'} <= cols
