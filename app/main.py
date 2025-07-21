@@ -2,10 +2,12 @@ from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
-import os
-import hmac
-import hashlib
-import json
+from datetime import datetime
+
+from app.db import SessionLocal
+from app.models import Photo, PhotoQuota
+
+
 
 app = FastAPI(
     title="Agronom Bot Internal API",
@@ -32,19 +34,9 @@ class ErrorResponse(BaseModel):
     message: str
 
 
-class PaymentWebhook(BaseModel):
-    payment_id: str
-    amount: int
-    currency: str
-    status: str
-    signature: str
-
-class PartnerOrderRequest(BaseModel):
-    order_id: str
-    user_tg_id: int
-    protocol_id: int
-    price_kopeks: int
-    signature: str
+class LimitsResponse(BaseModel):
+    limit_monthly_free: int
+    used_this_month: int
 
 
 # -------------------------------
@@ -110,18 +102,82 @@ async def diagnose(
 ):
     await verify_headers(x_api_key, x_api_ver)
 
+    user_id = 1  # в MVP ключ привязан к одному пользователю
+
+    db = SessionLocal()
+    month = datetime.utcnow().strftime("%Y-%m")
+    quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+    if not quota:
+        quota = PhotoQuota(user_id=user_id, used_count=0, month_year=month)
+        db.add(quota)
+        db.commit()
+        db.refresh(quota)
+
+    if quota.used_count >= 5:
+        db.close()
+        raise HTTPException(status_code=429, detail="LIMIT_EXCEEDED")
+
     # Определяем формат (multipart vs json)
     if image:
         contents = await image.read()
         if len(contents) > 2 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Image too large")
+
+            db.close()
+            raise HTTPException(status_code=400, detail="BAD_REQUEST: image too large")
+
         # заглушка: обрабатываем изображение
-        return DiagnoseResponse(crop="apple", disease="powdery_mildew", confidence=0.92)
+        crop, disease, conf = "apple", "powdery_mildew", 0.92
     else:
         try:
             json_data = await request.json()
             body = DiagnoseRequestBase64(**json_data)
         except Exception:
+
+            db.close()
+            raise HTTPException(status_code=400, detail="BAD_REQUEST: invalid JSON")
+        crop, disease, conf = "apple", "scab", 0.88
+
+    photo = Photo(
+        user_id=user_id,
+        file_id="placeholder",
+        crop=crop,
+        disease=disease,
+        confidence=conf,
+        status="ok",
+        ts=datetime.utcnow(),
+        deleted=False,
+    )
+    db.add(photo)
+    quota.used_count += 1
+    db.commit()
+    db.refresh(photo)
+    db.close()
+
+    return DiagnoseResponse(crop=crop, disease=disease, confidence=conf)
+
+
+@app.get(
+    "/v1/limits",
+    response_model=LimitsResponse,
+    responses={
+        401: {"model": ErrorResponse}
+    }
+)
+async def get_limits(
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+):
+    await verify_headers(x_api_key, x_api_ver)
+
+    user_id = 1
+    db = SessionLocal()
+    month = datetime.utcnow().strftime("%Y-%m")
+    quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+    used = quota.used_count if quota else 0
+    db.close()
+    return LimitsResponse(limit_monthly_free=5, used_this_month=used)
+
+=======
             raise HTTPException(status_code=400, detail="Invalid JSON body")
         # заглушка: обработка base64
         return DiagnoseResponse(crop="apple", disease="scab", confidence=0.88)
@@ -153,9 +209,5 @@ async def payments_webhook(
 
 # -------------------------------
 # Partner Order Webhook
-=======
 
-# -------------------------------
 
-@app.post(
-    "/v1/partner/orders",
