@@ -3,6 +3,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
 from typing import Optional
 from datetime import datetime
+import os
+import json
+import hmac
+import hashlib
 
 from app.db import SessionLocal
 from app.models import Photo, PhotoQuota
@@ -63,8 +67,6 @@ async def verify_headers(
 async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")):
     if x_api_ver != "v1":
         raise HTTPException(status_code=400, detail="Invalid API version")
-
-HMAC_SECRET = "hmac-secret"
 
 def verify_hmac(body: bytes, provided: str) -> str:
     expected = hmac.new(HMAC_SECRET.encode(), body, hashlib.sha256).hexdigest()
@@ -129,24 +131,44 @@ async def diagnose(
     if image:
         if prompt_id != "v1":
             err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+            db.close()
             return JSONResponse(status_code=400, content=err.model_dump())
         contents = await image.read()
         if len(contents) > 2 * 1024 * 1024:
-
             err = ErrorResponse(code="BAD_REQUEST", message="image too large")
+            db.close()
             return JSONResponse(status_code=400, content=err.model_dump())
 
         # заглушка: обрабатываем изображение
         crop, disease, conf = "apple", "powdery_mildew", 0.92
+        file_id = image.filename or "upload"
     else:
         try:
             json_data = await request.json()
         except Exception:
-
             err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
+            db.close()
             return JSONResponse(status_code=400, content=err.model_dump())
         try:
             body = DiagnoseRequestBase64(**json_data)
         except ValidationError:
             err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+            db.close()
             return JSONResponse(status_code=400, content=err.model_dump())
+        crop, disease, conf = "apple", "powdery_mildew", 0.92
+        file_id = "base64"
+
+    photo = Photo(
+        user_id=user_id,
+        file_id=file_id,
+        crop=crop,
+        disease=disease,
+        confidence=conf,
+        status="processed",
+    )
+    db.add(photo)
+    quota.used_count += 1
+    db.commit()
+    db.close()
+
+    return DiagnoseResponse(crop=crop, disease=disease, confidence=conf)
