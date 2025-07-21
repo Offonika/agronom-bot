@@ -137,7 +137,7 @@ components:
           example: RUB
         status:
           type: string
-          enum: [success, fail]
+          enum: [success, fail, cancel, bank_error]
         signature:
           type: string
           description: HMAC-SHA256 of payload
@@ -149,7 +149,7 @@ components:
         code:
           type: string
           enum:
-            [NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, NOT_FOUND, BAD_REQUEST, UNAUTHORIZED]
+            [NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, BAD_REQUEST, UNAUTHORIZED]
         message:
           type: string
 
