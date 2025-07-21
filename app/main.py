@@ -159,7 +159,7 @@ async def diagnose(
 
     # Определяем формат (multipart vs json)
     if image:
-        if prompt_id != "v1":
+        if prompt_id not in (None, "v1"):
             err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
             db.close()
             return JSONResponse(status_code=400, content=err.model_dump())
