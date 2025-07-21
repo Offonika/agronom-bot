@@ -78,6 +78,8 @@ agronom-bot/
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload
+npm install --prefix bot
+node bot/index.js
 📖 Документация
 Смотри в папке docs/:
 
