@@ -105,10 +105,11 @@ def test_payment_webhook_success():
         "currency": "RUB",
         "status": "success",
     }
-    payload["signature"] = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    payload["signature"] = sig
     headers = {
         "X-API-Ver": "v1",
-        "X-Sign": compute_signature("test-hmac-secret", json.dumps(payload).encode()),
+        "X-Sign": sig,
     }
     resp = client.post(
         "/v1/payments/sbp/webhook",
@@ -158,12 +159,13 @@ def test_partner_order_success():
         "protocol_id": 2,
         "price_kopeks": 100,
     }
-    payload["signature"] = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    payload["signature"] = sig
     resp = client.post(
         "/v1/partner/orders",
         headers={
             "X-API-Ver": "v1",
-            "X-Sign": compute_signature("test-hmac-secret", json.dumps(payload).encode()),
+            "X-Sign": sig,
         },
         json=payload,
     )
