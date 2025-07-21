@@ -1,6 +1,6 @@
 # Карманный агроном – Telegram Bot (MVP)
 
-[![Python 3.11](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/release/python-3110/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/release/python-3120/)
 
 > Минималистичный AI-бот для диагностики болезней растений и рекомендаций по протоколу обработки.  
 > Версия API: **v1.2.1** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
@@ -92,10 +92,10 @@ agronom-bot/
    S3_SECRET_KEY=minio123
    ```
 
-2. Создайте виртуальное окружение под **Python 3.11**:
+2. Создайте виртуальное окружение под **Python 3.12**:
 
    ```bash
-   python3.11 -m venv .venv
+   python3.12 -m venv .venv
    source .venv/bin/activate
    ```
 
@@ -123,6 +123,22 @@ agronom-bot/
 
    ```bash
    pytest
+   ```
+
+### ⚙️ Миграция на Python 3.12
+
+1. Удалите старое окружение `.venv` (если было):
+
+   ```bash
+   rm -rf .venv
+   ```
+
+2. Пересоздайте виртуальное окружение и переустановите зависимости:
+
+   ```bash
+   python3.12 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
    ```
 📖 Документация
 Смотри в папке docs/:
