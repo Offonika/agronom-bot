@@ -3,10 +3,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
 from typing import Optional
 from datetime import datetime
+import base64
 import os
 import json
 import hmac
 import hashlib
+
+from app.services.storage import upload_photo
 
 from app.db import SessionLocal
 from app.models import Photo, PhotoQuota, Payment, PartnerOrder
@@ -168,10 +171,11 @@ async def diagnose(
             err = ErrorResponse(code="BAD_REQUEST", message="image too large")
             db.close()
             return JSONResponse(status_code=400, content=err.model_dump())
+        key = upload_photo(user_id, contents)
 
         # заглушка: обрабатываем изображение
         crop, disease, conf = "apple", "powdery_mildew", 0.92
-        file_id = image.filename or "upload"
+        file_id = key
     else:
         try:
             json_data = await request.json()
@@ -185,8 +189,10 @@ async def diagnose(
             err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
             db.close()
             return JSONResponse(status_code=400, content=err.model_dump())
+        contents = base64.b64decode(body.image_base64)
+        key = upload_photo(user_id, contents)
         crop, disease, conf = "apple", "powdery_mildew", 0.92
-        file_id = "base64"
+        file_id = key
 
     photo = Photo(
         user_id=user_id,
@@ -221,7 +227,7 @@ async def list_photos(
     db = SessionLocal()
     q = (
         db.query(Photo)
-        .filter(Photo.user_id == user_id, Photo.deleted == False)
+        .filter(Photo.user_id == user_id, Photo.deleted.is_(False))
         .order_by(Photo.id.desc())
     )
     if cursor:
