@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Enum
 from app.models.base import Base
 from datetime import datetime
 
@@ -11,6 +11,10 @@ class Photo(Base):
     crop = Column(String)
     disease = Column(String)
     confidence = Column(Float)
-    status = Column(String)
+    status = Column(
+        Enum("pending", "ok", "retrying", name="photo_status"),
+        nullable=False,
+        server_default="pending",
+    )
     ts = Column(DateTime, default=datetime.utcnow)
     deleted = Column(Boolean, default=False)
