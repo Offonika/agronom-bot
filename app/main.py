@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException
+from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException, Form
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, ValidationError
 from typing import Optional
 from datetime import datetime
 
@@ -23,6 +23,13 @@ HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
 class DiagnoseRequestBase64(BaseModel):
     image_base64: str
     prompt_id: str
+
+    @field_validator("prompt_id")
+    @classmethod
+    def validate_prompt_id(cls, v: str) -> str:
+        if v != "v1":
+            raise ValueError("prompt_id must be 'v1'")
+        return v
 
 class DiagnoseResponse(BaseModel):
     crop: str
@@ -98,7 +105,8 @@ async def diagnose(
     request: Request,
     x_api_key: str = Header(..., alias="X-API-Key"),
     x_api_ver: str = Header(..., alias="X-API-Ver"),
-    image: Optional[UploadFile] = File(None)
+    image: Optional[UploadFile] = File(None),
+    prompt_id: Optional[str] = Form(None)
 ):
     await verify_headers(x_api_key, x_api_ver)
 
@@ -119,95 +127,26 @@ async def diagnose(
 
     # Определяем формат (multipart vs json)
     if image:
+        if prompt_id != "v1":
+            err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+            return JSONResponse(status_code=400, content=err.model_dump())
         contents = await image.read()
         if len(contents) > 2 * 1024 * 1024:
 
-            db.close()
-            raise HTTPException(status_code=400, detail="BAD_REQUEST: image too large")
+            err = ErrorResponse(code="BAD_REQUEST", message="image too large")
+            return JSONResponse(status_code=400, content=err.model_dump())
 
         # заглушка: обрабатываем изображение
         crop, disease, conf = "apple", "powdery_mildew", 0.92
     else:
         try:
             json_data = await request.json()
-            body = DiagnoseRequestBase64(**json_data)
         except Exception:
 
-            db.close()
-            raise HTTPException(status_code=400, detail="BAD_REQUEST: invalid JSON")
-        crop, disease, conf = "apple", "scab", 0.88
-
-    photo = Photo(
-        user_id=user_id,
-        file_id="placeholder",
-        crop=crop,
-        disease=disease,
-        confidence=conf,
-        status="ok",
-        ts=datetime.utcnow(),
-        deleted=False,
-    )
-    db.add(photo)
-    quota.used_count += 1
-    db.commit()
-    db.refresh(photo)
-    db.close()
-
-    return DiagnoseResponse(crop=crop, disease=disease, confidence=conf)
-
-
-@app.get(
-    "/v1/limits",
-    response_model=LimitsResponse,
-    responses={
-        401: {"model": ErrorResponse}
-    }
-)
-async def get_limits(
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
-):
-    await verify_headers(x_api_key, x_api_ver)
-
-    user_id = 1
-    db = SessionLocal()
-    month = datetime.utcnow().strftime("%Y-%m")
-    quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
-    used = quota.used_count if quota else 0
-    db.close()
-    return LimitsResponse(limit_monthly_free=5, used_this_month=used)
-
-=======
-            raise HTTPException(status_code=400, detail="Invalid JSON body")
-        # заглушка: обработка base64
-        return DiagnoseResponse(crop="apple", disease="scab", confidence=0.88)
-
-
-
-# -------------------------------
-
-@app.post(
-    "/v1/payments/sbp/webhook",
-
-    responses={
-        200: {"description": "Accepted"},
-        401: {"model": ErrorResponse},
-        400: {"model": ErrorResponse},
-    },
-)
-async def payments_webhook(
-    request: Request,
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
-    x_sign: str = Header(..., alias="X-Sign"),
-):
-    await verify_headers(x_api_key, x_api_ver)
-    data, _ = await verify_hmac(request, x_sign)
-    PaymentWebhook(**data)  # validate fields
-    return JSONResponse(status_code=200, content={"status": "accepted"})
-
-
-# -------------------------------
-# Partner Order Webhook
-
-
+            err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
+            return JSONResponse(status_code=400, content=err.model_dump())
+        try:
+            body = DiagnoseRequestBase64(**json_data)
+        except ValidationError:
+            err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+            return JSONResponse(status_code=400, content=err.model_dump())
