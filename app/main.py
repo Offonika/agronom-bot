@@ -2,11 +2,17 @@ from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
+import os
+import hmac
+import hashlib
+import json
 
 app = FastAPI(
     title="Agronom Bot Internal API",
     version="1.2.1"
 )
+
+HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
@@ -25,6 +31,20 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
 
+class PaymentWebhook(BaseModel):
+    payment_id: str
+    amount: int
+    currency: str
+    status: str
+    signature: str
+
+class PartnerOrderRequest(BaseModel):
+    order_id: str
+    user_tg_id: int
+    protocol_id: int
+    price_kopeks: int
+    signature: str
+
 # -------------------------------
 # Middleware / Dependency
 # -------------------------------
@@ -38,6 +58,22 @@ async def verify_headers(
     # Здесь можно добавить валидацию ключа
     if x_api_key != "test-api-key":
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+
+def compute_signature(secret: str, body: bytes) -> str:
+    return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+async def verify_hmac(request: Request, x_sign: str):
+    raw_body = await request.body()
+    calculated = compute_signature(HMAC_SECRET, raw_body)
+    if calculated != x_sign:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    try:
+        data = json.loads(raw_body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    if data.get("signature") != calculated:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    return data, calculated
 
 # -------------------------------
 # Diagnose Endpoint
@@ -75,3 +111,50 @@ async def diagnose(
             raise HTTPException(status_code=400, detail="BAD_REQUEST: invalid JSON")
         # заглушка: обработка base64
         return DiagnoseResponse(crop="apple", disease="scab", confidence=0.88)
+
+# -------------------------------
+# Payment Webhook
+# -------------------------------
+
+@app.post(
+    "/v1/payments/sbp/webhook",
+    responses={
+        200: {"description": "Accepted"},
+        401: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+    },
+)
+async def payments_webhook(
+    request: Request,
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    x_sign: str = Header(..., alias="X-Sign"),
+):
+    await verify_headers(x_api_key, x_api_ver)
+    data, _ = await verify_hmac(request, x_sign)
+    PaymentWebhook(**data)  # validate fields
+    return JSONResponse(status_code=200, content={"status": "accepted"})
+
+
+# -------------------------------
+# Partner Order Webhook
+# -------------------------------
+
+@app.post(
+    "/v1/partner/orders",
+    responses={
+        202: {"description": "Queued"},
+        401: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+    },
+)
+async def partner_orders(
+    request: Request,
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    x_sign: str = Header(..., alias="X-Sign"),
+):
+    await verify_headers(x_api_key, x_api_ver)
+    data, _ = await verify_hmac(request, x_sign)
+    PartnerOrderRequest(**data)
+    return JSONResponse(status_code=202, content={"status": "queued"})
