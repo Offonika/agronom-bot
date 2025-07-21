@@ -18,6 +18,7 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
+
     # Enums
     payment_status = postgresql.ENUM('success', 'fail', 'cancel', 'bank_error', name='payment_status')
     photo_status = postgresql.ENUM('pending', 'ok', 'retrying', name='photo_status')
