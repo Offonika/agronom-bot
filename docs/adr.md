@@ -7,9 +7,9 @@ MVP = Telegram‑bot.Launch ≤ 2 weeks.Handle ≤ 50 000 MAU without r
 2 · Stack Overview
 (см. C4) Node.js, GPT-Vision API, PostgreSQL, Redis, S3-compatible storage, Vault, k8s, Prometheus, Loki, Grafana.
 3 · C4 Diagrams (text)
-C1 System: Farmer → Telegram Bot ↔ Telegram API → App Svc → GPT‑Vision / PostgreSQL / S3 → Prometheus.C2 Containers: Bot Gateway, App Service, Worker, PG 14, S3 (VK), Prom+Grafana+Loki+Tempo.C3 App Components: DiagnoseController, ProtocolController, PaymentController, LimitsController.C4 Worker: BullQueue → RetryJobHandler (fetch photo → GPT → update DB).
+C1 System: Farmer → Telegram Bot ↔ Telegram API → App Svc → GPT‑Vision / PostgreSQL / S3 → Prometheus.C2 Containers: Bot Gateway, App Service, Worker, PG 14, S3 (VK), Prom+Grafana+Loki+Tempo.C3 App Components: DiagnoseController, PaymentController, LimitsController.C4 Worker: BullQueue → RetryJobHandler (fetch photo → GPT → update DB).
 4 · Data Flow
-Photo → Bot → App /v1/ai/diagnose → store JPEG in S3 + row in photos (status=pending) → GPT → update status=ok → Bot./protocol → App → protocols table → Bot./limits → App → counts photo rows for current month./partner/orders → HMAC check (header+body) → insert order.Webhook: /v1/payments/sbp/webhook → update user → Bot.
+Photo → Bot → App /v1/ai/diagnose → store JPEG in S3 + row in photos (status=pending) → GPT → update status=ok → Bot./limits → App → counts photo rows for current month./partner/orders → HMAC check (header+body) → insert order.Webhook: /v1/payments/sbp/webhook → update user → Bot.
 5 · Service-Level Objectives (SLO)
 diag_latency_p95 < 8s; GPT_timeout_ratio < 1%; uptime ≥ 99.5%; 0 critical quota leaks.
 6 · Scaling Plan

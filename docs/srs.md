@@ -33,7 +33,7 @@ FR‑T‑02
 Diagnose — POST /v1/ai/diagnose, возвращает диагноз.
 High
 FR‑T‑03
-Show Protocol — /protocol или кнопка после диагноза.
+Show Protocol — кнопка после диагноза.
 High
 FR‑T‑04
 Purchase Pro — платёж через Bot Payments (СБП).
@@ -89,7 +89,7 @@ Bot → TG: getFile
 Bot → GPT: diagnose
 GPT → Bot: JSON
 Bot → DB: insert photo
-Bot → User: message diagnosis + /protocol
+Bot → User: message diagnosis + кнопка «Протокол»
 6.2 Purchase Pro
 User → Bot: click Pay
 Bot → TG Payments: invoice
