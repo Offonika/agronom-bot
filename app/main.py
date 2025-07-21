@@ -10,6 +10,7 @@ import hmac
 import hashlib
 
 from app.services.storage import upload_photo
+from app.services.gpt import call_gpt_vision_stub
 
 from app.db import SessionLocal
 from app.models import Photo, PhotoQuota, Payment, PartnerOrder
@@ -173,8 +174,11 @@ async def diagnose(
             return JSONResponse(status_code=400, content=err.model_dump())
         key = upload_photo(user_id, contents)
 
-        # заглушка: обрабатываем изображение
-        crop, disease, conf = "apple", "powdery_mildew", 0.92
+        # заглушка GPT-Vision
+        result = call_gpt_vision_stub(key)
+        crop = result.get("crop", "")
+        disease = result.get("disease", "")
+        conf = result.get("confidence", 0.0)
         file_id = key
     else:
         try:
@@ -191,7 +195,10 @@ async def diagnose(
             return JSONResponse(status_code=400, content=err.model_dump())
         contents = base64.b64decode(body.image_base64)
         key = upload_photo(user_id, contents)
-        crop, disease, conf = "apple", "powdery_mildew", 0.92
+        result = call_gpt_vision_stub(key)
+        crop = result.get("crop", "")
+        disease = result.get("disease", "")
+        conf = result.get("confidence", 0.0)
         file_id = key
 
     photo = Photo(
