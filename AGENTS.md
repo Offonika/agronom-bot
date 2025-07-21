@@ -22,12 +22,16 @@ uvicorn app.main:app --reload
 # Запуск тестов
 pytest
 
+# Запуск Telegram‑бота
+npm install --prefix bot
+node bot/index.js
+
 # Линтинг
 flake8 app/
 # или
 ruff app/
 🔑 Переменные окружения
-Смотри файл .env.template для примера.
+Скопируйте `.env.template` в `.env` и укажите настройки.
 
 Не коммитьте реальные токены!
 
@@ -35,9 +39,9 @@ ruff app/
 
 Минимально необходимые переменные:
 
+POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_HOST, POSTGRES_PORT
 DATABASE_URL — строка подключения к БД
-
-S3_* — настройки S3/Minio
+S3_BUCKET, S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY
 
 BOT_TOKEN_DEV — Telegram Bot Token (тестовый!)
 
