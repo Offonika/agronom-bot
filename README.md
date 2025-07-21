@@ -1,5 +1,7 @@
 # Карманный агроном – Telegram Bot (MVP)
 
+[![Python 3.11](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/release/python-3110/)
+
 > Минималистичный AI-бот для диагностики болезней растений и рекомендаций по протоколу обработки.  
 > Версия API: **v1.2.1** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
 
@@ -90,27 +92,34 @@ agronom-bot/
    S3_SECRET_KEY=minio123
    ```
 
-2. Установите зависимости и примените миграции:
+2. Создайте виртуальное окружение под **Python 3.11**:
+
+   ```bash
+   python3.11 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. Установите зависимости и примените миграции:
 
    ```bash
    pip install -r requirements.txt
    alembic upgrade head
    ```
 
-3. Запустите API:
+4. Запустите API:
 
    ```bash
    uvicorn app.main:app --reload
    ```
 
-4. Запустите Telegram‑бота:
+5. Запустите Telegram‑бота:
 
    ```bash
    npm install --prefix bot
    node bot/index.js
    ```
 
-5. Тесты запускаются командой:
+6. Тесты запускаются командой:
 
    ```bash
    pytest
