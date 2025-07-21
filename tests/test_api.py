@@ -1,0 +1,156 @@
+import io
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+HEADERS = {"X-API-Key": "test-api-key", "X-API-Ver": "v1"}
+
+
+def test_openapi_schema():
+    resp = client.get("/openapi.json")
+    assert resp.status_code == 200
+    data = resp.json()
+    for path in [
+        "/v1/ai/diagnose",
+        "/v1/photos",
+        "/v1/limits",
+        "/v1/payments/sbp/webhook",
+        "/v1/partner/orders",
+    ]:
+        assert path in data.get("paths", {})
+
+
+def test_diagnose_json_success():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {"crop", "disease", "confidence"}
+
+
+def test_diagnose_multipart_success():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files={"image": ("leaf.jpg", b"x" * 10, "image/jpeg")},
+    )
+    assert resp.status_code == 200
+
+
+def test_diagnose_missing_header():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers={"X-API-Key": "test-api-key"},
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code in {400, 422}
+
+
+def test_diagnose_invalid_key():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers={"X-API-Key": "bad", "X-API-Ver": "v1"},
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 401
+
+
+def test_diagnose_large_image():
+    large = b"0" * (2 * 1024 * 1024 + 1)
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files={"image": ("big.jpg", large, "image/jpeg")},
+    )
+    assert resp.status_code == 400
+
+
+def test_quota_exceeded():
+    limits = client.get("/v1/limits", headers=HEADERS)
+    assert limits.status_code == 200
+    data = limits.json()
+    if data.get("limit_monthly_free") == data.get("used_this_month"):
+        diag = client.post(
+            "/v1/ai/diagnose",
+            headers=HEADERS,
+            json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+        )
+        assert diag.status_code == 429
+
+
+def test_photos_success():
+    resp = client.get("/v1/photos", headers=HEADERS)
+    assert resp.status_code == 200
+
+
+def test_photos_unauthorized():
+    resp = client.get("/v1/photos", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
+    assert resp.status_code in {401, 404}
+
+
+def test_payment_webhook_success():
+    payload = {
+        "payment_id": "123",
+        "amount": 100,
+        "currency": "RUB",
+        "status": "success",
+        "signature": "abc",
+    }
+    resp = client.post(
+        "/v1/payments/sbp/webhook",
+        headers={"X-API-Ver": "v1", "X-Sign": "sig"},
+        json=payload,
+    )
+    assert resp.status_code == 200
+
+
+def test_payment_webhook_missing_signature():
+    payload = {
+        "payment_id": "123",
+        "amount": 100,
+        "currency": "RUB",
+        "status": "success",
+        "signature": "abc",
+    }
+    resp = client.post(
+        "/v1/payments/sbp/webhook",
+        headers={"X-API-Ver": "v1"},
+        json=payload,
+    )
+    assert resp.status_code in {400, 401, 404}
+
+
+def test_partner_order_success():
+    payload = {
+        "order_id": "o1",
+        "user_tg_id": 1,
+        "protocol_id": 2,
+        "price_kopeks": 100,
+        "signature": "sig",
+    }
+    resp = client.post(
+        "/v1/partner/orders",
+        headers={"X-API-Ver": "v1", "X-Sign": "sig"},
+        json=payload,
+    )
+    assert resp.status_code in {200, 202}
+
+
+def test_partner_order_missing_signature():
+    payload = {
+        "order_id": "o1",
+        "user_tg_id": 1,
+        "protocol_id": 2,
+        "price_kopeks": 100,
+        "signature": "sig",
+    }
+    resp = client.post(
+        "/v1/partner/orders",
+        headers={"X-API-Ver": "v1"},
+        json=payload,
+    )
+    assert resp.status_code in {400, 401, 404}
