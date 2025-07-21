@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
-from typing import Optional
 from datetime import datetime
 import base64
 import os
@@ -61,7 +60,7 @@ class PhotoItem(DiagnoseResponse):
 
 class ListPhotosResponse(BaseModel):
     items: list[PhotoItem]
-    next_cursor: Optional[str] | None = None
+    next_cursor: str | None = None
 
 
 class PaymentWebhook(BaseModel):
@@ -141,8 +140,8 @@ async def diagnose(
     request: Request,
     x_api_key: str = Header(..., alias="X-API-Key"),
     x_api_ver: str = Header(..., alias="X-API-Ver"),
-    image: Optional[UploadFile] = File(None),
-    prompt_id: Optional[str] = Form(None)
+    image: UploadFile | None = File(None),
+    prompt_id: str | None = Form(None)
 ):
     await verify_headers(x_api_key, x_api_ver)
 
@@ -224,7 +223,7 @@ async def diagnose(
 )
 async def list_photos(
     limit: int = 10,
-    cursor: Optional[str] = None,
+    cursor: str | None = None,
     x_api_key: str = Header(..., alias="X-API-Key"),
     x_api_ver: str = Header(..., alias="X-API-Ver"),
 ):
