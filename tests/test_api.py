@@ -69,6 +69,47 @@ def test_diagnose_large_image():
     assert resp.status_code == 400
 
 
+def test_diagnose_json_returns_stub():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "crop": "apple",
+        "disease": "powdery_mildew",
+        "confidence": 0.92,
+    }
+
+
+def test_diagnose_json_bad_prompt():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v2"},
+    )
+    assert resp.status_code == 400
+
+
+def test_diagnose_json_missing_prompt():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA=="},
+    )
+    assert resp.status_code == 400
+
+
+def test_diagnose_multipart_missing_image():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files={"file": ("x.txt", b"123", "text/plain")},
+    )
+    assert resp.status_code == 400
+
+
 def test_quota_exceeded():
     limits = client.get("/v1/limits", headers=HEADERS)
     assert limits.status_code == 200
