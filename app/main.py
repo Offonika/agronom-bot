@@ -9,7 +9,7 @@ import hmac
 import hashlib
 
 from app.db import SessionLocal
-from app.models import Photo, PhotoQuota
+from app.models import Photo, PhotoQuota, Payment, PartnerOrder
 
 
 
@@ -48,6 +48,32 @@ class ErrorResponse(BaseModel):
 class LimitsResponse(BaseModel):
     limit_monthly_free: int
     used_this_month: int
+
+
+class PhotoItem(DiagnoseResponse):
+    id: int
+    ts: datetime
+
+
+class ListPhotosResponse(BaseModel):
+    items: list[PhotoItem]
+    next_cursor: Optional[str] | None = None
+
+
+class PaymentWebhook(BaseModel):
+    payment_id: str
+    amount: int
+    currency: str
+    status: str
+    signature: str
+
+
+class PartnerOrderRequest(BaseModel):
+    order_id: str
+    user_tg_id: int
+    protocol_id: int
+    price_kopeks: int
+    signature: str
 
 
 # -------------------------------
@@ -172,3 +198,129 @@ async def diagnose(
     db.close()
 
     return DiagnoseResponse(crop=crop, disease=disease, confidence=conf)
+
+
+@app.get(
+    "/v1/photos",
+    response_model=ListPhotosResponse,
+    responses={401: {"model": ErrorResponse}},
+)
+async def list_photos(
+    limit: int = 10,
+    cursor: Optional[str] = None,
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+):
+    await verify_headers(x_api_key, x_api_ver)
+
+    user_id = 1
+    db = SessionLocal()
+    q = (
+        db.query(Photo)
+        .filter(Photo.user_id == user_id, Photo.deleted == False)
+        .order_by(Photo.id.desc())
+    )
+    if cursor:
+        try:
+            last_id = int(cursor)
+            q = q.filter(Photo.id < last_id)
+        except ValueError:
+            db.close()
+            raise HTTPException(status_code=400, detail="BAD_REQUEST")
+
+    limit = min(limit, 50)
+    rows = q.limit(limit).all()
+    items = [
+        PhotoItem(
+            id=r.id,
+            ts=r.ts,
+            crop=r.crop or "",
+            disease=r.disease or "",
+            confidence=float(r.confidence or 0),
+        )
+        for r in rows
+    ]
+    next_cursor = str(rows[-1].id) if len(rows) == limit else None
+    db.close()
+    return ListPhotosResponse(items=items, next_cursor=next_cursor)
+
+
+@app.get(
+    "/v1/limits",
+    response_model=LimitsResponse,
+    responses={401: {"model": ErrorResponse}},
+)
+async def get_limits(
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+):
+    await verify_headers(x_api_key, x_api_ver)
+    user_id = 1
+    db = SessionLocal()
+    month = datetime.utcnow().strftime("%Y-%m")
+    quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+    used = quota.used_count if quota else 0
+    db.close()
+    return LimitsResponse(limit_monthly_free=5, used_this_month=used)
+
+
+@app.post(
+    "/v1/payments/sbp/webhook",
+    status_code=200,
+    responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
+)
+async def payments_webhook(
+    request: Request,
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    x_sign: str = Header(..., alias="X-Sign"),
+):
+    await verify_version(x_api_ver)
+    data, _ = await verify_hmac(request, x_sign)
+    try:
+        body = PaymentWebhook(**data)
+    except ValidationError:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+
+    db = SessionLocal()
+    payment = Payment(
+        user_id=1,
+        amount=body.amount,
+        source="sbp",
+        status=body.status,
+    )
+    db.add(payment)
+    db.commit()
+    db.close()
+    return {}
+
+
+@app.post(
+    "/v1/partner/orders",
+    status_code=202,
+    responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
+)
+async def partner_orders(
+    request: Request,
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    x_sign: str = Header(..., alias="X-Sign"),
+):
+    await verify_version(x_api_ver)
+    data, sign = await verify_hmac(request, x_sign)
+    try:
+        body = PartnerOrderRequest(**data)
+    except ValidationError:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+
+    db = SessionLocal()
+    order = PartnerOrder(
+        user_id=body.user_tg_id,
+        order_id=body.order_id,
+        protocol_id=body.protocol_id,
+        price_kopeks=body.price_kopeks,
+        signature=sign,
+        status="new",
+    )
+    db.add(order)
+    db.commit()
+    db.close()
+    return JSONResponse(status_code=202, content={"status": "queued"})

@@ -1,6 +1,7 @@
 import io
+import json
 from fastapi.testclient import TestClient
-from app.main import app
+from app.main import app, compute_signature
 
 client = TestClient(app)
 
@@ -82,6 +83,11 @@ def test_quota_exceeded():
         assert diag.status_code == 429
 
 
+def test_limits_unauthorized():
+    resp = client.get("/v1/limits", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
+    assert resp.status_code in {401, 404}
+
+
 def test_photos_success():
     resp = client.get("/v1/photos", headers=HEADERS)
     assert resp.status_code == 200
@@ -98,11 +104,15 @@ def test_payment_webhook_success():
         "amount": 100,
         "currency": "RUB",
         "status": "success",
-        "signature": "abc",
+    }
+    payload["signature"] = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    headers = {
+        "X-API-Ver": "v1",
+        "X-Sign": compute_signature("test-hmac-secret", json.dumps(payload).encode()),
     }
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers={"X-API-Ver": "v1", "X-Sign": "sig"},
+        headers=headers,
         json=payload,
     )
     assert resp.status_code == 200
@@ -124,17 +134,37 @@ def test_payment_webhook_missing_signature():
     assert resp.status_code in {400, 401, 404}
 
 
+def test_payment_webhook_bad_payload():
+    payload = {
+        "payment_id": "123",
+        "amount": 100,
+        # missing currency
+        "status": "success",
+    }
+    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    payload["signature"] = sig
+    resp = client.post(
+        "/v1/payments/sbp/webhook",
+        headers={"X-API-Ver": "v1", "X-Sign": sig},
+        json=payload,
+    )
+    assert resp.status_code in {400, 422}
+
+
 def test_partner_order_success():
     payload = {
         "order_id": "o1",
         "user_tg_id": 1,
         "protocol_id": 2,
         "price_kopeks": 100,
-        "signature": "sig",
     }
+    payload["signature"] = compute_signature("test-hmac-secret", json.dumps(payload).encode())
     resp = client.post(
         "/v1/partner/orders",
-        headers={"X-API-Ver": "v1", "X-Sign": "sig"},
+        headers={
+            "X-API-Ver": "v1",
+            "X-Sign": compute_signature("test-hmac-secret", json.dumps(payload).encode()),
+        },
         json=payload,
     )
     assert resp.status_code in {200, 202}
@@ -154,3 +184,20 @@ def test_partner_order_missing_signature():
         json=payload,
     )
     assert resp.status_code in {400, 401, 404}
+
+
+def test_partner_order_bad_payload():
+    payload = {
+        "order_id": "o1",
+        "user_tg_id": 1,
+        # missing protocol_id
+        "price_kopeks": 100,
+    }
+    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    payload["signature"] = sig
+    resp = client.post(
+        "/v1/partner/orders",
+        headers={"X-API-Ver": "v1", "X-Sign": sig},
+        json=payload,
+    )
+    assert resp.status_code in {400, 422}
