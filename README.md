@@ -1,6 +1,7 @@
 # Карманный агроном – Telegram Bot (MVP)
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/release/python-3120/)
+> Требуется Node.js 18+ для работы Telegram-бота и тестов.
 
 > Минималистичный AI-бот для диагностики болезней растений и рекомендаций по протоколу обработки.  
 > Версия API: **v1.4.0** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
@@ -127,6 +128,9 @@ agronom-bot/
    source .venv/bin/activate
    ```
 
+
+**Потребуется Node.js 18+** — используется для Telegram‑бота и тестов.
+
 3. Установите зависимости командой `./.codex/setup.sh`. Перед запуском приложения обязательно примените миграции:
 
    ```bash
@@ -141,7 +145,7 @@ agronom-bot/
    ```
 
 5. Запустите Telegram‑бота (не забудьте указать токен и ссылку партнёра в `.env`):
-
+   **Требуется Node.js 18+**
    В файл `.env` добавьте переменные:
 
    - `BOT_TOKEN_DEV=ваш_токен_бота`
