@@ -2,6 +2,7 @@ import json
 import pytest
 from starlette.requests import Request
 from app.main import compute_signature, verify_hmac
+import os
 from app.services.protocols import import_csv_to_db
 
 
@@ -24,7 +25,7 @@ def stub_upload(monkeypatch):
 
     _cache_protocol.cache_clear()
 
-HEADERS = {"X-API-Key": "test-api-key", "X-API-Ver": "v1"}
+HEADERS = {"X-API-Key": os.getenv("API_KEY", "test-api-key"), "X-API-Ver": "v1"}
 
 
 def test_openapi_schema(client):

@@ -56,9 +56,11 @@ OpenAPI см. в `openapi/openapi.yaml`
 
 ### Пример запроса `/v1/ai/diagnose`
 
+API-ключ берётся из переменной окружения `API_KEY` (по умолчанию `test-api-key`).
+
 ```bash
 curl -X POST http://localhost:8000/v1/ai/diagnose \
-  -H "X-API-Key: test-api-key" \
+  -H "X-API-Key: $API_KEY" \
   -H "X-API-Ver: v1" \
   -H "Content-Type: application/json" \
   -d '{"image_base64":"dGVzdA==","prompt_id":"v1"}'
