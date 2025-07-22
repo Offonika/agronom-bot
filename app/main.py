@@ -34,6 +34,8 @@ app = FastAPI(
 )
 
 HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
+# Количество бесплатных запросов в месяц
+FREE_MONTHLY_LIMIT = int(os.environ.get("FREE_MONTHLY_LIMIT", "5"))
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
@@ -180,7 +182,7 @@ async def diagnose(
             db.commit()
             db.refresh(quota)
 
-        if quota.used_count >= 5:
+        if quota.used_count >= FREE_MONTHLY_LIMIT:
             raise HTTPException(status_code=429, detail="LIMIT_EXCEEDED")
 
         # Определяем формат (multipart vs json)
@@ -318,7 +320,7 @@ async def get_limits(
         month = datetime.utcnow().strftime("%Y-%m")
         quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
         used = quota.used_count if quota else 0
-    return LimitsResponse(limit_monthly_free=5, used_this_month=used)
+    return LimitsResponse(limit_monthly_free=FREE_MONTHLY_LIMIT, used_this_month=used)
 
 
 @app.post(

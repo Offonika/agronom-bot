@@ -376,3 +376,26 @@ def test_diagnose_json_no_protocol_beta(client):
     data = resp.json()
     assert data["protocol"] is None
     assert data["protocol_status"] == "Бета"
+
+
+def test_free_monthly_limit_env(monkeypatch, client):
+    monkeypatch.setattr("app.main.FREE_MONTHLY_LIMIT", 1)
+    resp = client.get("/v1/limits", headers=HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["limit_monthly_free"] == 1
+
+    # first request consumes the free quota
+    first = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert first.status_code == 200
+
+    # second request should be rejected
+    second = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert second.status_code == 429
