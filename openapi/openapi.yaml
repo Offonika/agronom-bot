@@ -2,9 +2,9 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: 1.2.1
+  version: 1.3.0
   description: |
-    Telegram-бот «Карманный агроном» — API v1.2.1.
+    Telegram-бот «Карманный агроном» — API v1.3.0.
     Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
 
 servers:
@@ -73,10 +73,15 @@ components:
           type: number
           format: float
           example: 0.87
+        protocol_status:
+          type: string
+          example: "Бета"
+        protocol:
+          $ref: '#/components/schemas/ProtocolResponse'
 
     ProtocolResponse:
       type: object
-      required: [product, dosage_value, dosage_unit, phi, buy_url]
+      required: [product, dosage_value, dosage_unit, phi]
       properties:
         product:
           type: string
@@ -91,10 +96,6 @@ components:
         phi:
           type: integer
           example: 30
-        buy_url:
-          type: string
-          format: uri
-          example: https://partner.shop/product/123
 
     PhotoItem:
       allOf:

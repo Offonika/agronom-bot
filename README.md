@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/release/python-3120/)
 
 > Минималистичный AI-бот для диагностики болезней растений и рекомендаций по протоколу обработки.  
-> Версия API: **v1.2.1** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
+> Версия API: **v1.3.0** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
 
 ---
 
