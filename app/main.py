@@ -277,7 +277,7 @@ async def list_photos(
             db.close()
             raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
-    limit = min(limit, 50)
+    limit = max(1, min(limit, 50))
     rows = q.limit(limit).all()
     items = [
         PhotoItem(
