@@ -219,7 +219,7 @@ async def diagnose(
         crop=crop,
         disease=disease,
         confidence=conf,
-        status="processed",
+        status="ok",
     )
     db.add(photo)
     quota.used_count += 1
