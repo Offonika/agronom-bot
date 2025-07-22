@@ -17,7 +17,7 @@ HPA: CPU > 65% or diag_latency_p95 > 7s → scale pod.Telegram sharding: ≤ 3 t
 7 · Resilience & DR
 PITR 7d WAL + full snapshot 02:00 MSK. Redis optional Phase A. Restore test SLA ≤ 60m.
 8 · Security & Compliance
-TLS 1.2+ (external), mTLS (internal).X‑API‑Key Bot ↔ App, HMAC‑SHA256 for SBP & partner orders.signature duplicated in body + header (X-Sign).API versioning required: X-API-Ver: v1.Business quota: 5 diagnosis/month for Free tier — enforced via /v1/limits.Error codes standardized (ErrorResponse.code): UNAUTHORIZED, LIMIT_EXCEEDED, GPT_TIMEOUT.
+TLS 1.2+ (external), mTLS (internal).X‑API‑Key Bot ↔ App, HMAC‑SHA256 for SBP & partner orders.signature duplicated in body + header (X-Sign).API versioning required: X-API-Ver: v1.Business quota: FREE_MONTHLY_LIMIT diagnosis/month for Free tier (default 5) — enforced via /v1/limits.Error codes standardized (ErrorResponse.code): UNAUTHORIZED, LIMIT_EXCEEDED, GPT_TIMEOUT.
 9 · CI/CD & Secrets
 GitHub Actions: test → build → Docker.ArgoCD blue/green deploy.Vault CSI for secrets: GPT, SBP, HMAC.Secrets rotated: GPT monthly, HMAC every 90d.API schema diff gated in CI (openapi-diff).
 10 · Observability
