@@ -9,7 +9,7 @@ test('photoHandler stores info and replies', async () => {
   const ctx = {
     message: { photo: [{ file_id: 'id1', file_unique_id: 'uid', width: 1, height: 2, file_size: 3 }] },
     from: { id: 42 },
-    reply: async (msg) => replies.push(msg),
+    reply: async (msg, opts) => replies.push({ msg, opts }),
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   const origFetch = global.fetch;
@@ -22,7 +22,8 @@ test('photoHandler stores info and replies', async () => {
   await photoHandler(pool, ctx);
   global.fetch = origFetch;
   assert.equal(calls.length, 1);
-  assert.ok(replies[0].includes('Культура'));
+  assert.ok(replies[0].msg.includes('Культура'));
+  assert.ok(replies[0].opts.reply_markup.inline_keyboard.length > 0);
 });
 
 test('messageHandler ignores non-photo', () => {

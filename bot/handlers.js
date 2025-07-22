@@ -33,15 +33,37 @@ async function photoHandler(pool, ctx) {
     const data = await apiResp.json();
     console.log('API response', data);
 
-    let text = `Культура: ${data.crop}\nБолезнь: ${data.disease}\nУверенность: ${(data.confidence * 100).toFixed(1)}%`;
+    const text =
+      `Культура: ${data.crop}\n` +
+      `Болезнь: ${data.disease}\n` +
+      `Уверенность: ${(data.confidence * 100).toFixed(1)}%`;
+
+    let keyboard;
     if (data.protocol) {
-      text += `\nПрепарат: ${data.protocol.product}\nДоза: ${data.protocol.dosage_value} ${data.protocol.dosage_unit}\nPHI: ${data.protocol.phi}`;
-      await ctx.reply(text);
+      const cb = [
+        'proto',
+        data.protocol.product,
+        data.protocol.dosage_value,
+        data.protocol.dosage_unit,
+        data.protocol.phi,
+      ].join('|');
+      const row = [{ text: 'Протокол', callback_data: cb }];
+      if (data.protocol.product) {
+        const urlBase = process.env.PARTNER_LINK_BASE ||
+          'https://agrostore.example/buy';
+        const link = `${urlBase}?product=${encodeURIComponent(
+          data.protocol.product,
+        )}`;
+        row.push({ text: 'Купить', url: link });
+      }
+      keyboard = { inline_keyboard: [row] };
     } else {
-      text += `\nБета`;
-      const keyboard = { inline_keyboard: [[{ text: 'Спросить эксперта', callback_data: 'ask_expert' }]] };
-      await ctx.reply(text, { reply_markup: keyboard });
+      keyboard = {
+        inline_keyboard: [[{ text: 'Спросить эксперта', callback_data: 'ask_expert' }]],
+      };
     }
+
+    await ctx.reply(text, { reply_markup: keyboard });
   } catch (err) {
     console.error('diagnose error', err);
     if (typeof ctx.reply === 'function') {
