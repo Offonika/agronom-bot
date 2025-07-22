@@ -12,12 +12,13 @@ from app.services.storage import upload_photo, get_public_url
 
 @mock_aws
 def test_upload_and_url():
-    original = {
+    original_env = {
         "S3_BUCKET": os.environ.get("S3_BUCKET"),
         "S3_REGION": os.environ.get("S3_REGION"),
         "S3_ENDPOINT": os.environ.get("S3_ENDPOINT"),
         "S3_PUBLIC_URL": os.environ.get("S3_PUBLIC_URL"),
     }
+    original_bucket = storage.BUCKET
     try:
         os.environ["S3_BUCKET"] = "testbucket"
         os.environ["S3_REGION"] = "us-east-1"
@@ -37,7 +38,8 @@ def test_upload_and_url():
         url = get_public_url(key)
         assert url == f"http://localhost:9000/{key}"
     finally:
-        for name, value in original.items():
+        storage.BUCKET = original_bucket
+        for name, value in original_env.items():
             if value is None:
                 os.environ.pop(name, None)
             else:
@@ -46,12 +48,13 @@ def test_upload_and_url():
 
 @mock_aws
 def test_upload_failure():
-    original = {
+    original_env = {
         "S3_BUCKET": os.environ.get("S3_BUCKET"),
         "S3_REGION": os.environ.get("S3_REGION"),
         "S3_ENDPOINT": os.environ.get("S3_ENDPOINT"),
         "S3_PUBLIC_URL": os.environ.get("S3_PUBLIC_URL"),
     }
+    original_bucket = storage.BUCKET
     try:
         os.environ["S3_BUCKET"] = "testbucket"
         os.environ["S3_REGION"] = "us-east-1"
@@ -64,7 +67,8 @@ def test_upload_failure():
             upload_photo(42, b"hello")
         assert exc.value.status_code == 500
     finally:
-        for name, value in original.items():
+        storage.BUCKET = original_bucket
+        for name, value in original_env.items():
             if value is None:
                 os.environ.pop(name, None)
             else:
