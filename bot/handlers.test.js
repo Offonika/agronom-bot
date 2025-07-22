@@ -67,7 +67,7 @@ test('photoHandler sends protocol buttons', async () => {
   await photoHandler(pool, ctx);
   global.fetch = origFetch;
   const buttons = replies[0].opts.reply_markup.inline_keyboard[0];
-  assert.equal(buttons[0].text, 'Протокол');
+  assert.equal(buttons[0].text, 'Показать протокол');
   assert.equal(buttons[0].callback_data, 'proto|Скор 250 ЭК|2|ml_10l|30');
   assert.ok(buttons[1].url.includes('pid=1'));
 });
