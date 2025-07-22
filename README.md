@@ -3,7 +3,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/release/python-3120/)
 
 > Минималистичный AI-бот для диагностики болезней растений и рекомендаций по протоколу обработки.  
-> Версия API: **v1.3.0** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
+> Версия API: **v1.4.0** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
 
 ---
 
@@ -139,9 +139,12 @@ agronom-bot/
    uvicorn app.main:app --reload
    ```
 
-5. Запустите Telegram‑бота (не забудьте указать токен в `.env`):
+5. Запустите Telegram‑бота (не забудьте указать токен и ссылку партнёра в `.env`):
 
-   В файл `.env` добавьте переменную `BOT_TOKEN_DEV=ваш_токен_бота`.
+   В файл `.env` добавьте переменные:
+
+   - `BOT_TOKEN_DEV=ваш_токен_бота`
+   - `PARTNER_LINK_BASE=https://agrostore.ru/agronom`
 
    ```bash
    npm install --prefix bot

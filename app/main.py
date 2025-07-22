@@ -43,6 +43,7 @@ class DiagnoseRequestBase64(BaseModel):
         return v
 
 class ProtocolResponse(BaseModel):
+    id: int
     product: str
     dosage_value: float
     dosage_unit: str
@@ -228,6 +229,7 @@ async def diagnose(
     proto = find_protocol(crop, disease)
     if proto:
         proto_resp = ProtocolResponse(
+            id=proto.id,
             product=proto.product,
             dosage_value=float(proto.dosage_value or 0),
             dosage_unit=proto.dosage_unit,
