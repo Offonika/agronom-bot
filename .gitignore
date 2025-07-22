@@ -37,6 +37,7 @@ pytest_cache/
 
 # DB (если SQLite используется локально)
 db.sqlite3
+app.db
 
 # Exported OpenAPI clients
 client/
