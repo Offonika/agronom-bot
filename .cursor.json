@@ -1,5 +1,5 @@
 {
     "index": ["docs/", "prompts/", "openapi/", "app/"],
-    "exclude": ["tests/fixtures", "scripts/tmp"]
+    "exclude": ["tests/fixtures"]
   }
   
