@@ -9,7 +9,8 @@ from functools import lru_cache
 from app.db import SessionLocal
 from app.models import Protocol
 
-CSV_PATH = Path(__file__).resolve().parent.parent / "protocols.csv"
+# CSV is stored in the repository root
+CSV_PATH = Path(__file__).resolve().parent.parent.parent / "protocols.csv"
 
 
 def load_csv(path: Path = CSV_PATH) -> list[dict]:
