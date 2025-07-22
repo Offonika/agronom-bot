@@ -1,0 +1,25 @@
+extends: ["spectral:oas"]
+
+rules:
+  info-contact:
+    description: "info object must have contact details"
+    given: "$.info"
+    then:
+      field: contact
+      function: truthy
+  https-server-url:
+    description: "Server URLs must use HTTPS"
+    message: "Server URL {{value}} must start with https://"
+    given: "$.servers[*].url"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^https://"
+  semantic-version:
+    description: "info.version must follow semantic versioning"
+    message: "Version {{value}} should be semantic"
+    given: "$.info.version"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[\\da-z\\-]+(?:\\.[\\da-z\\-]+)*)?(?:\\+[\\da-z\\-]+(?:\\.[\\da-z\\-]+)*)?$"
