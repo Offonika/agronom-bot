@@ -165,6 +165,13 @@ agronom-bot/
    При отсутствии переменной окружения `DATABASE_URL` тесты используют
    SQLite файл `./test.db`.
 
+7. Проверьте спецификацию OpenAPI линтером Spectral:
+
+   ```bash
+   spectral lint -r .spectral.yaml openapi/openapi.yaml
+   ```
+
+
 ### Добавление протокола обработки
 
 Файл `protocols.csv` лежит в корне репозитория. Формат строк:
