@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Enum
 from app.models.base import Base
 from datetime import datetime
 
+
 class Photo(Base):
     __tablename__ = "photos"
 

@@ -27,7 +27,10 @@ def upload_photo(user_id: int, data: bytes) -> str:
             Bucket=BUCKET, Key=key, Body=data, ContentType="image/jpeg"
         )
     except (BotoCoreError, ClientError) as exc:
-        raise HTTPException(status_code=500, detail="S3 upload failed") from exc
+        raise HTTPException(
+            status_code=500,
+            detail="S3 upload failed",
+        ) from exc
     return key
 
 

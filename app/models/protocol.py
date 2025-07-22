@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Numeric
 from app.models.base import Base
 
+
 class Protocol(Base):
     __tablename__ = "protocols"
 

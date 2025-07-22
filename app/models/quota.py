@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String
 from app.models.base import Base
 
+
 class PhotoQuota(Base):
     __tablename__ = "photo_quota"
 
