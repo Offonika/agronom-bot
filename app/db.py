@@ -9,5 +9,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
-# Create tables automatically when running tests without Alembic
-Base.metadata.create_all(engine)
+# Optionally create tables automatically when DB_CREATE_ALL is set
+if os.getenv("DB_CREATE_ALL"):
+    Base.metadata.create_all(engine)
