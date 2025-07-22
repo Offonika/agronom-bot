@@ -1,9 +1,11 @@
 import os
 import re
 import boto3
+import pytest
 
 from moto import mock_aws
 
+from fastapi import HTTPException
 from app.services.storage import upload_photo, get_public_url
 
 
@@ -31,6 +33,32 @@ def test_upload_and_url():
 
         url = get_public_url(key)
         assert url == f"http://localhost:9000/{key}"
+    finally:
+        for name, value in original.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+@mock_aws
+def test_upload_failure():
+    original = {
+        "S3_BUCKET": os.environ.get("S3_BUCKET"),
+        "S3_REGION": os.environ.get("S3_REGION"),
+        "S3_ENDPOINT": os.environ.get("S3_ENDPOINT"),
+        "S3_PUBLIC_URL": os.environ.get("S3_PUBLIC_URL"),
+    }
+    try:
+        os.environ["S3_BUCKET"] = "testbucket"
+        os.environ["S3_REGION"] = "us-east-1"
+        os.environ.pop("S3_ENDPOINT", None)
+        os.environ.pop("S3_PUBLIC_URL", None)
+
+        # Intentionally do not create bucket to trigger error
+        with pytest.raises(HTTPException) as exc:
+            upload_photo(42, b"hello")
+        assert exc.value.status_code == 500
     finally:
         for name, value in original.items():
             if value is None:
