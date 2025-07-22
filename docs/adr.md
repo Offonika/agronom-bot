@@ -1,7 +1,7 @@
 Architecture Design Record (ADR)
 Project: «Карманный агроном» – Bot Phase
-Version 1.3 — 20 July 2025
-(v1.2 → v1.3: added /v1/limits, HMAC-in-body, X-API-Ver, API quota logic, updated scaling and error handling)
+Version 1.4 — 20 July 2025
+(v1.3 → v1.4: added /v1/limits, HMAC-in-body, X-API-Ver, API quota logic, updated scaling and error handling)
 1 · Context & Goals
 MVP = Telegram‑bot.Launch ≤ 2 weeks.Handle ≤ 50 000 MAU without redesign.Keep OPEX minimal (1 small VM + S3).Provide clear migration path to native app (Phase B/C).
 2 · Stack Overview
