@@ -1,4 +1,5 @@
 import os
+import re
 import boto3
 
 from moto import mock_aws
@@ -17,7 +18,7 @@ def test_upload_and_url():
     s3.create_bucket(Bucket='testbucket')
 
     key = upload_photo(42, b'hello')
-    assert key.startswith('42/')
+    assert re.fullmatch(r"42/\d{14}-[0-9a-f]{32}\.jpg", key)
     obj = s3.get_object(Bucket='testbucket', Key=key)
     assert obj['Body'].read() == b'hello'
 
