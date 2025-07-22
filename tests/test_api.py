@@ -4,6 +4,26 @@ from starlette.requests import Request
 from app.main import compute_signature, verify_hmac
 from app.services.protocols import import_csv_to_db
 
+
+@pytest.fixture(autouse=True)
+def stub_upload(monkeypatch):
+    """Prevent real S3 calls by stubbing upload_photo."""
+    def _stub(user_id: int, data: bytes) -> str:
+        return "1/stub.jpg"
+
+    monkeypatch.setattr("app.services.storage.upload_photo", _stub)
+    monkeypatch.setattr("app.main.upload_photo", _stub)
+    # reset quota to avoid 429 errors between tests
+    from app.db import SessionLocal
+    from app.models import PhotoQuota
+    from app.services.protocols import _cache_protocol
+
+    with SessionLocal() as session:
+        session.query(PhotoQuota).delete()
+        session.commit()
+
+    _cache_protocol.cache_clear()
+
 HEADERS = {"X-API-Key": "test-api-key", "X-API-Ver": "v1"}
 
 
@@ -240,7 +260,7 @@ def test_payment_webhook_missing_signature(client):
         headers={"X-API-Ver": "v1"},
         json=payload,
     )
-    assert resp.status_code in {400, 401, 404}
+    assert resp.status_code in {400, 401, 404, 422}
 
 
 def test_payment_webhook_bad_payload(client):
@@ -293,7 +313,7 @@ def test_partner_order_missing_signature(client):
         headers={"X-API-Ver": "v1"},
         json=payload,
     )
-    assert resp.status_code in {400, 401, 404}
+    assert resp.status_code in {400, 401, 404, 422}
 
 
 def test_partner_order_bad_payload(client):

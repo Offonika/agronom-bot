@@ -6,6 +6,7 @@ import pytest
 from moto import mock_aws
 
 from fastapi import HTTPException
+from app.services import storage
 from app.services.storage import upload_photo, get_public_url
 
 
@@ -22,6 +23,8 @@ def test_upload_and_url():
         os.environ["S3_REGION"] = "us-east-1"
         os.environ.pop("S3_ENDPOINT", None)
         os.environ["S3_PUBLIC_URL"] = "http://localhost:9000"
+        # update module constant to match env
+        storage.BUCKET = "testbucket"
 
         s3 = boto3.client("s3", region_name="us-east-1")
         s3.create_bucket(Bucket="testbucket")
@@ -54,6 +57,7 @@ def test_upload_failure():
         os.environ["S3_REGION"] = "us-east-1"
         os.environ.pop("S3_ENDPOINT", None)
         os.environ.pop("S3_PUBLIC_URL", None)
+        storage.BUCKET = "testbucket"
 
         # Intentionally do not create bucket to trigger error
         with pytest.raises(HTTPException) as exc:
