@@ -1,11 +1,12 @@
 import os
 import boto3
-from moto import mock_s3
+
+from moto import mock_aws
 
 from app.services.storage import upload_photo, get_public_url
 
 
-@mock_s3
+@mock_aws
 def test_upload_and_url():
     os.environ['S3_BUCKET'] = 'testbucket'
     os.environ['S3_REGION'] = 'us-east-1'
