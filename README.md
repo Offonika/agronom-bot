@@ -126,10 +126,10 @@ agronom-bot/
    source .venv/bin/activate
    ```
 
-3. Установите зависимости и примените миграции:
+3. Установите зависимости (используйте скрипт `./.codex/setup.sh`) и примените миграции:
 
    ```bash
-   pip install -r requirements.txt
+   ./.codex/setup.sh
    alembic upgrade head
    ```
 
@@ -189,7 +189,7 @@ apple,powdery_mildew,Скор 250 ЭК,2,ml_10l,30
    ```bash
    python3.12 -m venv .venv
    source .venv/bin/activate
-   pip install -r requirements.txt
+   ./.codex/setup.sh
    ```
 📖 Документация
 Смотри в папке docs/:
