@@ -8,9 +8,9 @@ load_dotenv()
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Импорт модели
-from app.models import Base  # ← убедись, что models.Base определён
-from alembic import context
-from sqlalchemy import engine_from_config, pool
+from app.models import Base  # ← убедись, что models.Base определён  # noqa: E402
+from alembic import context  # noqa: E402
+from sqlalchemy import engine_from_config, pool  # noqa: E402
 
 # Настройка метаданных
 target_metadata = Base.metadata
