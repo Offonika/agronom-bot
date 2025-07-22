@@ -1,6 +1,6 @@
 # Codegen Prompt for Cursor
 
-Ты пишешь код строго по OpenAPI v1.3.0 (см. `openapi/openapi.yaml`).
+Ты пишешь код строго по OpenAPI v1.4.0 (см. `openapi/openapi.yaml`).
 Не выдумывай схем и эндпоинтов — используй только те, что описаны.
 
 Каждый эндпоинт должен:
