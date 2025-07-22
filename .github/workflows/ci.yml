@@ -25,3 +25,15 @@ jobs:
         run: ruff app tests
       - name: Run Tests
         run: pytest -q
+
+  bot-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install bot dependencies
+        run: npm ci --prefix bot
+      - name: Run bot tests
+        run: npm test --prefix bot
