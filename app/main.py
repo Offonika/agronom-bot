@@ -20,13 +20,16 @@ from app.models import Photo, PhotoQuota, Payment, PartnerOrder
 
 app = FastAPI(
     title="Agronom Bot Internal API",
-    version="1.4.0"
+    version="1.4.0",
 )
 
 HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
 
-# Ensure protocol table is populated from CSV on startup
-import_csv_to_db()
+
+@app.on_event("startup")
+def startup_event() -> None:
+    """Populate protocol table from CSV if empty."""
+    import_csv_to_db()
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
