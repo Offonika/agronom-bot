@@ -134,7 +134,7 @@ async def verify_hmac(request: Request, x_sign: str):
     if calculated != x_sign or calculated != provided_sign:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
 
-    return data, calculated
+    return data, calculated, provided_sign
 
 # -------------------------------
 # Diagnose Endpoint
@@ -324,9 +324,9 @@ async def payments_webhook(
     x_sign: str = Header(..., alias="X-Sign"),
 ):
     await verify_version(x_api_ver)
-    data, _ = await verify_hmac(request, x_sign)
+    data, _, provided_sign = await verify_hmac(request, x_sign)
     try:
-        body = PaymentWebhook(**data)
+        body = PaymentWebhook(**data, signature=provided_sign)
     except ValidationError:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
@@ -354,9 +354,9 @@ async def partner_orders(
     x_sign: str = Header(..., alias="X-Sign"),
 ):
     await verify_version(x_api_ver)
-    data, sign = await verify_hmac(request, x_sign)
+    data, sign, provided_sign = await verify_hmac(request, x_sign)
     try:
-        body = PartnerOrderRequest(**data)
+        body = PartnerOrderRequest(**data, signature=provided_sign)
     except ValidationError:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
