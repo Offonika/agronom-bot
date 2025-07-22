@@ -165,10 +165,12 @@ paths:
   /v1/ai/diagnose:
     post:
       summary: Diagnose plant disease
+      operationId: diagnosePlant
       description: |
         Upload a leaf photo and get back the predicted crop,
         disease and confidence score. Supports multipart uploads
         via `image` field or JSON body with `image_base64`.
+      tags: [diagnose]
       security:
         - ApiKeyAuth: []
       parameters:
@@ -220,6 +222,9 @@ paths:
   /v1/photos:
     get:
       summary: List user’s photos (history)
+      operationId: listPhotos
+      description: List previously uploaded photos with pagination.
+      tags: [photos]
       security:
         - ApiKeyAuth: []
       parameters:
@@ -252,6 +257,9 @@ paths:
   /v1/limits:
     get:
       summary: Возвращает текущие лимиты пользователя
+      operationId: getUserLimits
+      description: Retrieve current monthly usage limits for the authenticated user.
+      tags: [limits]
       security:
         - ApiKeyAuth: []
       parameters:
@@ -281,6 +289,9 @@ paths:
   /v1/payments/sbp/webhook:
     post:
       summary: SBP payment webhook
+      operationId: handleSbpWebhook
+      description: Process SBP payment callback and update payment status.
+      tags: [payments]
       security:
         - HmacAuth: []
       parameters:
@@ -298,6 +309,9 @@ paths:
   /v1/partner/orders:
     post:
       summary: Order deep-link callback (AgroStore)
+      operationId: partnerOrderCallback
+      description: Receive deep-link order info from partner AgroStore.
+      tags: [partner]
       security:
         - HmacAuth: []
       parameters:
@@ -344,6 +358,8 @@ tags:
     description: Photo history
   - name: payments
     description: SBP integration
+  - name: limits
+    description: User usage limits
   - name: partner
     description: External partner callbacks
 
