@@ -199,7 +199,7 @@ def test_payment_webhook_success():
         "currency": "RUB",
         "status": "success",
     }
-    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     headers = {
         "X-API-Ver": "v1",
@@ -216,7 +216,7 @@ def test_payment_webhook_success():
 @pytest.mark.asyncio
 async def test_verify_hmac_returns_signature():
     payload = {"foo": "bar"}
-    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     body = json.dumps(payload).encode()
 
@@ -253,7 +253,7 @@ def test_payment_webhook_bad_payload():
         # missing currency
         "status": "success",
     }
-    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
@@ -270,7 +270,7 @@ def test_partner_order_success():
         "protocol_id": 2,
         "price_kopeks": 100,
     }
-    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/partner/orders",
@@ -306,7 +306,7 @@ def test_partner_order_bad_payload():
         # missing protocol_id
         "price_kopeks": 100,
     }
-    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/partner/orders",
