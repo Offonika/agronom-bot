@@ -11,6 +11,7 @@ import hashlib
 from app.services.storage import upload_photo
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol, import_csv_to_db
+from fastapi.concurrency import run_in_threadpool
 
 from app.db import SessionLocal
 from app.models import Photo, PhotoQuota, Payment, PartnerOrder
@@ -160,71 +161,63 @@ async def diagnose(
 
     user_id = 1  # в MVP ключ привязан к одному пользователю
 
-    db = SessionLocal()
-    month = datetime.utcnow().strftime("%Y-%m")
-    quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
-    if not quota:
-        quota = PhotoQuota(user_id=user_id, used_count=0, month_year=month)
-        db.add(quota)
+    with SessionLocal() as db:
+        month = datetime.utcnow().strftime("%Y-%m")
+        quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+        if not quota:
+            quota = PhotoQuota(user_id=user_id, used_count=0, month_year=month)
+            db.add(quota)
+            db.commit()
+            db.refresh(quota)
+
+        if quota.used_count >= 5:
+            raise HTTPException(status_code=429, detail="LIMIT_EXCEEDED")
+
+        # Определяем формат (multipart vs json)
+        if image:
+            if prompt_id not in (None, "v1"):
+                err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+                return JSONResponse(status_code=400, content=err.model_dump())
+            contents = await image.read()
+            if len(contents) > 2 * 1024 * 1024:
+                err = ErrorResponse(code="BAD_REQUEST", message="image too large")
+                return JSONResponse(status_code=400, content=err.model_dump())
+            key = await run_in_threadpool(upload_photo, user_id, contents)
+            result = call_gpt_vision_stub(key)
+            crop = result.get("crop", "")
+            disease = result.get("disease", "")
+            conf = result.get("confidence", 0.0)
+            file_id = key
+        else:
+            try:
+                json_data = await request.json()
+            except Exception:
+                err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
+                return JSONResponse(status_code=400, content=err.model_dump())
+            try:
+                body = DiagnoseRequestBase64(**json_data)
+            except ValidationError:
+                err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+                return JSONResponse(status_code=400, content=err.model_dump())
+            contents = base64.b64decode(body.image_base64)
+            key = await run_in_threadpool(upload_photo, user_id, contents)
+            result = call_gpt_vision_stub(key)
+            crop = result.get("crop", "")
+            disease = result.get("disease", "")
+            conf = result.get("confidence", 0.0)
+            file_id = key
+
+        photo = Photo(
+            user_id=user_id,
+            file_id=file_id,
+            crop=crop,
+            disease=disease,
+            confidence=conf,
+            status="ok",
+        )
+        db.add(photo)
+        quota.used_count += 1
         db.commit()
-        db.refresh(quota)
-
-    if quota.used_count >= 5:
-        db.close()
-        raise HTTPException(status_code=429, detail="LIMIT_EXCEEDED")
-
-    # Определяем формат (multipart vs json)
-    if image:
-        if prompt_id not in (None, "v1"):
-            err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
-            db.close()
-            return JSONResponse(status_code=400, content=err.model_dump())
-        contents = await image.read()
-        if len(contents) > 2 * 1024 * 1024:
-            err = ErrorResponse(code="BAD_REQUEST", message="image too large")
-            db.close()
-            return JSONResponse(status_code=400, content=err.model_dump())
-        key = upload_photo(user_id, contents)
-
-        # заглушка GPT-Vision
-        result = call_gpt_vision_stub(key)
-        crop = result.get("crop", "")
-        disease = result.get("disease", "")
-        conf = result.get("confidence", 0.0)
-        file_id = key
-    else:
-        try:
-            json_data = await request.json()
-        except Exception:
-            err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
-            db.close()
-            return JSONResponse(status_code=400, content=err.model_dump())
-        try:
-            body = DiagnoseRequestBase64(**json_data)
-        except ValidationError:
-            err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
-            db.close()
-            return JSONResponse(status_code=400, content=err.model_dump())
-        contents = base64.b64decode(body.image_base64)
-        key = upload_photo(user_id, contents)
-        result = call_gpt_vision_stub(key)
-        crop = result.get("crop", "")
-        disease = result.get("disease", "")
-        conf = result.get("confidence", 0.0)
-        file_id = key
-
-    photo = Photo(
-        user_id=user_id,
-        file_id=file_id,
-        crop=crop,
-        disease=disease,
-        confidence=conf,
-        status="ok",
-    )
-    db.add(photo)
-    quota.used_count += 1
-    db.commit()
-    db.close()
 
     proto = find_protocol(crop, disease)
     if proto:
@@ -263,34 +256,36 @@ async def list_photos(
     await verify_headers(x_api_key, x_api_ver)
 
     user_id = 1
-    db = SessionLocal()
-    q = (
-        db.query(Photo)
-        .filter(Photo.user_id == user_id, Photo.deleted.is_(False))
-        .order_by(Photo.id.desc())
-    )
-    if cursor:
-        try:
-            last_id = int(cursor)
-            q = q.filter(Photo.id < last_id)
-        except ValueError:
-            db.close()
-            raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    if limit <= 0:
+        return ListPhotosResponse(items=[], next_cursor=None)
 
-    limit = min(limit, 50)
-    rows = q.limit(limit).all()
-    items = [
-        PhotoItem(
-            id=r.id,
-            ts=r.ts,
-            crop=r.crop or "",
-            disease=r.disease or "",
-            confidence=float(r.confidence or 0),
+    with SessionLocal() as db:
+        q = (
+            db.query(Photo)
+            .filter(Photo.user_id == user_id, Photo.deleted.is_(False))
+            .order_by(Photo.id.desc())
         )
-        for r in rows
-    ]
-    next_cursor = str(rows[-1].id) if len(rows) == limit else None
-    db.close()
+        if cursor:
+            try:
+                last_id = int(cursor)
+                q = q.filter(Photo.id < last_id)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="BAD_REQUEST")
+
+        limit = min(limit, 50)
+        rows = q.limit(limit).all()
+        items = [
+            PhotoItem(
+                id=r.id,
+                ts=r.ts,
+                crop=r.crop or "",
+                disease=r.disease or "",
+                confidence=float(r.confidence or 0),
+            )
+            for r in rows
+        ]
+        next_cursor = str(rows[-1].id) if len(rows) == limit else None
+
     return ListPhotosResponse(items=items, next_cursor=next_cursor)
 
 
@@ -305,11 +300,10 @@ async def get_limits(
 ):
     await verify_headers(x_api_key, x_api_ver)
     user_id = 1
-    db = SessionLocal()
-    month = datetime.utcnow().strftime("%Y-%m")
-    quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
-    used = quota.used_count if quota else 0
-    db.close()
+    with SessionLocal() as db:
+        month = datetime.utcnow().strftime("%Y-%m")
+        quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+        used = quota.used_count if quota else 0
     return LimitsResponse(limit_monthly_free=5, used_this_month=used)
 
 
@@ -330,16 +324,15 @@ async def payments_webhook(
     except ValidationError:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
-    db = SessionLocal()
-    payment = Payment(
-        user_id=1,
-        amount=body.amount,
-        source="sbp",
-        status=body.status,
-    )
-    db.add(payment)
-    db.commit()
-    db.close()
+    with SessionLocal() as db:
+        payment = Payment(
+            user_id=1,
+            amount=body.amount,
+            source="sbp",
+            status=body.status,
+        )
+        db.add(payment)
+        db.commit()
     return {}
 
 
@@ -360,16 +353,15 @@ async def partner_orders(
     except ValidationError:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
-    db = SessionLocal()
-    order = PartnerOrder(
-        user_id=body.user_tg_id,
-        order_id=body.order_id,
-        protocol_id=body.protocol_id,
-        price_kopeks=body.price_kopeks,
-        signature=sign,
-        status="new",
-    )
-    db.add(order)
-    db.commit()
-    db.close()
+    with SessionLocal() as db:
+        order = PartnerOrder(
+            user_id=body.user_tg_id,
+            order_id=body.order_id,
+            protocol_id=body.protocol_id,
+            price_kopeks=body.price_kopeks,
+            signature=sign,
+            status="new",
+        )
+        db.add(order)
+        db.commit()
     return JSONResponse(status_code=202, content={"status": "queued"})
