@@ -19,7 +19,18 @@ def _client():
 
 
 def upload_photo(user_id: int, data: bytes) -> str:
-    """Upload bytes to S3 and return the object key."""
+    """Upload bytes to S3 and return the object key.
+
+    Args:
+        user_id: ID of the user who owns the photo.
+        data: Raw image bytes.
+
+    Returns:
+        The generated object key.
+
+    Raises:
+        HTTPException: If the upload to S3 fails.
+    """
     ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     key = f"{user_id}/{ts}-{uuid4().hex}.jpg"
     try:
