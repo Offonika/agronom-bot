@@ -10,6 +10,7 @@ import hashlib
 
 from app.services.storage import upload_photo
 from app.services.gpt import call_gpt_vision_stub
+from app.services.protocols import find_protocol, import_csv_to_db
 
 from app.db import SessionLocal
 from app.models import Photo, PhotoQuota, Payment, PartnerOrder
@@ -18,10 +19,13 @@ from app.models import Photo, PhotoQuota, Payment, PartnerOrder
 
 app = FastAPI(
     title="Agronom Bot Internal API",
-    version="1.2.1"
+    version="1.3.0"
 )
 
 HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
+
+# Ensure protocol table is populated from CSV on startup
+import_csv_to_db()
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
@@ -38,10 +42,18 @@ class DiagnoseRequestBase64(BaseModel):
             raise ValueError("prompt_id must be 'v1'")
         return v
 
+class ProtocolResponse(BaseModel):
+    product: str
+    dosage_value: float
+    dosage_unit: str
+    phi: int
+
 class DiagnoseResponse(BaseModel):
     crop: str
     disease: str
     confidence: float
+    protocol: ProtocolResponse | None = None
+    protocol_status: str | None = None
 
 class ErrorResponse(BaseModel):
     code: str
@@ -213,7 +225,26 @@ async def diagnose(
     db.commit()
     db.close()
 
-    return DiagnoseResponse(crop=crop, disease=disease, confidence=conf)
+    proto = find_protocol(crop, disease)
+    if proto:
+        proto_resp = ProtocolResponse(
+            product=proto.product,
+            dosage_value=float(proto.dosage_value or 0),
+            dosage_unit=proto.dosage_unit,
+            phi=proto.phi,
+        )
+        status = None
+    else:
+        proto_resp = None
+        status = "Бета" if crop and disease else "Обратитесь к эксперту"
+
+    return DiagnoseResponse(
+        crop=crop,
+        disease=disease,
+        confidence=conf,
+        protocol=proto_resp,
+        protocol_status=status,
+    )
 
 
 @app.get(

@@ -29,7 +29,13 @@ def test_diagnose_json_success():
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"crop", "disease", "confidence"}
+    assert set(body.keys()) == {
+        "crop",
+        "disease",
+        "confidence",
+        "protocol_status",
+        "protocol",
+    }
 
 
 def test_diagnose_multipart_success():
@@ -80,7 +86,34 @@ def test_diagnose_json_returns_stub():
         "crop": "apple",
         "disease": "powdery_mildew",
         "confidence": 0.92,
+        "protocol_status": None,
+        "protocol": {
+            "product": "Скор 250 ЭК",
+            "dosage_value": 2.0,
+            "dosage_unit": "ml_10l",
+            "phi": 30,
+        },
     }
+
+
+def test_diagnose_without_protocol():
+    from app.db import SessionLocal
+    from app.models import Protocol
+
+    session = SessionLocal()
+    session.query(Protocol).delete()
+    session.commit()
+    session.close()
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["protocol"] is None
+    assert data["protocol_status"] == "Бета"
 
 
 def test_diagnose_json_bad_prompt():
