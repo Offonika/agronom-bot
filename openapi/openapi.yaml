@@ -6,6 +6,10 @@ info:
   description: |
     Telegram-бот «Карманный агроном» — API v1.4.0.
     Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
+  contact:
+    name: Ivan Gromov
+    url: https://github.com/agronom-bot
+    email: i.gromov@agrostore.ru
 
 servers:
   - url: https://api.agronom.local
