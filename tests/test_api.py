@@ -1,16 +1,13 @@
 import json
 import pytest
-from fastapi.testclient import TestClient
 from starlette.requests import Request
-from app.main import app, compute_signature, verify_hmac
+from app.main import compute_signature, verify_hmac
 from app.services.protocols import import_csv_to_db
-
-client = TestClient(app)
 
 HEADERS = {"X-API-Key": "test-api-key", "X-API-Ver": "v1"}
 
 
-def test_openapi_schema():
+def test_openapi_schema(client):
     resp = client.get("/openapi.json")
     assert resp.status_code == 200
     data = resp.json()
@@ -24,7 +21,7 @@ def test_openapi_schema():
         assert path in data.get("paths", {})
 
 
-def test_diagnose_json_success():
+def test_diagnose_json_success(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -41,7 +38,7 @@ def test_diagnose_json_success():
     }
 
 
-def test_diagnose_multipart_success():
+def test_diagnose_multipart_success(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -50,7 +47,7 @@ def test_diagnose_multipart_success():
     assert resp.status_code == 200
 
 
-def test_diagnose_missing_header():
+def test_diagnose_missing_header(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers={"X-API-Key": "test-api-key"},
@@ -59,7 +56,7 @@ def test_diagnose_missing_header():
     assert resp.status_code in {400, 422}
 
 
-def test_diagnose_invalid_key():
+def test_diagnose_invalid_key(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers={"X-API-Key": "bad", "X-API-Ver": "v1"},
@@ -68,7 +65,7 @@ def test_diagnose_invalid_key():
     assert resp.status_code == 401
 
 
-def test_diagnose_large_image():
+def test_diagnose_large_image(client):
     large = b"0" * (2 * 1024 * 1024 + 1)
     resp = client.post(
         "/v1/ai/diagnose",
@@ -78,7 +75,7 @@ def test_diagnose_large_image():
     assert resp.status_code == 400
 
 
-def test_diagnose_json_returns_stub():
+def test_diagnose_json_returns_stub(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -100,7 +97,7 @@ def test_diagnose_json_returns_stub():
     }
 
 
-def test_diagnose_without_protocol():
+def test_diagnose_without_protocol(client):
     from app.db import SessionLocal
     from app.models import Protocol
 
@@ -120,7 +117,7 @@ def test_diagnose_without_protocol():
     assert data["protocol_status"] == "Бета"
 
 
-def test_diagnose_json_bad_prompt():
+def test_diagnose_json_bad_prompt(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -129,7 +126,7 @@ def test_diagnose_json_bad_prompt():
     assert resp.status_code == 400
 
 
-def test_diagnose_json_missing_prompt():
+def test_diagnose_json_missing_prompt(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -138,7 +135,7 @@ def test_diagnose_json_missing_prompt():
     assert resp.status_code == 400
 
 
-def test_diagnose_invalid_base64():
+def test_diagnose_invalid_base64(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -147,7 +144,7 @@ def test_diagnose_invalid_base64():
     assert resp.status_code == 400
 
 
-def test_diagnose_multipart_missing_image():
+def test_diagnose_multipart_missing_image(client):
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -156,7 +153,7 @@ def test_diagnose_multipart_missing_image():
     assert resp.status_code == 400
 
 
-def test_quota_exceeded():
+def test_quota_exceeded(client):
     limits = client.get("/v1/limits", headers=HEADERS)
     assert limits.status_code == 200
     data = limits.json()
@@ -169,17 +166,17 @@ def test_quota_exceeded():
         assert diag.status_code == 429
 
 
-def test_limits_unauthorized():
+def test_limits_unauthorized(client):
     resp = client.get("/v1/limits", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}
 
 
-def test_photos_success():
+def test_photos_success(client):
     resp = client.get("/v1/photos", headers=HEADERS)
     assert resp.status_code == 200
 
 
-def test_photos_limit_zero():
+def test_photos_limit_zero(client):
     resp = client.get("/v1/photos?limit=0", headers=HEADERS)
     assert resp.status_code == 200
     body = resp.json()
@@ -187,12 +184,12 @@ def test_photos_limit_zero():
     assert body["next_cursor"] is None
 
 
-def test_photos_unauthorized():
+def test_photos_unauthorized(client):
     resp = client.get("/v1/photos", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}
 
 
-def test_payment_webhook_success():
+def test_payment_webhook_success(client):
     payload = {
         "payment_id": "123",
         "amount": 100,
@@ -214,7 +211,7 @@ def test_payment_webhook_success():
 
 
 @pytest.mark.asyncio
-async def test_verify_hmac_returns_signature():
+async def test_verify_hmac_returns_signature(client):
     payload = {"foo": "bar"}
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
@@ -230,7 +227,7 @@ async def test_verify_hmac_returns_signature():
     assert provided == sig
 
 
-def test_payment_webhook_missing_signature():
+def test_payment_webhook_missing_signature(client):
     payload = {
         "payment_id": "123",
         "amount": 100,
@@ -246,7 +243,7 @@ def test_payment_webhook_missing_signature():
     assert resp.status_code in {400, 401, 404}
 
 
-def test_payment_webhook_bad_payload():
+def test_payment_webhook_bad_payload(client):
     payload = {
         "payment_id": "123",
         "amount": 100,
@@ -263,7 +260,7 @@ def test_payment_webhook_bad_payload():
     assert resp.status_code in {400, 422}
 
 
-def test_partner_order_success():
+def test_partner_order_success(client):
     payload = {
         "order_id": "o1",
         "user_tg_id": 1,
@@ -283,7 +280,7 @@ def test_partner_order_success():
     assert resp.status_code in {200, 202}
 
 
-def test_partner_order_missing_signature():
+def test_partner_order_missing_signature(client):
     payload = {
         "order_id": "o1",
         "user_tg_id": 1,
@@ -299,7 +296,7 @@ def test_partner_order_missing_signature():
     assert resp.status_code in {400, 401, 404}
 
 
-def test_partner_order_bad_payload():
+def test_partner_order_bad_payload(client):
     payload = {
         "order_id": "o1",
         "user_tg_id": 1,
@@ -316,7 +313,7 @@ def test_partner_order_bad_payload():
     assert resp.status_code in {400, 422}
 
 
-def test_photos_table_has_meta():
+def test_photos_table_has_meta(client):
     from app.db import SessionLocal
     import sqlalchemy as sa
 
@@ -327,7 +324,7 @@ def test_photos_table_has_meta():
     assert {'file_unique_id', 'width', 'height', 'file_size'} <= cols
 
 
-def test_diagnose_json_with_protocol():
+def test_diagnose_json_with_protocol(client):
     import_csv_to_db()
     resp = client.post(
         "/v1/ai/diagnose",
@@ -340,7 +337,7 @@ def test_diagnose_json_with_protocol():
     assert data["protocol_status"] is None
 
 
-def test_diagnose_json_no_protocol_beta():
+def test_diagnose_json_no_protocol_beta(client):
     from app.db import SessionLocal
     from app.models import Protocol
 
