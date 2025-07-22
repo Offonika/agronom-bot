@@ -175,6 +175,26 @@ def test_photos_unauthorized():
     assert resp.status_code in {401, 404}
 
 
+def test_photos_limit_zero_returns_one():
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    session = SessionLocal()
+    session.query(Photo).delete()
+    session.add_all([
+        Photo(user_id=1, file_id="f1"),
+        Photo(user_id=1, file_id="f2"),
+    ])
+    session.commit()
+    session.close()
+
+    resp = client.get("/v1/photos?limit=0", headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data.get("items", [])) == 1
+    assert data.get("next_cursor")
+
+
 def test_payment_webhook_success():
     payload = {
         "payment_id": "123",
