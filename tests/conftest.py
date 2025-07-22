@@ -1,5 +1,10 @@
+import os
 import subprocess
 import pytest
+
+# Ensure tests run against SQLite when DATABASE_URL is not defined
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+
 from fastapi.testclient import TestClient
 from app.main import app
 
