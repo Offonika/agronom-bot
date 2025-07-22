@@ -18,10 +18,8 @@ target_metadata = Base.metadata
 # Получаем конфиг Alembic
 config = context.config
 
-# Получаем URL из переменной окружения
-url = os.getenv("DATABASE_URL")
-if url is None:
-    raise ValueError("DATABASE_URL environment variable not set")
+# Получаем URL из переменной окружения либо используем SQLite
+url = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
 config.set_main_option("sqlalchemy.url", url)
 
