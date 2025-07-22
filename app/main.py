@@ -1,4 +1,12 @@
-from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException, Form
+from fastapi import (
+    FastAPI,
+    Header,
+    UploadFile,
+    File,
+    Request,
+    HTTPException,
+    Form,
+)
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
 from contextlib import asynccontextmanager
@@ -17,7 +25,6 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.db import SessionLocal
 from app.models import Photo, PhotoQuota, Payment, PartnerOrder
-
 
 
 @asynccontextmanager
@@ -41,6 +48,7 @@ FREE_MONTHLY_LIMIT = int(os.environ.get("FREE_MONTHLY_LIMIT", "5"))
 # Pydantic Schemas (по OpenAPI)
 # -------------------------------
 
+
 class DiagnoseRequestBase64(BaseModel):
     image_base64: str
     prompt_id: str
@@ -52,6 +60,7 @@ class DiagnoseRequestBase64(BaseModel):
             raise ValueError("prompt_id must be 'v1'")
         return v
 
+
 class ProtocolResponse(BaseModel):
     id: int
     product: str
@@ -59,12 +68,14 @@ class ProtocolResponse(BaseModel):
     dosage_unit: str
     phi: int
 
+
 class DiagnoseResponse(BaseModel):
     crop: str
     disease: str
     confidence: float
     protocol: ProtocolResponse | None = None
     protocol_status: str | None = None
+
 
 class ErrorResponse(BaseModel):
     code: str
@@ -106,6 +117,7 @@ class PartnerOrderRequest(BaseModel):
 # Middleware / Dependency
 # -------------------------------
 
+
 async def verify_headers(
     x_api_key: str = Header(..., alias="X-API-Key"),
     x_api_ver: str = Header(..., alias="X-API-Ver")
@@ -117,9 +129,11 @@ async def verify_headers(
     if x_api_key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+
 async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")):
     if x_api_ver != "v1":
         raise HTTPException(status_code=400, detail="Invalid API version")
+
 
 def verify_hmac_signature(body: bytes, provided: str) -> str:
     expected = hmac.new(HMAC_SECRET.encode(), body, hashlib.sha256).hexdigest()
@@ -127,10 +141,12 @@ def verify_hmac_signature(body: bytes, provided: str) -> str:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
     return expected
 
+
 def compute_signature(secret: str, payload: dict) -> str:
     """Return hex HMAC-SHA256 for a JSON payload."""
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
 
 async def verify_hmac(request: Request, x_sign: str):
     raw_body = await request.body()
@@ -152,6 +168,7 @@ async def verify_hmac(request: Request, x_sign: str):
 # -------------------------------
 # Diagnose Endpoint
 # -------------------------------
+
 
 @app.post(
     "/v1/ai/diagnose",
@@ -175,7 +192,11 @@ async def diagnose(
 
     with SessionLocal() as db:
         month = datetime.utcnow().strftime("%Y-%m")
-        quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+        quota = (
+            db.query(PhotoQuota)
+            .filter_by(user_id=user_id, month_year=month)
+            .first()
+        )
         if not quota:
             quota = PhotoQuota(user_id=user_id, used_count=0, month_year=month)
             db.add(quota)
@@ -188,12 +209,24 @@ async def diagnose(
         # Определяем формат (multipart vs json)
         if image:
             if prompt_id not in (None, "v1"):
-                err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
-                return JSONResponse(status_code=400, content=err.model_dump())
+                err = ErrorResponse(
+                    code="BAD_REQUEST",
+                    message="prompt_id must be 'v1'",
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content=err.model_dump(),
+                )
             contents = await image.read()
             if len(contents) > 2 * 1024 * 1024:
-                err = ErrorResponse(code="BAD_REQUEST", message="image too large")
-                return JSONResponse(status_code=400, content=err.model_dump())
+                err = ErrorResponse(
+                    code="BAD_REQUEST",
+                    message="image too large",
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content=err.model_dump(),
+                )
             key = await run_in_threadpool(upload_photo, user_id, contents)
             result = call_gpt_vision_stub(key)
             crop = result.get("crop", "")
@@ -204,21 +237,45 @@ async def diagnose(
             try:
                 json_data = await request.json()
             except Exception:
-                err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
-                return JSONResponse(status_code=400, content=err.model_dump())
+                err = ErrorResponse(
+                    code="BAD_REQUEST",
+                    message="invalid JSON",
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content=err.model_dump(),
+                )
             try:
                 body = DiagnoseRequestBase64(**json_data)
             except ValidationError:
-                err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
-                return JSONResponse(status_code=400, content=err.model_dump())
+                err = ErrorResponse(
+                    code="BAD_REQUEST",
+                    message="prompt_id must be 'v1'",
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content=err.model_dump(),
+                )
             try:
                 contents = base64.b64decode(body.image_base64, validate=True)
             except binascii.Error:
-                err = ErrorResponse(code="BAD_REQUEST", message="invalid base64")
-                return JSONResponse(status_code=400, content=err.model_dump())
+                err = ErrorResponse(
+                    code="BAD_REQUEST",
+                    message="invalid base64",
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content=err.model_dump(),
+                )
             if len(contents) > 2 * 1024 * 1024:
-                err = ErrorResponse(code="BAD_REQUEST", message="image too large")
-                return JSONResponse(status_code=400, content=err.model_dump())
+                err = ErrorResponse(
+                    code="BAD_REQUEST",
+                    message="image too large",
+                )
+                return JSONResponse(
+                    status_code=400,
+                    content=err.model_dump(),
+                )
             key = await run_in_threadpool(upload_photo, user_id, contents)
             result = call_gpt_vision_stub(key)
             crop = result.get("crop", "")
@@ -321,9 +378,16 @@ async def get_limits(
     user_id = 1
     with SessionLocal() as db:
         month = datetime.utcnow().strftime("%Y-%m")
-        quota = db.query(PhotoQuota).filter_by(user_id=user_id, month_year=month).first()
+        quota = (
+            db.query(PhotoQuota)
+            .filter_by(user_id=user_id, month_year=month)
+            .first()
+        )
         used = quota.used_count if quota else 0
-    return LimitsResponse(limit_monthly_free=FREE_MONTHLY_LIMIT, used_this_month=used)
+    return LimitsResponse(
+        limit_monthly_free=FREE_MONTHLY_LIMIT,
+        used_this_month=used,
+    )
 
 
 @app.post(

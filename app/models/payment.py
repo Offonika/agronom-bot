@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Enum
 from app.models.base import Base
 from datetime import datetime
 
+
 class Payment(Base):
     __tablename__ = "payments"
 

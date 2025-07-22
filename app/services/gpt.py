@@ -15,9 +15,13 @@ def call_gpt_vision_stub(image_path: str) -> dict:
     Returns
     -------
     dict
-        Mocked GPT response with keys: ``crop``, ``disease`` and ``confidence``.
+        Mocked GPT response with keys:
+        ``crop``, ``disease`` and ``confidence``.
     """
     # In real integration this function would upload the image to GPT-Vision
     # and parse the JSON response. The stub always returns a fixed payload.
-    return {"crop": "apple", "disease": "powdery_mildew", "confidence": 0.92}
-
+    return {
+        "crop": "apple",
+        "disease": "powdery_mildew",
+        "confidence": 0.92,
+    }

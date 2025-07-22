@@ -3,6 +3,7 @@ from datetime import datetime
 
 from app.models.base import Base
 
+
 class PartnerOrder(Base):
     __tablename__ = "partner_orders"
 
