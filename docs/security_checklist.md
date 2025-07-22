@@ -1,6 +1,6 @@
 Security & Compliance Checklist – «Карманный агроном» (Bot‑Phase)
-Version 1.3 — 20 July 2025
-(v1.2 → v1.3: API rate-limit, business quota 5/mo, signature in body, UNAUTHORIZED error, API versioning X‑API‑Ver, /v1/limits added)
+Version 1.4 — 20 July 2025
+(v1.3 → v1.4: API rate-limit, business quota 5/mo, signature in body, UNAUTHORIZED error, API versioning X‑API‑Ver, /v1/limits added)
 All controls map to ISO 27001 Annex A. Personal data limited; 152‑ФЗ not triggered.
 1. API Security Controls
 • API requests require `X-API-Key` (header)• Partner API requires `X-Sign` (HMAC-SHA256) and duplicate `signature` field in body• Signature is validated using shared secret from Vault (rotated every 90 days)• All API requests must include `X-API-Ver: v1` (required for version control)• Rate limit: 30 RPS per user• Business quota: 5 diagnosis requests/month for Free users, tracked per user_id• Violations return `ErrorResponse` with machine-readable code: `UNAUTHORIZED`, `LIMIT_EXCEEDED`, etc.

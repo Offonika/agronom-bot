@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
-Version 1.3 — 20 July 2025
-(v1.2 → v1.3: добавлен лимит 5 фото/мес, новая таблица photo_quota, поле signature в partner_orders, расширен enum ошибок, обновлён lifecycle)
+Version 1.4 — 20 July 2025
+(v1.3 → v1.4: добавлен лимит 5 фото/мес, новая таблица photo_quota, поле signature в partner_orders, расширен enum ошибок, обновлён lifecycle)
 0 · Scope
 Документ фиксирует схему БД, правила хранения, линии происхождения данных и JSON‑контракты API для MVP Telegram‑бота.
 1 · Storage & Retention
