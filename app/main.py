@@ -19,7 +19,7 @@ from app.models import Photo, PhotoQuota, Payment, PartnerOrder
 
 app = FastAPI(
     title="Agronom Bot Internal API",
-    version="1.3.0"
+    version="1.4.0"
 )
 
 HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
