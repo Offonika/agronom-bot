@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "commonjs",
   "main": "index.js",
+  "scripts": {
+    "test": "node handlers.test.js"
+  },
   "dependencies": {
     "dotenv": "^16.4.5",
     "pg": "^8.11.5",
