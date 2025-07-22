@@ -1,6 +1,8 @@
 import json
+import pytest
 from fastapi.testclient import TestClient
-from app.main import app, compute_signature
+from starlette.requests import Request
+from app.main import app, compute_signature, verify_hmac
 from app.services.protocols import import_csv_to_db
 
 client = TestClient(app)
@@ -192,6 +194,23 @@ def test_payment_webhook_success():
         json=payload,
     )
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_verify_hmac_returns_signature():
+    payload = {"foo": "bar"}
+    sig = compute_signature("test-hmac-secret", json.dumps(payload).encode())
+    payload["signature"] = sig
+    body = json.dumps(payload).encode()
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request = Request({"type": "http"}, receive)
+    data, calculated, provided = await verify_hmac(request, sig)
+    assert data == {"foo": "bar"}
+    assert calculated == sig
+    assert provided == sig
 
 
 def test_payment_webhook_missing_signature():
