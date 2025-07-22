@@ -21,7 +21,7 @@ agro-testset-v1/ (S3): 1 000 JPG + CSV-метки + MD5, SHA‑256 маниф�
 7. Нагрузочное тестирование
 k6 load_diag.js — 90 RPS, 5 мин; PASS: error < 1 %, latency P95 < 8 c.
 8. API integration tests
-Postman collection v1.3 + CI:• Проверка кодов 200/400/401/429/502• Ajv‑валидация схем OpenAPI• Проверка quota: /limits → 5/5 → diagnose = 429
+Postman collection v1.4 + CI:• Проверка кодов 200/400/401/429/502• Ajv‑валидация схем OpenAPI• Проверка quota: /limits → 5/5 → diagnose = 429
 9. Security checks
 • SSL Labs grade: A• SQL-injection• Проверка HMAC: signature в теле + заголовке• Rate-limiting (30 rps), бизнес-лимит (5/мес)
 10. Schedule & Roles
