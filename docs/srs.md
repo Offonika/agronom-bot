@@ -59,7 +59,7 @@ High
 /v1/partner/orders [POST]
 4.2 Schemas (excerpt)
 • dosage_value: number
-• dosage_unit: enum { ml_10l, g_l }
+• dosage_unit: enum { ml_10l, g_per_l }
 • ErrorResponse.code: enum { NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, BAD_REQUEST }
 • PhotoItem включает ts, id, crop, disease, confidence
 4.3 Errors
