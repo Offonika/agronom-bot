@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 from uuid import uuid4
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
+from fastapi import HTTPException
 
 BUCKET = os.getenv("S3_BUCKET", "agronom")
 
@@ -20,7 +22,12 @@ def upload_photo(user_id: int, data: bytes) -> str:
     """Upload bytes to S3 and return the object key."""
     ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     key = f"{user_id}/{ts}-{uuid4().hex}.jpg"
-    _client().put_object(Bucket=BUCKET, Key=key, Body=data, ContentType="image/jpeg")
+    try:
+        _client().put_object(
+            Bucket=BUCKET, Key=key, Body=data, ContentType="image/jpeg"
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise HTTPException(status_code=500, detail="S3 upload failed") from exc
     return key
 
 
