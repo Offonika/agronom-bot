@@ -35,3 +35,12 @@ bot.action('ask_expert', (ctx) => {
 
 bot.launch().then(() => console.log('Bot started'));
 
+// Gracefully close DB connections on termination
+async function shutdown() {
+  await pool.end();
+  process.exit(0);
+}
+
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);
+
