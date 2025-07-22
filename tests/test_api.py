@@ -1,4 +1,5 @@
 import json
+import base64
 import pytest
 from starlette.requests import Request
 from app.main import compute_signature, verify_hmac
@@ -92,6 +93,17 @@ def test_diagnose_large_image(client):
         "/v1/ai/diagnose",
         headers=HEADERS,
         files={"image": ("big.jpg", large, "image/jpeg")},
+    )
+    assert resp.status_code == 400
+
+
+def test_diagnose_large_base64(client):
+    large_bytes = b"0" * (2 * 1024 * 1024 + 1)
+    encoded = base64.b64encode(large_bytes).decode()
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": encoded, "prompt_id": "v1"},
     )
     assert resp.status_code == 400
 

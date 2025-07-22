@@ -216,6 +216,9 @@ async def diagnose(
             except binascii.Error:
                 err = ErrorResponse(code="BAD_REQUEST", message="invalid base64")
                 return JSONResponse(status_code=400, content=err.model_dump())
+            if len(contents) > 2 * 1024 * 1024:
+                err = ErrorResponse(code="BAD_REQUEST", message="image too large")
+                return JSONResponse(status_code=400, content=err.model_dump())
             key = await run_in_threadpool(upload_photo, user_id, contents)
             result = call_gpt_vision_stub(key)
             crop = result.get("crop", "")
