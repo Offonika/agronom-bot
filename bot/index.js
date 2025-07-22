@@ -20,7 +20,10 @@ bot.on('message', messageHandler);
 
 bot.action(/^proto\|/, (ctx) => {
   const [, product, val, unit, phi] = ctx.callbackQuery.data.split('|');
-  const msg = `Препарат: ${product}\nДоза: ${val} ${unit}\nPHI: ${phi}`;
+  const msg =
+    `Препарат: ${product}\n` +
+    `Доза: ${val} ${unit}\n` +
+    `Срок ожидания (PHI): ${phi} дней`;
   ctx.answerCbQuery();
   return ctx.reply(msg);
 });

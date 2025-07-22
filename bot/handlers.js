@@ -34,10 +34,13 @@ async function photoHandler(pool, ctx) {
     const data = await apiResp.json();
     console.log('API response', data);
 
-    const text =
+    let text =
       `Культура: ${data.crop}\n` +
-      `Болезнь: ${data.disease}\n` +
-      `Уверенность: ${(data.confidence * 100).toFixed(1)}%`;
+      `Диагноз: ${data.disease}\n` +
+      `Уверенность модели: ${(data.confidence * 100).toFixed(1)}%`;
+    if (data.protocol_status) {
+      text += `\n${data.protocol_status}`;
+    }
 
     let keyboard;
     if (data.protocol) {
@@ -48,7 +51,7 @@ async function photoHandler(pool, ctx) {
         data.protocol.dosage_unit,
         data.protocol.phi,
       ].join('|');
-      const row = [{ text: 'Протокол', callback_data: cb }];
+      const row = [{ text: 'Показать протокол', callback_data: cb }];
       if (data.protocol.id) {
         const urlBase = process.env.PARTNER_LINK_BASE ||
           'https://agrostore.example/agronom';
@@ -56,12 +59,12 @@ async function photoHandler(pool, ctx) {
           .update(String(ctx.from.id))
           .digest('hex');
         const link = `${urlBase}?pid=${data.protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
-        row.push({ text: 'Купить', url: link });
+        row.push({ text: 'Купить препарат', url: link });
       }
       keyboard = { inline_keyboard: [row] };
     } else {
       keyboard = {
-        inline_keyboard: [[{ text: 'Спросить эксперта', callback_data: 'ask_expert' }]],
+        inline_keyboard: [[{ text: 'Задать вопрос эксперту', callback_data: 'ask_expert' }]],
       };
     }
 
