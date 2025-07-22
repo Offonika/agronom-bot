@@ -202,7 +202,7 @@ async def diagnose(
             except ValidationError:
                 err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
                 return JSONResponse(status_code=400, content=err.model_dump())
-            contents = base64.b64decode(body.image_base64)
+            contents = base64.b64decode(body.image_base64, validate=True)
             key = await run_in_threadpool(upload_photo, user_id, contents)
             result = call_gpt_vision_stub(key)
             crop = result.get("crop", "")
