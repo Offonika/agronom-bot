@@ -1,6 +1,7 @@
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
+const crypto = require('node:crypto');
 
 async function photoHandler(pool, ctx) {
   const photo = ctx.message.photo[ctx.message.photo.length - 1];
@@ -48,12 +49,13 @@ async function photoHandler(pool, ctx) {
         data.protocol.phi,
       ].join('|');
       const row = [{ text: 'Протокол', callback_data: cb }];
-      if (data.protocol.product) {
+      if (data.protocol.id) {
         const urlBase = process.env.PARTNER_LINK_BASE ||
-          'https://agrostore.example/buy';
-        const link = `${urlBase}?product=${encodeURIComponent(
-          data.protocol.product,
-        )}`;
+          'https://agrostore.example/agronom';
+        const uid = crypto.createHash('sha256')
+          .update(String(ctx.from.id))
+          .digest('hex');
+        const link = `${urlBase}?pid=${data.protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
         row.push({ text: 'Купить', url: link });
       }
       keyboard = { inline_keyboard: [row] };

@@ -88,6 +88,7 @@ def test_diagnose_json_returns_stub():
         "confidence": 0.92,
         "protocol_status": None,
         "protocol": {
+            "id": 1,
             "product": "Скор 250 ЭК",
             "dosage_value": 2.0,
             "dosage_unit": "ml_10l",
