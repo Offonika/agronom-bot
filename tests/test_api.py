@@ -144,7 +144,7 @@ def test_diagnose_invalid_base64():
         headers=HEADERS,
         json={"image_base64": "dGVzdA==@@", "prompt_id": "v1"},
     )
-    assert resp.status_code != 200
+    assert resp.status_code == 400
 
 
 def test_diagnose_multipart_missing_image():
