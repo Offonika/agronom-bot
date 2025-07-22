@@ -22,8 +22,21 @@ def load_csv(path: Path = CSV_PATH) -> list[dict]:
         return list(reader)
 
 
-def import_csv_to_db(path: Path = CSV_PATH) -> None:
-    """Import CSV rows into the database if table empty."""
+def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
+    """Import CSV rows into the database if table empty.
+
+    If ``update`` is True or ``path`` doesn't exist, ``scripts.update_protocols``
+    will be used to download the latest CSV before import.
+    """
+    if update or not path.exists():
+        try:
+            from scripts.update_protocols import update_protocols_csv
+
+            update_protocols_csv(output=path)
+        except Exception:
+            # Fallback to existing file if download fails
+            pass
+
     session = SessionLocal()
     count = session.query(Protocol).count()
     if count == 0 and path.exists():
