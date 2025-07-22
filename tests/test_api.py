@@ -138,6 +138,15 @@ def test_diagnose_json_missing_prompt():
     assert resp.status_code == 400
 
 
+def test_diagnose_invalid_base64():
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==@@", "prompt_id": "v1"},
+    )
+    assert resp.status_code != 200
+
+
 def test_diagnose_multipart_missing_image():
     resp = client.post(
         "/v1/ai/diagnose",
