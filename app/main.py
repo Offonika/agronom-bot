@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Header, UploadFile, File, Request, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
+from contextlib import asynccontextmanager
 from datetime import datetime
 import base64
 import binascii
@@ -19,18 +20,20 @@ from app.models import Photo, PhotoQuota, Payment, PartnerOrder
 
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run startup tasks for the application."""
+    import_csv_to_db()
+    yield
+
+
 app = FastAPI(
     title="Agronom Bot Internal API",
     version="1.4.0",
+    lifespan=lifespan,
 )
 
 HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
-
-
-@app.on_event("startup")
-def startup_event() -> None:
-    """Populate protocol table from CSV if empty."""
-    import_csv_to_db()
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
