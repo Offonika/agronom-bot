@@ -110,8 +110,9 @@ async def verify_headers(
 ):
     if x_api_ver != "v1":
         raise HTTPException(status_code=400, detail="Invalid API version")
-    # Здесь можно добавить валидацию ключа
-    if x_api_key != "test-api-key":
+    # Validate API key against env var
+    api_key = os.getenv("API_KEY", "test-api-key")
+    if x_api_key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")):
