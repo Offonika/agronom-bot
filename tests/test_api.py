@@ -170,6 +170,14 @@ def test_photos_success():
     assert resp.status_code == 200
 
 
+def test_photos_limit_zero():
+    resp = client.get("/v1/photos?limit=0", headers=HEADERS)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["items"] == []
+    assert body["next_cursor"] is None
+
+
 def test_photos_unauthorized():
     resp = client.get("/v1/photos", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}
