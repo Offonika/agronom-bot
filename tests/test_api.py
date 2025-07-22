@@ -1,6 +1,7 @@
 import json
 from fastapi.testclient import TestClient
 from app.main import app, compute_signature
+from app.services.protocols import import_csv_to_db
 
 client = TestClient(app)
 
@@ -288,3 +289,36 @@ def test_photos_table_has_meta():
     cols = {c['name'] for c in insp.get_columns('photos')}
     session.close()
     assert {'file_unique_id', 'width', 'height', 'file_size'} <= cols
+
+
+def test_diagnose_json_with_protocol():
+    import_csv_to_db()
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["protocol"] is not None
+    assert data["protocol_status"] is None
+
+
+def test_diagnose_json_no_protocol_beta():
+    from app.db import SessionLocal
+    from app.models import Protocol
+
+    session = SessionLocal()
+    session.query(Protocol).delete()
+    session.commit()
+    session.close()
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["protocol"] is None
+    assert data["protocol_status"] == "Бета"

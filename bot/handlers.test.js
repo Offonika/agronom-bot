@@ -34,3 +34,62 @@ test('messageHandler ignores non-photo', () => {
   console.log = orig;
   assert.equal(logged, 'Ignoring non-photo message');
 });
+
+test('photoHandler sends protocol buttons', async () => {
+  const pool = { query: async () => {} };
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 99 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  const origFetch = global.fetch;
+  global.fetch = async (url) => {
+    if (url === 'http://file') {
+      return { arrayBuffer: async () => Buffer.from('x') };
+    }
+    return {
+      json: async () => ({
+        crop: 'apple',
+        disease: 'powdery_mildew',
+        confidence: 0.9,
+        protocol: {
+          id: 1,
+          product: 'Скор 250 ЭК',
+          dosage_value: 2,
+          dosage_unit: 'ml_10l',
+          phi: 30,
+        },
+      }),
+    };
+  };
+  await photoHandler(pool, ctx);
+  global.fetch = origFetch;
+  const buttons = replies[0].opts.reply_markup.inline_keyboard[0];
+  assert.equal(buttons[0].text, 'Протокол');
+  assert.equal(buttons[0].callback_data, 'proto|Скор 250 ЭК|2|ml_10l|30');
+  assert.ok(buttons[1].url.includes('pid=1'));
+});
+
+test('photoHandler beta without protocol', async () => {
+  const pool = { query: async () => {} };
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id2', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 100 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  const origFetch = global.fetch;
+  global.fetch = async (url) => {
+    if (url === 'http://file') {
+      return { arrayBuffer: async () => Buffer.from('x') };
+    }
+    return { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) };
+  };
+  await photoHandler(pool, ctx);
+  global.fetch = origFetch;
+  const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
+  assert.equal(button.callback_data, 'ask_expert');
+});
