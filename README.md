@@ -97,7 +97,6 @@ agronom-bot/
 ├── openapi/ # API спецификация (OpenAPI.yaml)
 ├── migrations/ # Alembic
 ├── tests/ # Тесты (pytest)
-├── scripts/ # Утилиты, генераторы
 ├── .env.template # Пример переменных окружения
 └── README.md # Этот файл
 
