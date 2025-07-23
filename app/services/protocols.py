@@ -8,6 +8,8 @@ from functools import lru_cache
 
 from app.db import SessionLocal
 from app.models import Protocol
+from sqlalchemy.exc import OperationalError
+import logging
 
 # CSV is stored in the repository root
 CSV_PATH = Path(__file__).resolve().parent.parent.parent / "protocols.csv"
@@ -38,7 +40,14 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
             pass
 
     session = SessionLocal()
-    count = session.query(Protocol).count()
+    try:
+        count = session.query(Protocol).count()
+    except OperationalError:
+        logging.warning(
+            "Table 'protocols' not found. Run 'alembic upgrade head' or set DB_CREATE_ALL=1"
+        )
+        session.close()
+        return
     if count == 0 and path.exists():
         rows = load_csv(path)
         for r in rows:
