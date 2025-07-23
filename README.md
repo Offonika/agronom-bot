@@ -231,3 +231,7 @@ security_checklist.md — безопасность
 
 partner_agrostore.md — интеграция партнёра
 
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
