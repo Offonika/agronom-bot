@@ -1,4 +1,16 @@
 from app.services.protocols import find_protocol, import_csv_to_db
+from app.db import SessionLocal
+from app.models import Protocol
+
+
+def test_import_csv_no_table():
+    engine = SessionLocal().bind
+    Protocol.__table__.drop(engine)
+    try:
+        import_csv_to_db()
+    finally:
+        Protocol.__table__.create(engine)
+        import_csv_to_db()
 
 
 def test_find_protocol_found():
