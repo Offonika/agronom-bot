@@ -6,6 +6,7 @@ from fastapi import (
     Request,
     HTTPException,
     Form,
+    Depends,
 )
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
@@ -118,21 +119,31 @@ class PartnerOrderRequest(BaseModel):
 # -------------------------------
 
 
-async def verify_headers(
+async def require_api_headers(
     x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver")
-):
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+) -> None:
+    """Validate API key and version headers."""
     if x_api_ver != "v1":
         err = ErrorResponse(code="BAD_REQUEST", message="Invalid API version")
         raise HTTPException(status_code=400, detail=err.model_dump())
-    # Validate API key against env var
+
     api_key = os.getenv("API_KEY", "test-api-key")
     if x_api_key != api_key:
         err = ErrorResponse(code="UNAUTHORIZED", message="Invalid API key")
         raise HTTPException(status_code=401, detail=err.model_dump())
 
 
-async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")):
+async def verify_headers(
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    x_api_ver: str = Header(..., alias="X-API-Ver"),
+) -> None:
+    """(Deprecated) Validate API key and version."""
+    await require_api_headers(x_api_key, x_api_ver)
+
+
+async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")) -> None:
+    """(Deprecated) Validate API version only."""
     if x_api_ver != "v1":
         err = ErrorResponse(code="BAD_REQUEST", message="Invalid API version")
         raise HTTPException(status_code=400, detail=err.model_dump())
@@ -184,12 +195,11 @@ async def verify_hmac(request: Request, x_sign: str):
 )
 async def diagnose(
     request: Request,
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    _: None = Depends(require_api_headers),
     image: UploadFile | None = File(None),
     prompt_id: str | None = Form(None)
 ):
-    await verify_headers(x_api_key, x_api_ver)
+    # headers validated via dependency
 
     user_id = 1  # в MVP ключ привязан к одному пользователю
 
@@ -329,10 +339,9 @@ async def diagnose(
 async def list_photos(
     limit: int = 10,
     cursor: str | None = None,
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    _: None = Depends(require_api_headers),
 ):
-    await verify_headers(x_api_key, x_api_ver)
+    # headers validated via dependency
 
     user_id = 1
     if limit <= 0:
@@ -374,10 +383,9 @@ async def list_photos(
     responses={401: {"model": ErrorResponse}},
 )
 async def get_limits(
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    _: None = Depends(require_api_headers),
 ):
-    await verify_headers(x_api_key, x_api_ver)
+    # headers validated via dependency
     user_id = 1
     with SessionLocal() as db:
         month = datetime.utcnow().strftime("%Y-%m")
@@ -400,10 +408,10 @@ async def get_limits(
 )
 async def payments_webhook(
     request: Request,
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    _: None = Depends(require_api_headers),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    await verify_version(x_api_ver)
+    # headers validated via dependency
     data, _, provided_sign = await verify_hmac(request, x_sign)
     try:
         body = PaymentWebhook(**data, signature=provided_sign)
@@ -429,10 +437,10 @@ async def payments_webhook(
 )
 async def partner_orders(
     request: Request,
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
+    _: None = Depends(require_api_headers),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    await verify_version(x_api_ver)
+    # headers validated via dependency
     data, sign, provided_sign = await verify_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)

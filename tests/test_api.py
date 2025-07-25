@@ -237,6 +237,7 @@ def test_payment_webhook_success(client):
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     headers = {
+        "X-API-Key": os.getenv("API_KEY", "test-api-key"),
         "X-API-Ver": "v1",
         "X-Sign": sig,
     }
@@ -275,7 +276,10 @@ def test_payment_webhook_missing_signature(client):
     }
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers={"X-API-Ver": "v1"},
+        headers={
+            "X-API-Key": os.getenv("API_KEY", "test-api-key"),
+            "X-API-Ver": "v1",
+        },
         json=payload,
     )
     assert resp.status_code in {400, 401, 404, 422}
@@ -292,7 +296,11 @@ def test_payment_webhook_bad_payload(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers={"X-API-Ver": "v1", "X-Sign": sig},
+        headers={
+            "X-API-Key": os.getenv("API_KEY", "test-api-key"),
+            "X-API-Ver": "v1",
+            "X-Sign": sig,
+        },
         json=payload,
     )
     assert resp.status_code in {400, 422}
@@ -310,6 +318,7 @@ def test_partner_order_success(client):
     resp = client.post(
         "/v1/partner/orders",
         headers={
+            "X-API-Key": os.getenv("API_KEY", "test-api-key"),
             "X-API-Ver": "v1",
             "X-Sign": sig,
         },
@@ -328,7 +337,10 @@ def test_partner_order_missing_signature(client):
     }
     resp = client.post(
         "/v1/partner/orders",
-        headers={"X-API-Ver": "v1"},
+        headers={
+            "X-API-Key": os.getenv("API_KEY", "test-api-key"),
+            "X-API-Ver": "v1",
+        },
         json=payload,
     )
     assert resp.status_code in {400, 401, 404, 422}
@@ -345,7 +357,11 @@ def test_partner_order_bad_payload(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/partner/orders",
-        headers={"X-API-Ver": "v1", "X-Sign": sig},
+        headers={
+            "X-API-Key": os.getenv("API_KEY", "test-api-key"),
+            "X-API-Ver": "v1",
+            "X-Sign": sig,
+        },
         json=payload,
     )
     assert resp.status_code in {400, 422}
