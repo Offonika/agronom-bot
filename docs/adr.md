@@ -32,3 +32,9 @@ Phase B = native app. Phase C = on-device CV. GraphQL gateway. DDD refactor > 50
 Redis Phase A or B? S3 provider choice? Is x-region backup MVP?
 15 · Approval
 This document supersedes v1.2. Stored in /docs/adr_bot_phase_v1.3.md
+
+16 · Router Split Evaluation
+Current API endpoints live in a single `app/main.py` file. Splitting them into
+multiple FastAPI routers (diagnose, photos, payments) would reduce file size and
+improve maintainability. The change is backward compatible and can be scheduled
+when refactoring for Phase B.
