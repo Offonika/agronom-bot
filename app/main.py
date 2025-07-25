@@ -14,18 +14,24 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import base64
 import binascii
-import os
 import json
 import hmac
 import hashlib
 
-from app.services.storage import upload_photo
-from app.services.gpt import call_gpt_vision_stub
-from app.services.protocols import find_protocol, import_csv_to_db
+from app.config import Settings
 from fastapi.concurrency import run_in_threadpool
 
-from app.db import SessionLocal
-from app.models import Photo, PhotoQuota, Payment, PartnerOrder
+settings = Settings()
+
+from app.services.storage import upload_photo, init_storage  # noqa: E402
+from app.services.gpt import call_gpt_vision_stub  # noqa: E402
+from app.services.protocols import find_protocol, import_csv_to_db  # noqa: E402
+
+from app.db import SessionLocal, init_db  # noqa: E402
+from app.models import Photo, PhotoQuota, Payment, PartnerOrder  # noqa: E402
+
+init_db(settings)
+init_storage(settings)
 
 
 @asynccontextmanager
@@ -41,9 +47,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-HMAC_SECRET = os.environ.get("HMAC_SECRET", "test-hmac-secret")
+HMAC_SECRET = settings.hmac_secret
 # Количество бесплатных запросов в месяц
-FREE_MONTHLY_LIMIT = int(os.environ.get("FREE_MONTHLY_LIMIT", "5"))
+FREE_MONTHLY_LIMIT = settings.free_monthly_limit
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
@@ -128,7 +134,7 @@ async def require_api_headers(
         err = ErrorResponse(code="BAD_REQUEST", message="Invalid API version")
         raise HTTPException(status_code=400, detail=err.model_dump())
 
-    api_key = os.getenv("API_KEY", "test-api-key")
+    api_key = settings.api_key
     if x_api_key != api_key:
         err = ErrorResponse(code="UNAUTHORIZED", message="Invalid API key")
         raise HTTPException(status_code=401, detail=err.model_dump())
