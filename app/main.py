@@ -123,16 +123,19 @@ async def verify_headers(
     x_api_ver: str = Header(..., alias="X-API-Ver")
 ):
     if x_api_ver != "v1":
-        raise HTTPException(status_code=400, detail="Invalid API version")
+        err = ErrorResponse(code="BAD_REQUEST", message="Invalid API version")
+        raise HTTPException(status_code=400, detail=err.model_dump())
     # Validate API key against env var
     api_key = os.getenv("API_KEY", "test-api-key")
     if x_api_key != api_key:
-        raise HTTPException(status_code=401, detail="Invalid API key")
+        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid API key")
+        raise HTTPException(status_code=401, detail=err.model_dump())
 
 
 async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")):
     if x_api_ver != "v1":
-        raise HTTPException(status_code=400, detail="Invalid API version")
+        err = ErrorResponse(code="BAD_REQUEST", message="Invalid API version")
+        raise HTTPException(status_code=400, detail=err.model_dump())
 
 
 def verify_hmac_signature(body: bytes, provided: str) -> str:
