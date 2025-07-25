@@ -85,6 +85,7 @@ def test_diagnose_invalid_key(client):
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
 
 
 def test_diagnose_large_image(client):
@@ -202,6 +203,8 @@ def test_quota_exceeded(client):
 def test_limits_unauthorized(client):
     resp = client.get("/v1/limits", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}
+    if resp.status_code == 401:
+        assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
 
 
 def test_photos_success(client):
@@ -220,6 +223,8 @@ def test_photos_limit_zero(client):
 def test_photos_unauthorized(client):
     resp = client.get("/v1/photos", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}
+    if resp.status_code == 401:
+        assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
 
 
 def test_payment_webhook_success(client):
