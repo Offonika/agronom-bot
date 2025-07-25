@@ -156,6 +156,7 @@ async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")) -> Non
 
 
 def verify_hmac_signature(body: bytes, provided: str) -> str:
+    """Ensure the provided HMAC-SHA256 matches the payload."""
     expected = hmac.new(HMAC_SECRET.encode(), body, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, provided):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
@@ -169,6 +170,7 @@ def compute_signature(secret: str, payload: dict) -> str:
 
 
 async def verify_hmac(request: Request, x_sign: str):
+    """Return parsed JSON payload if HMAC signature is valid."""
     raw_body = await request.body()
     try:
         data = json.loads(raw_body)
@@ -205,6 +207,7 @@ async def diagnose(
     image: UploadFile | None = File(None),
     prompt_id: str | None = Form(None)
 ):
+    """Diagnose plant disease from an uploaded image."""
     # headers validated via dependency
 
     user_id = 1  # в MVP ключ привязан к одному пользователю
@@ -347,8 +350,8 @@ async def list_photos(
     cursor: str | None = None,
     _: None = Depends(require_api_headers),
 ):
-    # headers validated via dependency
-
+    """Return paginated list of user's uploaded photos."""
+    
     user_id = 1
     if limit <= 0:
         return ListPhotosResponse(items=[], next_cursor=None)
@@ -391,7 +394,7 @@ async def list_photos(
 async def get_limits(
     _: None = Depends(require_api_headers),
 ):
-    # headers validated via dependency
+    """Return remaining free quota for the current month."""
     user_id = 1
     with SessionLocal() as db:
         month = datetime.utcnow().strftime("%Y-%m")
@@ -417,7 +420,7 @@ async def payments_webhook(
     _: None = Depends(require_api_headers),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    # headers validated via dependency
+    """Record SBP payment status from webhook."""
     data, _, provided_sign = await verify_hmac(request, x_sign)
     try:
         body = PaymentWebhook(**data, signature=provided_sign)
@@ -446,7 +449,7 @@ async def partner_orders(
     _: None = Depends(require_api_headers),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    # headers validated via dependency
+    """Create partner order after verifying the signature."""
     data, sign, provided_sign = await verify_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)

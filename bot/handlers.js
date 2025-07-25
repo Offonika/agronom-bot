@@ -3,6 +3,10 @@ const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 const crypto = require('node:crypto');
 
+/**
+ * Handle incoming photo messages.
+ * Downloads the photo, sends it to the API and replies with diagnosis.
+ */
 async function photoHandler(pool, ctx) {
   const photo = ctx.message.photo[ctx.message.photo.length - 1];
   const { file_id, file_unique_id, width, height, file_size } = photo;
@@ -77,12 +81,18 @@ async function photoHandler(pool, ctx) {
   }
 }
 
+/**
+ * Ignore non-photo messages in chat.
+ */
 function messageHandler(ctx) {
   if (!ctx.message.photo) {
     console.log('Ignoring non-photo message');
   }
 }
 
+/**
+ * Send onboarding message when user starts the bot.
+ */
 function startHandler(ctx) {
   ctx.reply('Отправьте фото листа для диагностики');
 }
