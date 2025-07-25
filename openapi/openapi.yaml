@@ -294,6 +294,7 @@ paths:
       tags: [payments]
       security:
         - HmacAuth: []
+        - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
       requestBody:
@@ -314,6 +315,7 @@ paths:
       tags: [partner]
       security:
         - HmacAuth: []
+        - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
       requestBody:
