@@ -14,13 +14,7 @@ BUCKET = os.getenv("S3_BUCKET", "agronom")
 _settings: Settings | None = None
 
 
-def init_storage(cfg: Settings) -> None:
-    """Store settings for later use."""
-    global _settings
-    _settings = cfg
-
-
-def _client():
+def _make_client() -> boto3.client:
     endpoint = os.getenv(
         "S3_ENDPOINT",
         _settings.s3_endpoint if _settings is not None else None,
@@ -46,6 +40,16 @@ def _client():
     )
 
 
+_client = _make_client()
+
+
+def init_storage(cfg: Settings) -> None:
+    """Store settings and reinitialize the client."""
+    global _settings, _client
+    _settings = cfg
+    _client = _make_client()
+
+
 def upload_photo(user_id: int, data: bytes) -> str:
     """Upload bytes to S3 and return the object key."""
     ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
@@ -55,7 +59,7 @@ def upload_photo(user_id: int, data: bytes) -> str:
         _settings.s3_bucket if _settings is not None else BUCKET,
     )
     try:
-        _client().put_object(
+        _client.put_object(
             Bucket=bucket, Key=key, Body=data, ContentType="image/jpeg"
         )
     except (BotoCoreError, ClientError) as exc:
@@ -79,14 +83,14 @@ def get_public_url(key: str) -> str:
     if base:
         return f"{base.rstrip('/')}/{key}"
 
-    endpoint = os.getenv(
+    endpoint = _client.meta.endpoint_url or os.getenv(
         "S3_ENDPOINT",
         _settings.s3_endpoint if _settings is not None else None,
     )
     if endpoint:
         return f"{endpoint.rstrip('/')}/{bucket}/{key}"
 
-    region = os.getenv(
+    region = _client.meta.region_name or os.getenv(
         "S3_REGION",
         _settings.s3_region if _settings is not None else "us-east-1",
     )
