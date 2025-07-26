@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { photoHandler, messageHandler } = require('./handlers');
+const { photoHandler, messageHandler, subscribeHandler } = require('./handlers');
 
 async function withMockFetch(responses, fn) {
   const origFetch = global.fetch;
@@ -118,6 +118,16 @@ test('photoHandler paywall on 402', async () => {
   }, async () => {
     await photoHandler(pool, ctx);
   });
+  assert.equal(replies[0].msg, 'Бесплатный лимит 5 фото/мес исчерпан');
+  const btns = replies[0].opts.reply_markup.inline_keyboard[0];
+  assert.equal(btns[0].url, 'https://t.me/YourBot?start=paywall');
+  assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
+});
+
+test('subscribeHandler shows paywall', async () => {
+  const replies = [];
+  const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
+  await subscribeHandler(ctx);
   assert.equal(replies[0].msg, 'Бесплатный лимит 5 фото/мес исчерпан');
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].url, 'https://t.me/YourBot?start=paywall');

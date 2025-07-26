@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { Pool } = require('pg');
-const { photoHandler, messageHandler, startHandler } = require('./handlers');
+const { photoHandler, messageHandler, startHandler, subscribeHandler } = require('./handlers');
 const crypto = require('node:crypto');
 
 const token = process.env.BOT_TOKEN_DEV;
@@ -13,6 +13,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const bot = new Telegraf(token);
 
 bot.start(startHandler);
+
+bot.command('subscribe', subscribeHandler);
 
 bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
