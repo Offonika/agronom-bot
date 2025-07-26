@@ -136,11 +136,12 @@ agronom-bot/
 
 **Потребуется Node.js 18+** — используется для Telegram‑бота и тестов.
 
-3. Установите зависимости командой `./.codex/setup.sh` и дополнительные пакеты для тестов из `requirements-dev.txt`. Команду `pip install -r ./requirements-dev.txt` запускайте **из корня репозитория**. Перед запуском приложения обязательно примените миграции:
+3. Установите зависимости командой `./.codex/setup.sh` и дополнительные пакеты для тестов из `requirements-dev.txt`. Команду `pip install -r ./requirements-dev.txt` запускайте **из корня репозитория**. Перед запуском приложения обязательно задайте `DATABASE_URL` и примените миграции:
 
    ```bash
    ./.codex/setup.sh
    pip install -r ./requirements-dev.txt
+   export DATABASE_URL=sqlite:///./app.db  # или другая строка подключения
    alembic upgrade head
    ```
    Если пропустить этот шаг и таблица `protocols` не будет создана, функция
@@ -179,7 +180,7 @@ agronom-bot/
    ```
 
    При отсутствии переменной окружения `DATABASE_URL` тесты используют
-   SQLite файл `./test.db`.
+   SQLite файл `./app.db`.
 
 7. Проверьте спецификацию OpenAPI линтером Spectral:
 

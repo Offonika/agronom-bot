@@ -20,7 +20,7 @@ target_metadata = Base.metadata
 url = (
     os.getenv("DATABASE_URL")
     or os.getenv("DB_URL")
-    or "sqlite:///./test.db"
+    or "sqlite:///./app.db"
 )
 
 config = context.config
