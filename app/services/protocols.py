@@ -54,12 +54,13 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
     engine = session.bind
     insp = inspect(engine)
     try:
-        search_path = engine.execute("SHOW search_path").scalar()
+        with engine.connect() as conn:
+            search_path = conn.exec_driver_sql("SHOW search_path").scalar()
     except Exception:  # noqa: BLE001
         search_path = "n/a"
-    print("DEBUG  • DB url       →", engine.url)
-    print("DEBUG  • search_path  →", search_path)
-    print("DEBUG  • table list   →", insp.get_table_names())
+    logging.debug("DB url       → %s", engine.url)
+    logging.debug("search_path  → %s", search_path)
+    logging.debug("table list   → %s", insp.get_table_names())
     # ───────────────────────────────────────────────────────────────────────────
 
     # -------- 3. if table missing → warn & exit --------------------------------

@@ -3,7 +3,6 @@ const Fastify = require('fastify');
 const fastifyMultipart = require('@fastify/multipart');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { Pool } = require('pg');
-const path = require('path');
 
 const app = Fastify({ logger: true });
 app.register(fastifyMultipart);
