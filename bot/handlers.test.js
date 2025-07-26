@@ -102,3 +102,24 @@ test('photoHandler beta without protocol', async () => {
   const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(button.callback_data, 'ask_expert');
 });
+
+test('photoHandler paywall on 402', async () => {
+  const pool = { query: async () => {} };
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id3', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 101 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  await withMockFetch({
+    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    default: { status: 402, json: async () => ({ error: 'limit_reached', limit: 5 }) },
+  }, async () => {
+    await photoHandler(pool, ctx);
+  });
+  assert.equal(replies[0].msg, 'Бесплатный лимит 5 фото/мес исчерпан');
+  const btns = replies[0].opts.reply_markup.inline_keyboard[0];
+  assert.equal(btns[0].url, 'https://t.me/YourBot?start=paywall');
+  assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
+});

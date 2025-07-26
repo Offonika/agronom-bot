@@ -35,6 +35,17 @@ async function photoHandler(pool, ctx) {
       headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
       body: form,
     });
+    if (apiResp.status === 402) {
+      await ctx.reply('Бесплатный лимит 5 фото/мес исчерпан', {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: 'Купить PRO (199 ₽/мес)', url: 'https://t.me/YourBot?start=paywall' },
+            { text: 'Подробнее', url: 'https://t.me/YourBot?start=faq' },
+          ]],
+        },
+      });
+      return;
+    }
     const data = await apiResp.json();
     console.log('API response', data);
 
