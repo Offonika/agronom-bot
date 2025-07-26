@@ -22,7 +22,14 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 from app.config import Settings
 from app.db import SessionLocal, init_db
-from app.models import Payment, PartnerOrder, Photo, PhotoQuota
+from zoneinfo import ZoneInfo
+from sqlalchemy import text
+
+from app.models import (
+    Payment,
+    PartnerOrder,
+    Photo,
+)
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol, import_csv_to_db
 from app.services.storage import init_storage, upload_photo
@@ -40,7 +47,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agronom Bot Internal API",
-    version="1.4.0",
+    version="1.5.0",
     lifespan=lifespan,
 )
 
@@ -210,20 +217,26 @@ async def diagnose(
     user_id = 1  # в MVP ключ привязан к одному пользователю
 
     with SessionLocal() as db:
-        month = datetime.now(timezone.utc).strftime("%Y-%m")
-        quota = (
-            db.query(PhotoQuota)
-            .filter_by(user_id=user_id, month_year=month)
-            .first()
+        moscow_tz = ZoneInfo("Europe/Moscow")
+        month_key = datetime.now(moscow_tz).strftime("%Y-%m")
+        stmt = text(
+            "INSERT INTO photo_usage (user_id, month, used, updated_at) "
+            "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
+            "ON CONFLICT(user_id, month) DO UPDATE "
+            "SET used = photo_usage.used + 1, "
+            "updated_at = CURRENT_TIMESTAMP RETURNING used"
         )
-        if not quota:
-            quota = PhotoQuota(user_id=user_id, used_count=0, month_year=month)
-            db.add(quota)
-            db.commit()
-            db.refresh(quota)
-
-        if quota.used_count >= FREE_MONTHLY_LIMIT:
-            raise HTTPException(status_code=429, detail="LIMIT_EXCEEDED")
+        used = db.execute(stmt, {"uid": user_id, "month": month_key}).scalar_one()
+        pro = db.execute(
+            text("SELECT pro_expires_at FROM users WHERE id=:uid"),
+            {"uid": user_id},
+        ).scalar()
+        now_utc = datetime.now(timezone.utc)
+        if used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
+            return JSONResponse(
+                status_code=402,
+                content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
+            )
 
         # Определяем формат (multipart vs json)
         if image:
@@ -311,7 +324,6 @@ async def diagnose(
             status="ok",
         )
         db.add(photo)
-        quota.used_count += 1
         db.commit()
 
     proto = find_protocol(crop, disease)
@@ -394,13 +406,14 @@ async def get_limits(
     """Return remaining free quota for the current month."""
     user_id = 1
     with SessionLocal() as db:
-        month = datetime.now(timezone.utc).strftime("%Y-%m")
-        quota = (
-            db.query(PhotoQuota)
-            .filter_by(user_id=user_id, month_year=month)
-            .first()
-        )
-        used = quota.used_count if quota else 0
+        moscow_tz = ZoneInfo("Europe/Moscow")
+        month_key = datetime.now(moscow_tz).strftime("%Y-%m")
+        used = db.execute(
+            text(
+                "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
+            ),
+            {"uid": user_id, "month": month_key},
+        ).scalar() or 0
     return LimitsResponse(
         limit_monthly_free=FREE_MONTHLY_LIMIT,
         used_this_month=used,

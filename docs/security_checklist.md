@@ -1,5 +1,6 @@
+(v1.4 → v1.5: monthly usage via photo_usage, payment on limit reach)
 Security & Compliance Checklist – «Карманный агроном» (Bot‑Phase)
-Version 1.4 — 20 July 2025
+Version 1.5 — 26 July 2025
 (v1.3 → v1.4: API rate-limit, business quota FREE_MONTHLY_LIMIT/mo (default 5), signature in body, UNAUTHORIZED error, API versioning X‑API‑Ver, /v1/limits added)
 All controls map to ISO 27001 Annex A. Personal data limited; 152‑ФЗ not triggered.
 1. API Security Controls

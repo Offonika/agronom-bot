@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: 1.4.0
+  version: 1.5.0
   description: |
     Telegram-бот «Карманный агроном» — API v1.4.0.
     Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
@@ -160,6 +160,16 @@ components:
             [NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, BAD_REQUEST, UNAUTHORIZED]
         message:
           type: string
+    LimitReached:
+      type: object
+      required: [error, limit]
+      properties:
+        error:
+          type: string
+          example: limit_reached
+        limit:
+          type: integer
+          example: 5
 
 paths:
   /v1/ai/diagnose:
@@ -197,12 +207,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '429':
+        '402':
           description: Free quota exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/LimitReached'
         '502':
           description: GPT timeout
           content:
