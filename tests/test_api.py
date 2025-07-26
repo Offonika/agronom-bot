@@ -16,13 +16,13 @@ def stub_upload(monkeypatch):
 
     monkeypatch.setattr("app.services.storage.upload_photo", _stub)
     monkeypatch.setattr("app.main.upload_photo", _stub)
-    # reset quota to avoid 429 errors between tests
+    # reset usage to avoid 402 errors between tests
     from app.db import SessionLocal
-    from app.models import PhotoQuota
+    from app.models import PhotoUsage
     from app.services.protocols import _cache_protocol
 
     with SessionLocal() as session:
-        session.query(PhotoQuota).delete()
+        session.query(PhotoUsage).delete()
         session.commit()
 
     _cache_protocol.cache_clear()
@@ -198,7 +198,7 @@ def test_quota_exceeded(client):
             headers=HEADERS,
             json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
         )
-        assert diag.status_code == 429
+        assert diag.status_code == 402
 
 
 def test_limits_unauthorized(client):
@@ -464,4 +464,4 @@ def test_free_monthly_limit_env(monkeypatch, client):
         headers=HEADERS,
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
-    assert second.status_code == 429
+    assert second.status_code == 402
