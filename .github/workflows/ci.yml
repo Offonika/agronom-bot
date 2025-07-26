@@ -10,7 +10,7 @@ jobs:
   lint-test:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: sqlite:///./test.db
+      DATABASE_URL: sqlite:///./app.db
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v5
