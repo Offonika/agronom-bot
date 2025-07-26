@@ -11,3 +11,4 @@ All controls map to ISO 27001 Annex A. Personal data limited; 152‑ФЗ not t
 • All diagnosis and payment requests logged with user_id, diag_id, latency, error_code• Logs are structured (JSON) and retained for 30 days (Loki)• Alerts configured for GPT timeout rate > 5% and 401 spikes• Metrics tracked in Prometheus: diag_latency_seconds, diag_requests_total, quota_reject_total
 4. Compliance Verification
 • Secrets stored in Vault with rotation policies (GPT: 30d, HMAC: 90d)• All API schemas validated via OpenAPI + Spectral in CI• API diff changes tracked in ADR (v1.2+)• Manual audit checklist reviewed each release (QA + Security)• Edge case coverage for business rules (e.g., quota violations) in QA plan
+• **Advisory:** check for race conditions during parallel uploads (use transactions and row‑level locks)
