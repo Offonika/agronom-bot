@@ -159,7 +159,8 @@ agronom-bot/
    В файл `.env` добавьте переменные:
 
    - `BOT_TOKEN_DEV=ваш_токен_бота`
-   - `PARTNER_LINK_BASE=https://agrostore.ru/agronom`
+  - `PARTNER_LINK_BASE=https://agrostore.ru/agronom`
+  - `PAYWALL_ENABLED=true`  # включить показ paywall
 
    ```bash
    npm install --prefix bot

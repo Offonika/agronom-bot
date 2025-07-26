@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     hmac_secret: str = "test-hmac-secret"
     free_monthly_limit: int = 5
+    paywall_enabled: bool = Field(True, alias="PAYWALL_ENABLED")
 
     api_key: str = "test-api-key"
 

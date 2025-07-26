@@ -54,6 +54,7 @@ app = FastAPI(
 HMAC_SECRET = settings.hmac_secret
 # Количество бесплатных запросов в месяц
 FREE_MONTHLY_LIMIT = settings.free_monthly_limit
+PAYWALL_ENABLED = settings.paywall_enabled
 
 # -------------------------------
 # Pydantic Schemas (по OpenAPI)
@@ -232,7 +233,11 @@ async def diagnose(
             {"uid": user_id},
         ).scalar()
         now_utc = datetime.now(timezone.utc)
-        if used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
+        if (
+            PAYWALL_ENABLED
+            and used > FREE_MONTHLY_LIMIT
+            and (not pro or pro < now_utc)
+        ):
             return JSONResponse(
                 status_code=402,
                 content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},

@@ -158,3 +158,12 @@ test('startHandler logs paywall clicks', async () => {
     ['INSERT INTO events (user_id, event) VALUES ($1, $2)', [9, 'paywall_click_faq']],
   ]);
 });
+
+test('paywall disabled does not reply', async () => {
+  process.env.PAYWALL_ENABLED = 'false';
+  const replies = [];
+  const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
+  await subscribeHandler(ctx);
+  assert.equal(replies.length, 0);
+  delete process.env.PAYWALL_ENABLED;
+});
