@@ -1,6 +1,7 @@
 import json
 import base64
 import pytest
+from fastapi import HTTPException
 from starlette.requests import Request
 from app.main import compute_signature, verify_hmac
 import os
@@ -264,6 +265,38 @@ async def test_verify_hmac_returns_signature(client):
     assert data == {"foo": "bar"}
     assert calculated == sig
     assert provided == sig
+
+
+@pytest.mark.asyncio
+async def test_verify_hmac_bad_header_signature(client):
+    payload = {"foo": "bar"}
+    sig = compute_signature("test-hmac-secret", payload)
+    payload["signature"] = sig
+    body = json.dumps(payload).encode()
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request = Request({"type": "http"}, receive)
+    with pytest.raises(HTTPException) as exc:
+        await verify_hmac(request, "bad")
+    assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_verify_hmac_bad_payload_signature(client):
+    payload = {"foo": "bar"}
+    sig = compute_signature("test-hmac-secret", payload)
+    payload["signature"] = "invalid"
+    body = json.dumps(payload).encode()
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request = Request({"type": "http"}, receive)
+    with pytest.raises(HTTPException) as exc:
+        await verify_hmac(request, sig)
+    assert exc.value.status_code == 401
 
 
 def test_payment_webhook_missing_signature(client):

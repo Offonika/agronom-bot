@@ -182,7 +182,7 @@ async def verify_hmac(request: Request, x_sign: str):
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
     calculated = compute_signature(HMAC_SECRET, data)
-    if calculated != x_sign or calculated != provided_sign:
+    if not hmac.compare_digest(calculated, x_sign) or not hmac.compare_digest(calculated, provided_sign):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
 
     return data, calculated, provided_sign
