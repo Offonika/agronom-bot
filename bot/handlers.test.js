@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
 process.env.FREE_PHOTO_LIMIT = '5';
-const { photoHandler, messageHandler, subscribeHandler } = require('./handlers');
+const { photoHandler, messageHandler, subscribeHandler, startHandler } = require('./handlers');
 
 async function withMockFetch(responses, fn) {
   const origFetch = global.fetch;
@@ -136,4 +136,25 @@ test('subscribeHandler shows paywall', async () => {
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].url, 'https://t.me/YourBot?start=paywall');
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
+});
+
+test('subscribeHandler logs paywall_shown', async () => {
+  const events = [];
+  const pool = { query: async (...a) => events.push(a) };
+  const ctx = { from: { id: 7 }, reply: async () => {} };
+  await subscribeHandler(ctx, pool);
+  assert.equal(events.length, 1);
+  assert.equal(events[0][0], 'INSERT INTO events (user_id, event) VALUES ($1, $2)');
+  assert.deepEqual(events[0][1], [7, 'paywall_shown']);
+});
+
+test('startHandler logs paywall clicks', async () => {
+  const events = [];
+  const pool = { query: async (...a) => events.push(a) };
+  await startHandler({ startPayload: 'paywall', from: { id: 8 }, reply: async () => {} }, pool);
+  await startHandler({ startPayload: 'faq', from: { id: 9 }, reply: async () => {} }, pool);
+  assert.deepEqual(events, [
+    ['INSERT INTO events (user_id, event) VALUES ($1, $2)', [8, 'paywall_click_buy']],
+    ['INSERT INTO events (user_id, event) VALUES ($1, $2)', [9, 'paywall_click_faq']],
+  ]);
 });
