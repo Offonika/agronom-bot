@@ -20,10 +20,37 @@ depends_on = None
 def upgrade() -> None:
 
     # Enums
-    payment_status = postgresql.ENUM('success', 'fail', 'cancel', 'bank_error', name='payment_status')
-    photo_status = postgresql.ENUM('pending', 'ok', 'retrying', name='photo_status')
-    order_status = postgresql.ENUM('new', 'processed', 'cancelled', name='order_status')
-    error_code = postgresql.ENUM('NO_LEAF', 'LIMIT_EXCEEDED', 'GPT_TIMEOUT', 'BAD_REQUEST', 'UNAUTHORIZED', name='error_code')
+    payment_status = postgresql.ENUM(
+        'success',
+        'fail',
+        'cancel',
+        'bank_error',
+        name='payment_status',
+        create_type=False,
+    )
+    photo_status = postgresql.ENUM(
+        'pending',
+        'ok',
+        'retrying',
+        name='photo_status',
+        create_type=False,
+    )
+    order_status = postgresql.ENUM(
+        'new',
+        'processed',
+        'cancelled',
+        name='order_status',
+        create_type=False,
+    )
+    error_code = postgresql.ENUM(
+        'NO_LEAF',
+        'LIMIT_EXCEEDED',
+        'GPT_TIMEOUT',
+        'BAD_REQUEST',
+        'UNAUTHORIZED',
+        name='error_code',
+        create_type=False,
+    )
 
     payment_status.create(op.get_bind(), checkfirst=True)
     photo_status.create(op.get_bind(), checkfirst=True)
