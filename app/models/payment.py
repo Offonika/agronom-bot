@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Enum
 from app.models.base import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Payment(Base):
@@ -14,4 +14,4 @@ class Payment(Base):
         Enum("success", "fail", "cancel", "bank_error", name="payment_status"),
         nullable=False,
     )
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
