@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
-Version 1.4 — 20 July 2025
-(v1.3 → v1.4: добавлен лимит 5 фото/мес, новая таблица photo_quota, поле signature в partner_orders, расширен enum ошибок, обновлён lifecycle)
+Version 1.5 — 26 July 2025
+(v1.4 → v1.5: added photo_usage table, pro_expires_at in users)
 0 · Scope
 Документ фиксирует схему БД, правила хранения, линии происхождения данных и JSON‑контракты API для MVP Telegram‑бота.
 1 · Storage & Retention
@@ -20,6 +20,8 @@ id PK, user_id FK, amount INT, source TEXT, status payment_status, created_at TI
 id PK, user_id FK, order_id TEXT, protocol_id INT, price_kopeks INT, signature TEXT, created_at TIMESTAMP, status order_status
 3.6 photo_quota (NEW)
 user_id PK, used_count INT, month_year CHAR(7)
+3.7 photo_usage (NEW)
+user_id PK, month CHAR(7) PK, used INT, updated_at TIMESTAMP
 4 · Enum Definitions
 CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying');CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');CREATE TYPE error_code     AS ENUM ('NO_LEAF', 'LIMIT_EXCEEDED', 'GPT_TIMEOUT', 'BAD_REQUEST', 'UNAUTHORIZED');
 5 · Data Lifecycle
