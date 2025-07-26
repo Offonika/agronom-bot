@@ -46,7 +46,7 @@ def upgrade() -> None:
         sa.Column('crop', sa.Text),
         sa.Column('disease', sa.Text),
         sa.Column('confidence', sa.Numeric),
-        sa.Column('status', sa.Enum('pending', 'ok', 'retrying', name='photo_status'), nullable=False, server_default='pending'),
+        sa.Column('status', photo_status, nullable=False, server_default='pending'),
         sa.Column('ts', sa.DateTime, server_default=sa.func.now()),
         sa.Column('deleted', sa.Boolean, server_default='false'),
     )
@@ -68,7 +68,7 @@ def upgrade() -> None:
         sa.Column('user_id', sa.Integer, nullable=False),
         sa.Column('amount', sa.Integer),
         sa.Column('source', sa.Text),
-        sa.Column('status', sa.Enum('success', 'fail', 'cancel', 'bank_error', name='payment_status'), nullable=False),
+        sa.Column('status', payment_status, nullable=False),
         sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
     )
 
@@ -81,7 +81,7 @@ def upgrade() -> None:
         sa.Column('price_kopeks', sa.Integer),
         sa.Column('signature', sa.Text),
         sa.Column('created_at', sa.DateTime, server_default=sa.func.now()),
-        sa.Column('status', sa.Enum('new', 'processed', 'cancelled', name='order_status'), nullable=False, server_default='new'),
+        sa.Column('status', order_status, nullable=False, server_default='new'),
     )
 
     op.create_table(
