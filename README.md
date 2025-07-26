@@ -232,6 +232,8 @@ security_checklist.md — безопасность
 
 partner_agrostore.md — интеграция партнёра
 
+[pricing.md](pricing.md) — тарифы и способы оплаты
+
 
 ## License
 
