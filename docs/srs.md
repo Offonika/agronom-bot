@@ -1,6 +1,6 @@
 System Requirements Specification (SRS)
 Telegram‑бот «Карманный агроном» (MVP)
-Версия 1.4 — 20 июля 2025 г.
+Версия 1.5 — 26 июля 2025 г.
 1. Scope
 Документ охватывает Telegram‑бот «Карманный агроном» (далее — Система) на этапе MVP.
 Система:
@@ -8,6 +8,7 @@ Telegram‑бот «Карманный агроном» (MVP)
 • Отправляет JPEG ≤ 2 МБ в GPT‑Vision; получает диагноз {crop,disease,confidence}.
 • Выдаёт протокол обработки (product, dosage_value, dosage_unit, phi) при наличии записи в БД, иначе помечает как «Бета».
 • Ограничивает бесплатный тариф 5 фото/месяц, продаёт Pro‑подписку (₽ 499) через Bot Payments 2.0 / СБП.
+• При превышении лимита API возвращает 402, бот показывает paywall со ссылкой на оплату.
 • Сохраняет историю снимков и предоставляет команду /history.
 Out‑of‑scope: нативные приложения, оф‑лайн CV‑модели, карта полей, white‑label‑SDK.
 2. Glossary
@@ -50,6 +51,9 @@ High
 FR‑T‑08
 Partner Order Webhook — /v1/partner/orders принимает заказ.
 High
+FR‑T‑09
+Paywall Display — ошибка 402 приводит к показу paywall.
+High
 
 4. API Contracts
 4.1 Endpoints
@@ -81,7 +85,9 @@ users(id PK, tg_id BIGINT, pro_expires_at TIMESTAMP, created_at TIMESTAMP)
 photos(id PK, user_id FK, file_id TEXT, crop TEXT, disease TEXT, confidence NUMERIC, ts TIMESTAMP)
 protocols(id PK, crop TEXT, disease TEXT, product TEXT, dosage_value NUMERIC, dosage_unit TEXT, phi INT)
 payments(id PK, user_id FK, amount INT, source TEXT, status TEXT, created_at TIMESTAMP)
+photo_usage(user_id PK, month CHAR(7) PK, used INT, updated_at TIMESTAMP)
 idx: photos_user_ts(user_id, ts DESC)
+Counters reset monthly by worker (CRON `5 0 1 * *` Europe/Moscow).
 6. Sequence Diagrams (Text)
 6.1 Happy Path
 User → Bot: send photo
@@ -97,6 +103,11 @@ User → SBP: pay
 SBP → Bot: webhook
 Bot → DB: insert payment, update user.pro
 Bot → User: confirmation
+6.3 Limit Reached
+User → Bot: send photo
+Bot → App: /v1/ai/diagnose
+App → Bot: 402 limit_reached
+Bot → User: показать paywall
 7. Edge Cases
 Code
 Behavior

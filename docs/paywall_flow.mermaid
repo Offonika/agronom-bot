@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant U as User
+    participant B as Bot
+    participant A as API
+    U->>B: send photo
+    B->>A: POST /v1/ai/diagnose
+    A-->>B: 402 limit_reached
+    B->>U: show paywall
+    U->>B: tap buy
+    B->>A: create invoice
