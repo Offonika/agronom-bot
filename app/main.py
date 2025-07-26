@@ -11,7 +11,7 @@ from fastapi import (
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator, ValidationError
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 import base64
 import binascii
 import json
@@ -213,7 +213,7 @@ async def diagnose(
     user_id = 1  # в MVP ключ привязан к одному пользователю
 
     with SessionLocal() as db:
-        month = datetime.utcnow().strftime("%Y-%m")
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
         quota = (
             db.query(PhotoQuota)
             .filter_by(user_id=user_id, month_year=month)
@@ -397,7 +397,7 @@ async def get_limits(
     """Return remaining free quota for the current month."""
     user_id = 1
     with SessionLocal() as db:
-        month = datetime.utcnow().strftime("%Y-%m")
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
         quota = (
             db.query(PhotoQuota)
             .filter_by(user_id=user_id, month_year=month)

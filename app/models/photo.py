@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Enum
 from app.models.base import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Photo(Base):
@@ -21,5 +21,5 @@ class Photo(Base):
         nullable=False,
         server_default="pending",
     )
-    ts = Column(DateTime, default=datetime.utcnow)
+    ts = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     deleted = Column(Boolean, default=False)

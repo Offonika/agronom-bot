@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import boto3
@@ -52,7 +52,7 @@ def init_storage(cfg: Settings) -> None:
 
 def upload_photo(user_id: int, data: bytes) -> str:
     """Upload bytes to S3 and return the object key."""
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     key = f"{user_id}/{ts}-{uuid4().hex}.jpg"
     bucket = os.getenv(
         "S3_BUCKET",
