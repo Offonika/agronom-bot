@@ -2,6 +2,9 @@ const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 const crypto = require('node:crypto');
+function paywallEnabled() {
+  return process.env.PAYWALL_ENABLED !== 'false';
+}
 
 function getLimit() {
   return parseInt(process.env.FREE_PHOTO_LIMIT || '5', 10);
@@ -20,16 +23,21 @@ async function logEvent(pool, userId, ev) {
 }
 
 function sendPaywall(ctx, pool) {
+  if (!paywallEnabled()) {
+    return;
+  }
   if (ctx.from) {
     logEvent(pool, ctx.from.id, 'paywall_shown');
   }
   const limit = getLimit();
   return ctx.reply(`Бесплатный лимит ${limit} фото/мес исчерпан`, {
     reply_markup: {
-      inline_keyboard: [[
-        { text: 'Купить PRO (199 ₽/мес)', url: 'https://t.me/YourBot?start=paywall' },
-        { text: 'Подробнее', url: 'https://t.me/YourBot?start=faq' },
-      ]],
+      inline_keyboard: [
+        [
+          { text: 'Купить PRO (199 ₽/мес)', url: 'https://t.me/YourBot?start=paywall' },
+          { text: 'Подробнее', url: 'https://t.me/YourBot?start=faq' },
+        ],
+      ],
     },
   });
 }

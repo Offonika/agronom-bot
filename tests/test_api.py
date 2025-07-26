@@ -485,3 +485,22 @@ def test_sixth_diagnose_call_returns_402(client):
     assert sixth.status_code == 402
     data = sixth.json()
     assert data.get("error") == "limit_reached"
+
+
+def test_paywall_disabled_returns_200(monkeypatch, client):
+    monkeypatch.setattr("app.main.FREE_MONTHLY_LIMIT", 1)
+    monkeypatch.setattr("app.main.PAYWALL_ENABLED", False)
+
+    first = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert second.status_code == 200
