@@ -19,18 +19,18 @@ import hmac
 import hashlib
 
 from app.config import Settings
-from fastapi.concurrency import run_in_threadpool
-
+from app.db import SessionLocal, init_db  # noqa: E402
 settings = Settings()
-
+init_db(settings) 
 from app.services.storage import upload_photo, init_storage  # noqa: E402
 from app.services.gpt import call_gpt_vision_stub  # noqa: E402
-from app.services.protocols import find_protocol, import_csv_to_db  # noqa: E402
 
-from app.db import SessionLocal, init_db  # noqa: E402
+from app.services.protocols import find_protocol, import_csv_to_db  # noqa: E402
+from fastapi.concurrency import run_in_threadpool
+
 from app.models import Photo, PhotoQuota, Payment, PartnerOrder  # noqa: E402
 
-init_db(settings)
+
 init_storage(settings)
 
 

@@ -1,57 +1,54 @@
-#env.py
+# env.py
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
+from alembic import context
+from sqlalchemy import create_engine, pool
+
+# 1. .env
 load_dotenv()
 
-# Добавляем путь к app
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# 2. PYTHONPATH до импорта app
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-# Импорт модели
-from app.models import Base  # ← убедись, что models.Base определён  # noqa: E402
-from alembic import context  # noqa: E402
-from sqlalchemy import engine_from_config, pool  # noqa: E402
+from app.models import Base  # noqa: E402
 
-# Настройка метаданных
 target_metadata = Base.metadata
 
-# Получаем конфиг Alembic
+# 3. URL из env
+url = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("DB_URL")
+    or "sqlite:///./test.db"
+)
+
 config = context.config
-
-# Получаем URL из переменной окружения либо используем SQLite
-url = os.getenv("DATABASE_URL", "sqlite:///./test.db")
-
 config.set_main_option("sqlalchemy.url", url)
 
-
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        compare_server_default=True,
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
-
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
+    connectable = create_engine(url, poolclass=pool.NullPool)
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+        )
         with context.begin_transaction():
             context.run_migrations()
-
 
 if context.is_offline_mode():
     run_migrations_offline()

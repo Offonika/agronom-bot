@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict, Field
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=".env")
+
+from __future__ import annotations
+
+from pydantic_settings import BaseSettings
+from pydantic import ConfigDict, Field
 
 
 class Settings(BaseSettings):

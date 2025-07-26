@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 import csv
-from pathlib import Path
+import logging
 from functools import lru_cache
+from pathlib import Path
+
+from sqlalchemy import inspect
+from sqlalchemy.exc import OperationalError
 
 from app.db import SessionLocal
 from app.models import Protocol
-from sqlalchemy.exc import OperationalError
-import logging
 
 # CSV is stored in the repository root
 CSV_PATH = Path(__file__).resolve().parent.parent.parent / "protocols.csv"
 
 
+# --------------------------------------------------------------------------- #
+# Utils
+# --------------------------------------------------------------------------- #
 def load_csv(path: Path = CSV_PATH) -> list[dict]:
     """Load protocols from CSV file."""
     if not path.exists():
@@ -24,30 +29,51 @@ def load_csv(path: Path = CSV_PATH) -> list[dict]:
         return list(reader)
 
 
+# --------------------------------------------------------------------------- #
+# CSV → DB import
+# --------------------------------------------------------------------------- #
 def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
-    """Import CSV rows into the database if table empty.
+    """Import CSV rows into the database if table is empty.
 
-    If ``update`` is True or ``path`` doesn't exist, ``scripts.update_protocols``
-    will be used to download the latest CSV before import.
+    If ``update`` is True or CSV is missing, scripts.update_protocols downloads
+    the latest version before import.
     """
+    # -------- 1. optionally download fresh CSV --------------------------------
     if update or not path.exists():
         try:
             from scripts.update_protocols import update_protocols_csv
 
             update_protocols_csv(output=path)
-        except Exception:
-            # Fallback to existing file if download fails
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logging.warning("CSV download failed: %s — using cached file", exc)
 
+    # -------- 2. connect to DB -------------------------------------------------
     session = SessionLocal()
+
+    # DEBUG ─────────────────────────────────────────────────────────────────────
+    engine = session.bind
+    insp = inspect(engine)
+    try:
+        search_path = engine.execute("SHOW search_path").scalar()
+    except Exception:  # noqa: BLE001
+        search_path = "n/a"
+    print("DEBUG  • DB url       →", engine.url)
+    print("DEBUG  • search_path  →", search_path)
+    print("DEBUG  • table list   →", insp.get_table_names())
+    # ───────────────────────────────────────────────────────────────────────────
+
+    # -------- 3. if table missing → warn & exit --------------------------------
     try:
         count = session.query(Protocol).count()
     except OperationalError:
         logging.warning(
-            "Table 'protocols' not found. Run 'alembic upgrade head' or set DB_CREATE_ALL=1"
+            "Table 'protocols' not found. "
+            "Run 'alembic upgrade head' or set DB_CREATE_ALL=1"
         )
         session.close()
         return
+
+    # -------- 4. initial import ------------------------------------------------
     if count == 0 and path.exists():
         rows = load_csv(path)
         for r in rows:
@@ -61,9 +87,14 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
             )
             session.add(proto)
         session.commit()
+        logging.info("Imported %s protocols from CSV", len(rows))
+
     session.close()
 
 
+# --------------------------------------------------------------------------- #
+# Runtime lookup with LRU-cache
+# --------------------------------------------------------------------------- #
 @lru_cache(maxsize=None)
 def _cache_protocol(crop: str, disease: str) -> Protocol | None:
     session = SessionLocal()
