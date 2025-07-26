@@ -465,3 +465,23 @@ def test_free_monthly_limit_env(monkeypatch, client):
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert second.status_code == 402
+
+
+def test_sixth_diagnose_call_returns_402(client):
+    """Ensure the 6th diagnose request fails with 402 by default."""
+    for i in range(5):
+        resp = client.post(
+            "/v1/ai/diagnose",
+            headers=HEADERS,
+            json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+        )
+        assert resp.status_code == 200, f"call {i}"
+
+    sixth = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert sixth.status_code == 402
+    data = sixth.json()
+    assert data.get("error") == "limit_reached"
