@@ -4,6 +4,20 @@ const API_VER = process.env.API_VER || 'v1';
 const crypto = require('node:crypto');
 
 /**
+ * Send paywall message with subscription links.
+ */
+function sendPaywall(ctx) {
+  return ctx.reply('Бесплатный лимит 5 фото/мес исчерпан', {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: 'Купить PRO (199 ₽/мес)', url: 'https://t.me/YourBot?start=paywall' },
+        { text: 'Подробнее', url: 'https://t.me/YourBot?start=faq' },
+      ]],
+    },
+  });
+}
+
+/**
  * Handle incoming photo messages.
  * Downloads the photo, sends it to the API and replies with diagnosis.
  */
@@ -36,14 +50,7 @@ async function photoHandler(pool, ctx) {
       body: form,
     });
     if (apiResp.status === 402) {
-      await ctx.reply('Бесплатный лимит 5 фото/мес исчерпан', {
-        reply_markup: {
-          inline_keyboard: [[
-            { text: 'Купить PRO (199 ₽/мес)', url: 'https://t.me/YourBot?start=paywall' },
-            { text: 'Подробнее', url: 'https://t.me/YourBot?start=faq' },
-          ]],
-        },
-      });
+      await sendPaywall(ctx);
       return;
     }
     const data = await apiResp.json();
@@ -108,4 +115,11 @@ function startHandler(ctx) {
   ctx.reply('Отправьте фото листа для диагностики');
 }
 
-module.exports = { photoHandler, messageHandler, startHandler };
+/**
+ * Temporary stub for subscription command.
+ */
+function subscribeHandler(ctx) {
+  return sendPaywall(ctx);
+}
+
+module.exports = { photoHandler, messageHandler, startHandler, subscribeHandler };
