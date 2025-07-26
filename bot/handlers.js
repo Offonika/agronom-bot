@@ -3,11 +3,16 @@ const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 const crypto = require('node:crypto');
 
+function getLimit() {
+  return parseInt(process.env.FREE_PHOTO_LIMIT || '5', 10);
+}
+
 /**
  * Send paywall message with subscription links.
  */
 function sendPaywall(ctx) {
-  return ctx.reply('Бесплатный лимит 5 фото/мес исчерпан', {
+  const limit = getLimit();
+  return ctx.reply(`Бесплатный лимит ${limit} фото/мес исчерпан`, {
     reply_markup: {
       inline_keyboard: [[
         { text: 'Купить PRO (199 ₽/мес)', url: 'https://t.me/YourBot?start=paywall' },

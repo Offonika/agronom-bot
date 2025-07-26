@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+
+process.env.FREE_PHOTO_LIMIT = '5';
 const { photoHandler, messageHandler, subscribeHandler } = require('./handlers');
 
 async function withMockFetch(responses, fn) {
@@ -112,13 +114,14 @@ test('photoHandler paywall on 402', async () => {
     reply: async (msg, opts) => replies.push({ msg, opts }),
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
+  process.env.FREE_PHOTO_LIMIT = '4';
   await withMockFetch({
     'http://file': { arrayBuffer: async () => Buffer.from('x') },
     default: { status: 402, json: async () => ({ error: 'limit_reached', limit: 5 }) },
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].msg, 'Бесплатный лимит 5 фото/мес исчерпан');
+  assert.equal(replies[0].msg, 'Бесплатный лимит 4 фото/мес исчерпан');
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].url, 'https://t.me/YourBot?start=paywall');
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
@@ -127,6 +130,7 @@ test('photoHandler paywall on 402', async () => {
 test('subscribeHandler shows paywall', async () => {
   const replies = [];
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
+  process.env.FREE_PHOTO_LIMIT = '5';
   await subscribeHandler(ctx);
   assert.equal(replies[0].msg, 'Бесплатный лимит 5 фото/мес исчерпан');
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
