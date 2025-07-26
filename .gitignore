@@ -43,3 +43,4 @@ test.db
 # Exported OpenAPI clients
 client/
 bot/node_modules/
+node_modules/
