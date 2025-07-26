@@ -119,6 +119,7 @@ agronom-bot/
    POSTGRES_HOST=localhost
    POSTGRES_PORT=5432
    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
+   BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
 
    S3_BUCKET=agronom
    S3_ENDPOINT=http://localhost:9000
@@ -160,8 +161,11 @@ agronom-bot/
    В файл `.env` добавьте переменные:
 
    - `BOT_TOKEN_DEV=ваш_токен_бота`
-  - `PARTNER_LINK_BASE=https://agrostore.ru/agronom`
-  - `PAYWALL_ENABLED=true`  # включить показ paywall
+   - `PARTNER_LINK_BASE=https://agrostore.ru/agronom`
+   - `PAYWALL_ENABLED=true`  # включить показ paywall
+   - `BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom`  # строка подключения для бота
+
+  Бот подключается к PostgreSQL по DSN из `BOT_DATABASE_URL`.
 
    ```bash
    npm install --prefix bot

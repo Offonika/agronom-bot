@@ -9,7 +9,10 @@ if (!token) {
   throw new Error('BOT_TOKEN_DEV not set');
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString:
+    process.env.BOT_DATABASE_URL || process.env.DATABASE_URL,
+});
 const bot = new Telegraf(token);
 
 bot.start((ctx) => startHandler(ctx, pool));
