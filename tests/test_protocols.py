@@ -4,7 +4,10 @@ from app.models import Protocol
 
 
 def test_import_csv_no_table():
-    engine = SessionLocal().bind
+    """Drop protocols table to verify CSV import recreates it."""
+    with SessionLocal() as session:
+        engine = session.bind
+
     Protocol.__table__.drop(engine)
     try:
         import_csv_to_db()
