@@ -12,9 +12,9 @@ if (!token) {
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const bot = new Telegraf(token);
 
-bot.start(startHandler);
+bot.start((ctx) => startHandler(ctx, pool));
 
-bot.command('subscribe', subscribeHandler);
+bot.command('subscribe', (ctx) => subscribeHandler(ctx, pool));
 
 bot.on('photo', (ctx) => photoHandler(pool, ctx));
 

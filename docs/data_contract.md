@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
-Version 1.5 — 26 July 2025
-(v1.4 → v1.5: added photo_usage table, pro_expires_at in users)
+Version 1.6 — 26 July 2025
+(v1.5 → v1.6: added events table for analytics)
 0 · Scope
 Документ фиксирует схему БД, правила хранения, линии происхождения данных и JSON‑контракты API для MVP Telegram‑бота.
 1 · Storage & Retention
@@ -22,6 +22,8 @@ id PK, user_id FK, order_id TEXT, protocol_id INT, price_kopeks INT, signature T
 user_id PK, used_count INT, month_year CHAR(7)
 3.7 photo_usage (NEW)
 user_id PK, month CHAR(7) PK, used INT, updated_at TIMESTAMP
+3.8 events (NEW)
+id PK, user_id INT, event TEXT, ts TIMESTAMP
 4 · Enum Definitions
 CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying');CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');CREATE TYPE error_code     AS ENUM ('NO_LEAF', 'LIMIT_EXCEEDED', 'GPT_TIMEOUT', 'BAD_REQUEST', 'UNAUTHORIZED');
 5 · Data Lifecycle

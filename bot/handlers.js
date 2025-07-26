@@ -10,7 +10,19 @@ function getLimit() {
 /**
  * Send paywall message with subscription links.
  */
-function sendPaywall(ctx) {
+async function logEvent(pool, userId, ev) {
+  if (!pool) return;
+  try {
+    await pool.query('INSERT INTO events (user_id, event) VALUES ($1, $2)', [userId, ev]);
+  } catch (err) {
+    console.error('event log error', err);
+  }
+}
+
+function sendPaywall(ctx, pool) {
+  if (ctx.from) {
+    logEvent(pool, ctx.from.id, 'paywall_shown');
+  }
   const limit = getLimit();
   return ctx.reply(`Бесплатный лимит ${limit} фото/мес исчерпан`, {
     reply_markup: {
@@ -55,7 +67,7 @@ async function photoHandler(pool, ctx) {
       body: form,
     });
     if (apiResp.status === 402) {
-      await sendPaywall(ctx);
+      await sendPaywall(ctx, pool);
       return;
     }
     const data = await apiResp.json();
@@ -116,15 +128,20 @@ function messageHandler(ctx) {
 /**
  * Send onboarding message when user starts the bot.
  */
-function startHandler(ctx) {
+function startHandler(ctx, pool) {
+  if (ctx.startPayload === 'paywall') {
+    logEvent(pool, ctx.from.id, 'paywall_click_buy');
+  } else if (ctx.startPayload === 'faq') {
+    logEvent(pool, ctx.from.id, 'paywall_click_faq');
+  }
   ctx.reply('Отправьте фото листа для диагностики');
 }
 
 /**
  * Temporary stub for subscription command.
  */
-function subscribeHandler(ctx) {
-  return sendPaywall(ctx);
+function subscribeHandler(ctx, pool) {
+  return sendPaywall(ctx, pool);
 }
 
 module.exports = { photoHandler, messageHandler, startHandler, subscribeHandler };
