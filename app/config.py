@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydantic_settings import BaseSettings
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 
 class Settings(BaseSettings):
@@ -12,8 +12,8 @@ class Settings(BaseSettings):
 
     api_key: str = "test-api-key"
 
-    database_url: str = "sqlite:///./app.db"
-    db_create_all: bool = False
+    database_url: str = Field("sqlite:///./app.db", alias="DATABASE_URL")
+    db_create_all: bool = Field(False, alias="DB_CREATE_ALL")
 
     s3_bucket: str = "agronom"
     s3_endpoint: str | None = None
