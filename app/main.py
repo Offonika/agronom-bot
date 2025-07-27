@@ -251,6 +251,7 @@ async def diagnose(
     user_id = 1  # в MVP ключ привязан к одному пользователю
 
     with SessionLocal() as db:
+        status = "ok"
         moscow_tz = ZoneInfo("Europe/Moscow")
         month_key = datetime.now(moscow_tz).strftime("%Y-%m")
         params = {"uid": user_id, "month": month_key}
@@ -322,11 +323,18 @@ async def diagnose(
                     content=err.model_dump(),
                 )
             key = await run_in_threadpool(upload_photo, user_id, contents)
-            result = call_gpt_vision_stub(key)
-            crop = result.get("crop", "")
-            disease = result.get("disease", "")
-            conf = result.get("confidence", 0.0)
             file_id = key
+            try:
+                result = call_gpt_vision_stub(key)
+                crop = result.get("crop", "")
+                disease = result.get("disease", "")
+                conf = result.get("confidence", 0.0)
+                status = "ok"
+            except Exception:
+                crop = ""
+                disease = ""
+                conf = 0.0
+                status = "pending"
         else:
             try:
                 json_data = await request.json()
@@ -371,11 +379,18 @@ async def diagnose(
                     content=err.model_dump(),
                 )
             key = await run_in_threadpool(upload_photo, user_id, contents)
-            result = call_gpt_vision_stub(key)
-            crop = result.get("crop", "")
-            disease = result.get("disease", "")
-            conf = result.get("confidence", 0.0)
             file_id = key
+            try:
+                result = call_gpt_vision_stub(key)
+                crop = result.get("crop", "")
+                disease = result.get("disease", "")
+                conf = result.get("confidence", 0.0)
+                status = "ok"
+            except Exception:
+                crop = ""
+                disease = ""
+                conf = 0.0
+                status = "pending"
 
         photo = Photo(
             user_id=user_id,
@@ -383,10 +398,13 @@ async def diagnose(
             crop=crop,
             disease=disease,
             confidence=conf,
-            status="ok",
+            status=status,
         )
         db.add(photo)
         db.commit()
+        if status != "ok":
+            err = ErrorResponse(code="GPT_TIMEOUT", message="GPT timeout")
+            return JSONResponse(status_code=502, content=err.model_dump())
 
     proto = find_protocol(crop, disease)
     if proto:
@@ -397,17 +415,17 @@ async def diagnose(
             dosage_unit=proto.dosage_unit,
             phi=proto.phi,
         )
-        status = None
+        proto_status = None
     else:
         proto_resp = None
-        status = "Бета" if crop and disease else "Обратитесь к эксперту"
+        proto_status = "Бета" if crop and disease else "Обратитесь к эксперту"
 
     return DiagnoseResponse(
         crop=crop,
         disease=disease,
         confidence=conf,
         protocol=proto_resp,
-        protocol_status=status,
+        protocol_status=proto_status,
     )
 
 
