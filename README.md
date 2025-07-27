@@ -49,6 +49,7 @@
 Очередь повторной диагностики запускается скриптом `retry_diagnosis.js`
 по CRON из переменной `RETRY_CRON` (по умолчанию `0 1 * * *`) и
 обрабатывает задачи с параллелизмом из `RETRY_CONCURRENCY` (по умолчанию `1`).
+После трёх неудачных попыток (`RETRY_LIMIT=3`) статус снимка меняется на `failed`.
 
 ---
 
@@ -133,6 +134,7 @@ agronom-bot/
    S3_SECRET_KEY=minio123
    REDIS_URL=redis://localhost:6379
    RETRY_CONCURRENCY=1
+   RETRY_LIMIT=3
    ```
 
 2. Создайте виртуальное окружение под **Python 3.12** (в нём уже есть SQLite 3.35+):

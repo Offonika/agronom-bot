@@ -12,6 +12,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const retryCron = process.env.RETRY_CRON || '0 1 * * *';
 const RETRY_CONCURRENCY = parseInt(process.env.RETRY_CONCURRENCY || '1', 10);
+const RETRY_LIMIT = parseInt(process.env.RETRY_LIMIT || '3', 10);
 
 console.log(`Retry diagnosis worker concurrency=${RETRY_CONCURRENCY}`);
 
@@ -47,7 +48,12 @@ new Worker(
           );
           success += 1;
         } catch (err) {
-          await client.query("UPDATE photos SET status='retrying' WHERE id=$1", [row.id]);
+          await client.query(
+            "UPDATE photos SET retry_attempts=retry_attempts+1, " +
+              "status=CASE WHEN retry_attempts+1 >= $2 THEN 'failed' ELSE 'retrying' END " +
+              "WHERE id=$1",
+            [row.id, RETRY_LIMIT]
+          );
           failed += 1;
         }
       }
