@@ -235,7 +235,7 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
   };
   await withMockFetch({
     'http://file': { arrayBuffer: async () => Buffer.from('x') },
-    default: { json: async () => ({ status: 'pending', id: 42 }) },
+    default: { status: 202, json: async () => ({ status: 'pending', id: 42 }) },
   }, async () => {
     await photoHandler(pool, ctx);
   });
