@@ -273,6 +273,21 @@ def test_photo_status_pending(client):
     assert "updated_at" in data
 
 
+def test_photo_retry_attempts_default(client):
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        photo = Photo(user_id=1, file_id="test.jpg", status="pending")
+        session.add(photo)
+        session.commit()
+        pid = photo.id
+
+    with SessionLocal() as session:
+        db_photo = session.get(Photo, pid)
+        assert db_photo.retry_attempts == 0
+
+
 def test_photo_status_completed(client):
     from app.db import SessionLocal
     from app.models import Photo

@@ -16,6 +16,7 @@ class Photo(Base):
     crop = Column(String)
     disease = Column(String)
     confidence = Column(Float)
+    retry_attempts = Column(Integer, nullable=False, default=0)
     status = Column(
         Enum("pending", "ok", "retrying", "failed", name="photo_status"),
         nullable=False,

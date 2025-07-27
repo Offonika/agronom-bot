@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
-Version 1.6 — 26 July 2025
-(v1.5 → v1.6: added events table for analytics)
+Version 1.7 — 27 July 2025
+(v1.6 → v1.7: added retry_attempts column)
 0 · Scope
 Документ фиксирует схему БД, правила хранения, линии происхождения данных и JSON‑контракты API для MVP Telegram‑бота.
 1 · Storage & Retention
@@ -11,7 +11,7 @@ users 1—n photosusers 1—n paymentsusers 1—n partner_ordersusers 1—1 phot
 3.1 users
 id PK, tg_id BIGINT, pro_expires_at TIMESTAMP, created_at TIMESTAMP
 3.2 photos
-id PK, user_id FK, file_id TEXT, file_unique_id TEXT, width INT, height INT, file_size INT, crop TEXT, disease TEXT, confidence NUMERIC, status TEXT, ts TIMESTAMP, deleted BOOLEAN
+id PK, user_id FK, file_id TEXT, file_unique_id TEXT, width INT, height INT, file_size INT, crop TEXT, disease TEXT, confidence NUMERIC, retry_attempts INT, status TEXT, ts TIMESTAMP, deleted BOOLEAN
 3.3 protocols
 Без изменений
 3.4 payments
