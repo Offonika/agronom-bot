@@ -31,9 +31,12 @@ from app.models import (
     PartnerOrder,
     Photo,
 )
+from uuid import uuid4
+
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol, import_csv_to_db
 from app.services.storage import init_storage, upload_photo
+from app.services import create_sbp_link
 
 settings = Settings()
 init_db(settings)
@@ -118,7 +121,16 @@ class PaymentWebhook(BaseModel):
     signature: str
 
 
+class PaymentCreateRequest(BaseModel):
+    """Schema for payment creation request."""
+
+    user_id: int
+    plan: str
+    months: int = 1
+
+
 class PaymentCreateResponse(BaseModel):
+    payment_id: str
     url: str
 
 
@@ -454,9 +466,34 @@ async def get_limits(
     response_model=PaymentCreateResponse,
     responses={401: {"model": ErrorResponse}},
 )
-async def create_payment(_: None = Depends(require_api_headers)):
-    """Return payment link for SBP."""
-    return {"url": "https://sbp.example/pay"}
+async def create_payment(
+    body: PaymentCreateRequest,
+    _: None = Depends(require_api_headers),
+):
+    """Create SBP payment and persist it."""
+    # Currently only PRO plan is supported
+    if body.plan.lower() != "pro":
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+
+    amount = 19900 * body.months  # price in kopeks
+    currency = "RUB"
+    external_id = uuid4().hex
+    url = create_sbp_link(external_id, amount, currency)
+
+    with SessionLocal() as db:
+        payment = Payment(
+            user_id=body.user_id,
+            amount=amount,
+            currency=currency,
+            provider="sbp",
+            external_id=external_id,
+            prolong_months=body.months,
+            status="pending",
+        )
+        db.add(payment)
+        db.commit()
+
+    return PaymentCreateResponse(payment_id=external_id, url=url)
 
 
 @app.post(

@@ -150,6 +150,19 @@ components:
           type: string
           description: HMAC-SHA256 of payload
 
+    PaymentCreateRequest:
+      type: object
+      required: [user_id, plan]
+      properties:
+        user_id:
+          type: integer
+        plan:
+          type: string
+          example: pro
+        months:
+          type: integer
+          default: 1
+
     ErrorResponse:
       type: object
       required: [code, message]
@@ -305,6 +318,12 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreateRequest'
       responses:
         '200':
           description: Payment link
@@ -312,8 +331,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [url]
+                required: [payment_id, url]
                 properties:
+                  payment_id:
+                    type: string
+                    example: 123e4567e89
                   url:
                     type: string
                     example: https://sbp.example/pay

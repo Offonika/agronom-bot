@@ -230,9 +230,20 @@ def test_photos_unauthorized(client):
 
 
 def test_create_payment(client):
-    resp = client.post("/v1/payments/create", headers=HEADERS)
+    payload = {"user_id": 1, "plan": "pro", "months": 1}
+    resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
     assert resp.status_code == 200
-    assert resp.json()["url"].startswith("https://")
+    data = resp.json()
+    assert data["url"].startswith("https://")
+    assert data["payment_id"]
+
+    from app.db import SessionLocal
+    from app.models import Payment
+
+    with SessionLocal() as session:
+        row = session.query(Payment).filter_by(external_id=data["payment_id"]).first()
+        assert row is not None
+        assert row.status == "pending"
 
 
 def test_payment_webhook_success(client):
