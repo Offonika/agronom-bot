@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "worker": "node worker/usage_reset.js"
+    "worker": "node worker/usage_reset.js",
+    "test": "node --test bot/handlers.test.js"
   },
   "dependencies": {
     "dotenv": "^17.2.1",

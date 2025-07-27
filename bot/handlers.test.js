@@ -16,19 +16,32 @@ const {
 
 async function withMockFetch(responses, fn) {
   const origFetch = global.fetch;
+  const open = [];
   global.fetch = async (url) => {
+    let resp;
     if (Object.prototype.hasOwnProperty.call(responses, url)) {
-      return { ok: true, ...responses[url] };
+      resp = responses[url];
+    } else if (responses.default) {
+      resp = responses.default;
+    } else {
+      throw new Error(`Unexpected fetch ${url}`);
     }
-    if (responses.default) {
-      return { ok: true, ...responses.default };
+    if (resp.body && typeof resp.body.destroy === 'function') {
+      open.push(resp.body);
     }
-    throw new Error(`Unexpected fetch ${url}`);
+    return { ok: true, ...resp };
   };
   try {
     await fn();
   } finally {
     global.fetch = origFetch;
+    for (const b of open) {
+      try {
+        b.destroy();
+      } catch {
+        // ignore
+      }
+    }
   }
 }
 
