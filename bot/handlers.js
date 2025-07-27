@@ -183,6 +183,16 @@ function startHandler(ctx, pool) {
   ctx.reply('Отправьте фото листа для диагностики');
 }
 
+function helpHandler(ctx) {
+  const url = process.env.PRIVACY_URL || '';
+  const text =
+    `Используя бота, вы соглашаетесь с [политикой конфиденциальности](${url}).`;
+  return ctx.reply(text, {
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: [[{ text: 'Открыть политику', url }]] },
+  });
+}
+
 /**
  * Temporary stub for subscription command.
  */
@@ -301,6 +311,7 @@ module.exports = {
   messageHandler,
   startHandler,
   subscribeHandler,
+  helpHandler,
   buyProHandler,
   retryHandler,
   historyHandler,
