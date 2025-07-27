@@ -212,8 +212,10 @@ function subscribeHandler(ctx, pool) {
 
 async function historyHandler(ctx, offset = 0, pool) {
   if (ctx.from && pool) {
-    const ev = offset === 0 ? 'history_open' : 'history_page';
-    logEvent(pool, ctx.from.id, ev);
+    if (offset === 0) {
+      logEvent(pool, ctx.from.id, 'history_open');
+    }
+    logEvent(pool, ctx.from.id, `history_page_${offset}`);
   }
   const resp = await fetch(
     `${API_BASE}/v1/photos/history?limit=10&offset=${offset}`,
