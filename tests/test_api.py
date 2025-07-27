@@ -241,12 +241,14 @@ def test_create_payment(client):
     assert data["payment_id"]
 
     from app.db import SessionLocal
-    from app.models import Payment
+    from app.models import Payment, Event
 
     with SessionLocal() as session:
         row = session.query(Payment).filter_by(external_id=data["payment_id"]).first()
         assert row is not None
         assert row.status == "pending"
+        event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
+        assert event.event == "payment_created"
 
 
 def test_payment_webhook_success(client):
@@ -287,8 +289,15 @@ def test_payment_webhook_success(client):
     with SessionLocal() as session:
         row = session.query(Payment).filter_by(external_id="p1").first()
         assert row.status == "success"
-        event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
-        assert event.event == "payment_success"
+        events = (
+            session.query(Event)
+            .filter_by(user_id=1)
+            .order_by(Event.id.desc())
+            .limit(2)
+            .all()
+        )
+        names = {e.event for e in events}
+        assert {"payment_success", "pro_activated"}.issubset(names)
 
 
 def test_payment_webhook_updates_pro_expiration(client):
@@ -670,3 +679,30 @@ def test_diagnose_old_sqlite_fallback(monkeypatch, client):
     assert resp.status_code == 200
     limits = client.get("/v1/limits", headers=HEADERS)
     assert limits.json()["used_this_month"] == 1
+
+
+def test_pro_expired_event_logged(monkeypatch, client):
+    monkeypatch.setattr("app.main.FREE_MONTHLY_LIMIT", 0)
+    from app.db import SessionLocal
+    from app.models import Event
+    past = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    with SessionLocal() as session:
+        session.execute(
+            text(
+                "INSERT OR IGNORE INTO users (id, tg_id, pro_expires_at) "
+                "VALUES (1, 1, :dt)"
+            ),
+            {"dt": past},
+        )
+        session.commit()
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 402
+
+    with SessionLocal() as session:
+        event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
+        assert event.event == "pro_expired"
