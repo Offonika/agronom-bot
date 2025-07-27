@@ -111,7 +111,7 @@ async function photoHandler(pool, ctx) {
     console.log('API response', data);
 
     if (data.status === 'pending') {
-      await ctx.reply('Диагноз в процессе обработки. Результат появится позже.', {
+      await ctx.reply('Диагностика в процессе обработки. Результат будет позже', {
         reply_markup: {
           inline_keyboard: [[{ text: '🔄 Проверить позже', callback_data: `retry|${data.id}` }]],
         },
@@ -201,7 +201,7 @@ async function retryHandler(ctx, photoId) {
     }
     const data = await resp.json();
     if (data.status === 'pending' || data.status === 'retrying') {
-      await ctx.reply('Диагноз в процессе обработки. Результат появится позже.', {
+      await ctx.reply('Диагностика в процессе обработки. Результат будет позже', {
         reply_markup: {
           inline_keyboard: [[{ text: '🔄 Проверить позже', callback_data: `retry|${photoId}` }]],
         },
