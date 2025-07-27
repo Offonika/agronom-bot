@@ -262,6 +262,7 @@ partner_agrostore.md — интеграция партнёра
 
 [pricing.md](pricing.md) — тарифы и способы оплаты
 payment_flow.md — процесс оплаты и webhook SBP
+[privacy_policy.md](docs/privacy_policy.md) — политика конфиденциальности
 
 
 ## License

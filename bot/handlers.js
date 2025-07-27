@@ -184,7 +184,9 @@ function startHandler(ctx, pool) {
 }
 
 function helpHandler(ctx) {
-  const url = process.env.PRIVACY_URL || '';
+  const url =
+    process.env.PRIVACY_URL ||
+    'https://github.com/your-org/agronom-bot/blob/main/docs/privacy_policy.md';
   const text =
     `Используя бота, вы соглашаетесь с [политикой конфиденциальности](${url}).`;
   return ctx.reply(text, {
