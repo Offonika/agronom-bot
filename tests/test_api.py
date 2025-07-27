@@ -203,9 +203,10 @@ def test_diagnose_gpt_timeout(monkeypatch, client):
         headers=HEADERS,
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
-    assert resp.status_code == 502
+    assert resp.status_code in {200, 202}
     data = resp.json()
-    assert data["code"] == "GPT_TIMEOUT"
+    assert data["status"] == "pending"
+    assert "id" in data
 
     from app.db import SessionLocal
     from app.models import Photo

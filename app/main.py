@@ -407,8 +407,10 @@ async def diagnose(
         db.add(photo)
         db.commit()
         if status != "ok":
-            err = ErrorResponse(code="GPT_TIMEOUT", message="GPT timeout")
-            return JSONResponse(status_code=502, content=err.model_dump())
+            return JSONResponse(
+                status_code=202,
+                content={"id": photo.id, "status": "pending"},
+            )
 
     proto = find_protocol(crop, disease)
     if proto:

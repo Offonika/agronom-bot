@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: 1.7.0
+  version: 1.8.0
   description: |
     Telegram-бот «Карманный агроном» — API v1.4.0.
     Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
@@ -189,6 +189,17 @@ components:
         protocol:
           $ref: '#/components/schemas/ProtocolResponse'
 
+    DiagnoseQueuedResponse:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: integer
+          example: 1
+        status:
+          type: string
+          example: pending
+
     ErrorResponse:
       type: object
       required: [code, message]
@@ -240,6 +251,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DiagnoseResponse'
+        '202':
+          description: Image queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnoseQueuedResponse'
         '400':
           description: Bad image / bad request
           content:
@@ -252,12 +269,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LimitReached'
-        '502':
-          description: GPT timeout
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Unexpected internal error
           content:
