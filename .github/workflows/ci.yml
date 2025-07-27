@@ -22,7 +22,7 @@ jobs:
           ./.codex/setup.sh
           pip install pytest-asyncio
       - name: Run Ruff
-        run: ruff app tests
+        run: ruff check app tests
       - name: Run Tests
         run: pytest -q
 
