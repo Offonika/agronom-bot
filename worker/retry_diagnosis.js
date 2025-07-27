@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Queue, Worker } = require('bullmq');
 const { Pool } = require('pg');
-const { execFileSync } = require('child_process');
+const { callGptVisionStub } = require('./gpt_stub');
 
 const connection = { connectionString: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = 'retry-diagnosis';
@@ -35,16 +35,7 @@ new Worker(
       processed = rows.length;
       for (const row of rows) {
         try {
-          const out = execFileSync(
-            'python3',
-            [
-              '-c',
-              "import sys,json; from app.services.gpt import call_gpt_vision_stub; print(json.dumps(call_gpt_vision_stub(sys.argv[1])))",
-              row.file_id,
-            ],
-            { encoding: 'utf8' }
-          );
-          const resp = JSON.parse(out.trim() || '{}');
+          const resp = await callGptVisionStub(row.file_id);
           await client.query(
             "UPDATE photos SET crop=$1, disease=$2, confidence=$3, status='ok' WHERE id=$4",
             [resp.crop || null, resp.disease || null, resp.confidence || 0, row.id]
