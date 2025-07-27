@@ -255,6 +255,7 @@ security_checklist.md — безопасность
 partner_agrostore.md — интеграция партнёра
 
 [pricing.md](pricing.md) — тарифы и способы оплаты
+payment_flow.md — процесс оплаты и webhook SBP
 
 
 ## License
