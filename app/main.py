@@ -38,7 +38,7 @@ from uuid import uuid4
 
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol, import_csv_to_db
-from app.services.storage import init_storage, upload_photo
+from app.services.storage import init_storage, upload_photo, get_public_url
 from app.services import create_sbp_link
 from app.logger import setup_logging
 
@@ -150,6 +150,16 @@ class PhotoStatusResponse(BaseModel):
     crop: str | None = None
     disease: str | None = None
     protocol: ProtocolResponse | None = None
+
+
+class PhotoHistoryItem(BaseModel):
+    photo_id: int
+    ts: datetime
+    crop: str
+    disease: str
+    status: str
+    confidence: float
+    thumb_url: str
 
 
 class PartnerOrderRequest(BaseModel):
@@ -479,6 +489,50 @@ async def list_photos(
         next_cursor = str(rows[-1].id) if len(rows) == limit else None
 
     return ListPhotosResponse(items=items, next_cursor=next_cursor)
+
+
+@app.get(
+    "/v1/photos/history",
+    response_model=list[PhotoHistoryItem],
+    responses={401: {"model": ErrorResponse}},
+)
+async def list_photos_history(
+    limit: int = 10,
+    offset: int = 0,
+    user_id: int | None = None,
+    _: None = Depends(require_api_headers),
+):
+    """Return past photos ordered by ts DESC."""
+
+    if user_id and user_id != 1:
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
+
+    user_id = 1
+    limit = max(0, min(limit, 50))
+    offset = max(0, offset)
+
+    with SessionLocal() as db:
+        rows = (
+            db.query(Photo)
+            .filter(Photo.user_id == user_id, Photo.deleted.is_(False))
+            .order_by(Photo.ts.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+    return [
+        PhotoHistoryItem(
+            photo_id=r.id,
+            ts=r.ts,
+            crop=r.crop or "",
+            disease=r.disease or "",
+            status=r.status,
+            confidence=float(r.confidence or 0),
+            thumb_url=get_public_url(r.file_id),
+        )
+        for r in rows
+    ]
 
 
 @app.get(

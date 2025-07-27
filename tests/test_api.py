@@ -256,6 +256,37 @@ def test_photos_unauthorized(client):
         assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
 
 
+def test_photos_history_limit_offset(client):
+    from app.db import SessionLocal
+    from app.models import Photo
+    with SessionLocal() as session:
+        p1 = Photo(user_id=1, file_id="a.jpg", status="ok", ts=datetime(2024, 1, 1, tzinfo=timezone.utc))
+        p2 = Photo(user_id=1, file_id="b.jpg", status="ok", ts=datetime(2024, 1, 2, tzinfo=timezone.utc))
+        p3 = Photo(user_id=1, file_id="c.jpg", status="ok", ts=datetime(2024, 1, 3, tzinfo=timezone.utc))
+        session.add_all([p1, p2, p3])
+        session.commit()
+        expected = (
+            session.query(Photo)
+            .filter_by(user_id=1)
+            .order_by(Photo.ts.desc())
+            .limit(2)
+            .offset(1)
+            .all()
+        )
+        expected_ids = [p.id for p in expected]
+
+    resp = client.get("/v1/photos/history?limit=2&offset=1", headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+    assert [item["photo_id"] for item in data] == expected_ids
+
+
+def test_photos_history_forbidden_other_user(client):
+    resp = client.get("/v1/photos/history?user_id=2", headers=HEADERS)
+    assert resp.status_code == 403
+
+
 def test_photo_status_pending(client):
     from app.db import SessionLocal
     from app.models import Photo

@@ -39,7 +39,7 @@ bot.command('subscribe', (ctx) => subscribeHandler(ctx, pool));
 
 bot.command('help', (ctx) => helpHandler(ctx));
 
-bot.command('history', (ctx) => historyHandler(ctx, 0));
+bot.command('history', (ctx) => historyHandler(ctx, 0, pool));
 
 bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
@@ -76,7 +76,7 @@ bot.action(/^history\|/, (ctx) => {
   const [, off] = ctx.callbackQuery.data.split('|');
   const offset = Math.max(parseInt(off, 10) || 0, 0);
   ctx.answerCbQuery();
-  return historyHandler(ctx, offset);
+  return historyHandler(ctx, offset, pool);
 });
 
 bot.action(/^info\|/, (ctx) => {
