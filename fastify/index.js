@@ -70,6 +70,44 @@ app.post('/v1/ai/diagnose', async function (request, reply) {
   };
 });
 
+app.get('/v1/photos/history', async function (request) {
+  const limitParam = parseInt(request.query.limit ?? '10', 10);
+  const offset = parseInt(request.query.offset ?? '0', 10);
+  const limit = Math.min(Number.isNaN(limitParam) ? 10 : limitParam, 50);
+
+  let userId = 1;
+  if (request.headers['x-user-id']) {
+    const parsed = parseInt(request.headers['x-user-id'], 10);
+    if (!Number.isNaN(parsed)) {
+      userId = parsed;
+    }
+  }
+
+  const res = await pool.query(
+    `SELECT id AS photo_id, ts, crop, disease, status, confidence, file_id
+     FROM photos
+     WHERE user_id = $1
+     ORDER BY ts DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, limit, offset]
+  );
+
+  const baseUrl = process.env.S3_PUBLIC_URL ||
+    (process.env.S3_ENDPOINT
+      ? `${process.env.S3_ENDPOINT.replace(/\/$/, '')}/${bucket}`
+      : `https://${bucket}.s3.amazonaws.com`);
+
+  return res.rows.map((r) => ({
+    photo_id: r.photo_id,
+    ts: r.ts,
+    crop: r.crop,
+    disease: r.disease,
+    status: r.status,
+    confidence: parseFloat(r.confidence),
+    thumb_url: `${baseUrl}/${r.file_id}`,
+  }));
+});
+
 const start = async () => {
   try {
     await app.listen({ port: process.env.PORT || 3000, host: '0.0.0.0' });
@@ -79,4 +117,8 @@ const start = async () => {
   }
 };
 
-start();
+if (require.main === module) {
+  start();
+}
+
+module.exports = { app, pool };

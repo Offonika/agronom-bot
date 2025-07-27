@@ -118,6 +118,32 @@ components:
               format: date-time
               example: "2025-07-20T12:34:56Z"
 
+    PhotoHistoryItem:
+      type: object
+      required: [photo_id, ts, crop, disease, status, confidence, thumb_url]
+      properties:
+        photo_id:
+          type: integer
+          example: 1
+        ts:
+          type: string
+          format: date-time
+        crop:
+          type: string
+          example: apple
+        disease:
+          type: string
+          example: scab
+        status:
+          type: string
+          enum: [pending, ok, retrying, failed]
+        confidence:
+          type: number
+          format: float
+        thumb_url:
+          type: string
+          format: uri
+
     ListPhotosResponse:
       type: object
       required: [items]
@@ -313,6 +339,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/photos/history:
+    get:
+      summary: Photo history (offset)
+      operationId: listPhotosHistory
+      description: Return past photos ordered by ts DESC.
+      tags: [photos]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: User ID (stub)
+      responses:
+        '200':
+          description: List of history items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhotoHistoryItem'
 
   /v1/photos/{photo_id}:
     get:
