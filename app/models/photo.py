@@ -17,7 +17,7 @@ class Photo(Base):
     disease = Column(String)
     confidence = Column(Float)
     status = Column(
-        Enum("pending", "ok", "retrying", name="photo_status"),
+        Enum("pending", "ok", "retrying", "failed", name="photo_status"),
         nullable=False,
         server_default="pending",
     )
