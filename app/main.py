@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agronom Bot Internal API",
-    version="1.5.0",
+    version="1.7.0",
     lifespan=lifespan,
 )
 
