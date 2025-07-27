@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 import os
 import sqlite3
+import logging
 
 from fastapi import (
     FastAPI,
@@ -45,6 +46,7 @@ settings = Settings()
 init_db(settings)
 init_storage(settings)
 setup_logging()
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -330,7 +332,8 @@ async def diagnose(
                 disease = result.get("disease", "")
                 conf = result.get("confidence", 0.0)
                 status = "ok"
-            except Exception:
+            except Exception as exc:
+                logger.exception("GPT error", exc_info=exc)
                 crop = ""
                 disease = ""
                 conf = 0.0
@@ -386,7 +389,8 @@ async def diagnose(
                 disease = result.get("disease", "")
                 conf = result.get("confidence", 0.0)
                 status = "ok"
-            except Exception:
+            except Exception as exc:
+                logger.exception("GPT error", exc_info=exc)
                 crop = ""
                 disease = ""
                 conf = 0.0
