@@ -16,7 +16,14 @@ class Payment(Base):
     external_id = Column(String)
     prolong_months = Column(Integer)
     status = Column(
-        Enum("success", "fail", "cancel", "bank_error", name="payment_status"),
+        Enum(
+            "pending",
+            "success",
+            "fail",
+            "cancel",
+            "bank_error",
+            name="payment_status",
+        ),
         nullable=False,
     )
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
