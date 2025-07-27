@@ -5,6 +5,7 @@ import hashlib
 import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import sqlite3
 
 from fastapi import (
     FastAPI,
@@ -220,14 +221,33 @@ async def diagnose(
     with SessionLocal() as db:
         moscow_tz = ZoneInfo("Europe/Moscow")
         month_key = datetime.now(moscow_tz).strftime("%Y-%m")
-        stmt = text(
-            "INSERT INTO photo_usage (user_id, month, used, updated_at) "
-            "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
-            "ON CONFLICT(user_id, month) DO UPDATE "
-            "SET used = photo_usage.used + 1, "
-            "updated_at = CURRENT_TIMESTAMP RETURNING used"
-        )
-        used = db.execute(stmt, {"uid": user_id, "month": month_key}).scalar_one()
+        params = {"uid": user_id, "month": month_key}
+        if sqlite3.sqlite_version_info >= (3, 35):
+            stmt = text(
+                "INSERT INTO photo_usage (user_id, month, used, updated_at) "
+                "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
+                "ON CONFLICT(user_id, month) DO UPDATE "
+                "SET used = photo_usage.used + 1, "
+                "updated_at = CURRENT_TIMESTAMP RETURNING used"
+            )
+            used = db.execute(stmt, params).scalar_one()
+        else:
+            # Older SQLite versions (<3.35) lack RETURNING support
+            stmt = text(
+                "INSERT INTO photo_usage (user_id, month, used, updated_at) "
+                "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
+                "ON CONFLICT(user_id, month) DO UPDATE "
+                "SET used = photo_usage.used + 1, "
+                "updated_at = CURRENT_TIMESTAMP"
+            )
+            db.execute(stmt, params)
+            db.commit()
+            used = db.execute(
+                text(
+                    "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
+                ),
+                params,
+            ).scalar_one()
         pro = db.execute(
             text("SELECT pro_expires_at FROM users WHERE id=:uid"),
             {"uid": user_id},

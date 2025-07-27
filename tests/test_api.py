@@ -504,3 +504,16 @@ def test_paywall_disabled_returns_200(monkeypatch, client):
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert second.status_code == 200
+
+
+def test_diagnose_old_sqlite_fallback(monkeypatch, client):
+    """Fallback path for SQLite versions without RETURNING."""
+    monkeypatch.setattr("sqlite3.sqlite_version_info", (3, 34, 0))
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    limits = client.get("/v1/limits", headers=HEADERS)
+    assert limits.json()["used_this_month"] == 1
