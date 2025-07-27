@@ -2,16 +2,23 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
 process.env.FREE_PHOTO_LIMIT = '5';
-const { photoHandler, messageHandler, subscribeHandler, startHandler, buyProHandler } = require('./handlers');
+const {
+  photoHandler,
+  messageHandler,
+  subscribeHandler,
+  startHandler,
+  buyProHandler,
+  pollPaymentStatus,
+} = require('./handlers');
 
 async function withMockFetch(responses, fn) {
   const origFetch = global.fetch;
   global.fetch = async (url) => {
     if (Object.prototype.hasOwnProperty.call(responses, url)) {
-      return responses[url];
+      return { ok: true, ...responses[url] };
     }
     if (responses.default) {
-      return responses.default;
+      return { ok: true, ...responses.default };
     }
     throw new Error(`Unexpected fetch ${url}`);
   };
@@ -22,7 +29,7 @@ async function withMockFetch(responses, fn) {
   }
 }
 
-test('photoHandler stores info and replies', async () => {
+test('photoHandler stores info and replies', { concurrency: false }, async () => {
   const calls = [];
   const pool = { query: async (...args) => { calls.push(args); } };
   const replies = [];
@@ -43,7 +50,7 @@ test('photoHandler stores info and replies', async () => {
   assert.ok(replies[0].opts.reply_markup.inline_keyboard.length > 0);
 });
 
-test('messageHandler ignores non-photo', () => {
+test('messageHandler ignores non-photo', { concurrency: false }, () => {
   let logged = '';
   const orig = console.log;
   console.log = (msg) => { logged = msg; };
@@ -52,7 +59,7 @@ test('messageHandler ignores non-photo', () => {
   assert.equal(logged, 'Ignoring non-photo message');
 });
 
-test('photoHandler sends protocol buttons', async () => {
+test('photoHandler sends protocol buttons', { concurrency: false }, async () => {
   const pool = { query: async () => {} };
   const replies = [];
   const ctx = {
@@ -86,7 +93,7 @@ test('photoHandler sends protocol buttons', async () => {
   assert.ok(buttons[1].url.includes('pid=1'));
 });
 
-test('photoHandler beta without protocol', async () => {
+test('photoHandler beta without protocol', { concurrency: false }, async () => {
   const pool = { query: async () => {} };
   const replies = [];
   const ctx = {
@@ -105,7 +112,7 @@ test('photoHandler beta without protocol', async () => {
   assert.equal(button.callback_data, 'ask_expert');
 });
 
-test('photoHandler paywall on 402', async () => {
+test('photoHandler paywall on 402', { concurrency: false }, async () => {
   const pool = { query: async () => {} };
   const replies = [];
   const ctx = {
@@ -127,7 +134,7 @@ test('photoHandler paywall on 402', async () => {
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
 });
 
-test('subscribeHandler shows paywall', async () => {
+test('subscribeHandler shows paywall', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
   process.env.FREE_PHOTO_LIMIT = '5';
@@ -138,7 +145,7 @@ test('subscribeHandler shows paywall', async () => {
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
 });
 
-test('subscribeHandler logs paywall_shown', async () => {
+test('subscribeHandler logs paywall_shown', { concurrency: false }, async () => {
   const events = [];
   const pool = { query: async (...a) => events.push(a) };
   const ctx = { from: { id: 7 }, reply: async () => {} };
@@ -148,7 +155,7 @@ test('subscribeHandler logs paywall_shown', async () => {
   assert.deepEqual(events[0][1], [7, 'paywall_shown']);
 });
 
-test('startHandler logs paywall clicks', async () => {
+test('startHandler logs paywall clicks', { concurrency: false }, async () => {
   const events = [];
   const pool = { query: async (...a) => events.push(a) };
   await startHandler({ startPayload: 'paywall', from: { id: 8 }, reply: async () => {} }, pool);
@@ -159,19 +166,55 @@ test('startHandler logs paywall clicks', async () => {
   ]);
 });
 
-test('buyProHandler returns payment link', async () => {
+test('buyProHandler returns payment link', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
   const pool = { query: async () => {} };
-  await withMockFetch({ 'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay' }) } }, async () => {
-    await buyProHandler(ctx, pool);
+  await withMockFetch({
+    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p1' }) },
+    default: { json: async () => ({ status: 'success', pro_expires_at: '2025-01-01T00:00:00Z' }) },
+  }, async () => {
+    await buyProHandler(ctx, pool, 0);
+    if (ctx.pollPromise) await ctx.pollPromise;
+    await new Promise(r => setTimeout(r, 20));
   });
   const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(btn.url, 'http://pay');
   assert.equal(btn.text, 'Оплатить 199 ₽ через СБП');
+  assert.equal(ctx.paymentId, 'p1');
 });
 
-test('paywall disabled does not reply', async () => {
+test('buyProHandler polls success', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 2 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
+  const pool = { query: async () => {} };
+  await withMockFetch({
+    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p2' }) },
+    'http://localhost:8000/v1/payments/p2': { json: async () => ({ status: 'success', pro_expires_at: '2025-12-31T00:00:00Z' }) },
+    default: { json: async () => ({ status: 'pending' }) },
+  }, async () => {
+    await buyProHandler(ctx, pool, 1);
+    if (ctx.pollPromise) await ctx.pollPromise;
+  });
+  assert.ok(replies[1].msg.startsWith('Оплата прошла'));
+});
+
+test('buyProHandler polls fail', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 3 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
+  const pool = { query: async () => {} };
+  await withMockFetch({
+    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p3' }) },
+    'http://localhost:8000/v1/payments/p3': { json: async () => ({ status: 'fail' }) },
+    default: { json: async () => ({ status: 'fail' }) },
+  }, async () => {
+    await buyProHandler(ctx, pool, 1);
+    if (ctx.pollPromise) await ctx.pollPromise;
+  });
+  assert.equal(replies[1].msg, 'Оплата не удалась ❌');
+});
+
+test('paywall disabled does not reply', { concurrency: false }, async () => {
   process.env.PAYWALL_ENABLED = 'false';
   const replies = [];
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
