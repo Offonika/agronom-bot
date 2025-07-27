@@ -192,6 +192,29 @@ def test_diagnose_multipart_missing_image(client):
     assert resp.status_code == 400
 
 
+def test_diagnose_gpt_timeout(monkeypatch, client):
+    def _fail(_key: str):
+        raise TimeoutError("timeout")
+
+    monkeypatch.setattr("app.main.call_gpt_vision_stub", _fail)
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 502
+    data = resp.json()
+    assert data["code"] == "GPT_TIMEOUT"
+
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        photo = session.query(Photo).order_by(Photo.id.desc()).first()
+        assert photo.status == "pending"
+
+
 def test_quota_exceeded(client):
     limits = client.get("/v1/limits", headers=HEADERS)
     assert limits.status_code == 200
