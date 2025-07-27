@@ -11,6 +11,9 @@ const queue = new Queue(queueName, { connection });
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const retryCron = process.env.RETRY_CRON || '0 1 * * *';
+const RETRY_CONCURRENCY = parseInt(process.env.RETRY_CONCURRENCY || '1', 10);
+
+console.log(`Retry diagnosis worker concurrency=${RETRY_CONCURRENCY}`);
 
 async function schedule() {
   await queue.add(
@@ -55,5 +58,5 @@ new Worker(
       client.release();
     }
   },
-  { connection }
+  { connection, concurrency: RETRY_CONCURRENCY }
 );

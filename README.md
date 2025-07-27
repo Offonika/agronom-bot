@@ -47,7 +47,8 @@
 производит воркер `usage_reset.js` по CRON `5 0 1 * *` (МСК). При получении
 ошибки 402 бот показывает paywall с предложением купить Pro.
 Очередь повторной диагностики запускается скриптом `retry_diagnosis.js`
-по CRON из переменной `RETRY_CRON` (по умолчанию `0 1 * * *`).
+по CRON из переменной `RETRY_CRON` (по умолчанию `0 1 * * *`) и
+обрабатывает задачи с параллелизмом из `RETRY_CONCURRENCY` (по умолчанию `1`).
 
 ---
 
@@ -131,6 +132,7 @@ agronom-bot/
    S3_ACCESS_KEY=minio
    S3_SECRET_KEY=minio123
    REDIS_URL=redis://localhost:6379
+   RETRY_CONCURRENCY=1
    ```
 
 2. Создайте виртуальное окружение под **Python 3.12** (в нём уже есть SQLite 3.35+):
