@@ -192,7 +192,7 @@ function subscribeHandler(ctx, pool) {
 
 async function retryHandler(ctx, photoId) {
   try {
-    const resp = await fetch(`${API_BASE}/v1/photos/${photoId}/status`, {
+    const resp = await fetch(`${API_BASE}/v1/photos/${photoId}`, {
       headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
     });
     if (!resp.ok) {

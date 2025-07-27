@@ -249,7 +249,7 @@ test('retryHandler returns result', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch({
-    'http://localhost:8000/v1/photos/42/status': {
+    'http://localhost:8000/v1/photos/42': {
       json: async () => ({
         status: 'ok',
         crop: 'apple',
