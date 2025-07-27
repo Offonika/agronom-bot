@@ -118,6 +118,10 @@ class PaymentWebhook(BaseModel):
     signature: str
 
 
+class PaymentCreateResponse(BaseModel):
+    url: str
+
+
 class PartnerOrderRequest(BaseModel):
     order_id: str
     user_tg_id: int
@@ -443,6 +447,16 @@ async def get_limits(
         limit_monthly_free=FREE_MONTHLY_LIMIT,
         used_this_month=used,
     )
+
+
+@app.post(
+    "/v1/payments/create",
+    response_model=PaymentCreateResponse,
+    responses={401: {"model": ErrorResponse}},
+)
+async def create_payment(_: None = Depends(require_api_headers)):
+    """Return payment link for SBP."""
+    return {"url": "https://sbp.example/pay"}
 
 
 @app.post(

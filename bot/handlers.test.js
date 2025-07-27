@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
 process.env.FREE_PHOTO_LIMIT = '5';
-const { photoHandler, messageHandler, subscribeHandler, startHandler } = require('./handlers');
+const { photoHandler, messageHandler, subscribeHandler, startHandler, buyProHandler } = require('./handlers');
 
 async function withMockFetch(responses, fn) {
   const origFetch = global.fetch;
@@ -123,7 +123,7 @@ test('photoHandler paywall on 402', async () => {
   });
   assert.equal(replies[0].msg, 'Бесплатный лимит 4 фото/мес исчерпан');
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
-  assert.equal(btns[0].url, 'https://t.me/YourBot?start=paywall');
+  assert.equal(btns[0].callback_data, 'buy_pro');
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
 });
 
@@ -134,7 +134,7 @@ test('subscribeHandler shows paywall', async () => {
   await subscribeHandler(ctx);
   assert.equal(replies[0].msg, 'Бесплатный лимит 5 фото/мес исчерпан');
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
-  assert.equal(btns[0].url, 'https://t.me/YourBot?start=paywall');
+  assert.equal(btns[0].callback_data, 'buy_pro');
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
 });
 
@@ -157,6 +157,18 @@ test('startHandler logs paywall clicks', async () => {
     ['INSERT INTO events (user_id, event) VALUES ($1, $2)', [8, 'paywall_click_buy']],
     ['INSERT INTO events (user_id, event) VALUES ($1, $2)', [9, 'paywall_click_faq']],
   ]);
+});
+
+test('buyProHandler returns payment link', async () => {
+  const replies = [];
+  const ctx = { from: { id: 1 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
+  const pool = { query: async () => {} };
+  await withMockFetch({ 'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay' }) } }, async () => {
+    await buyProHandler(ctx, pool);
+  });
+  const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
+  assert.equal(btn.url, 'http://pay');
+  assert.equal(btn.text, 'Оплатить 199 ₽ через СБП');
 });
 
 test('paywall disabled does not reply', async () => {

@@ -38,6 +38,7 @@ def test_openapi_schema(client):
         "/v1/ai/diagnose",
         "/v1/photos",
         "/v1/limits",
+        "/v1/payments/create",
         "/v1/payments/sbp/webhook",
         "/v1/partner/orders",
     ]:
@@ -226,6 +227,12 @@ def test_photos_unauthorized(client):
     assert resp.status_code in {401, 404}
     if resp.status_code == 401:
         assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
+
+
+def test_create_payment(client):
+    resp = client.post("/v1/payments/create", headers=HEADERS)
+    assert resp.status_code == 200
+    assert resp.json()["url"].startswith("https://")
 
 
 def test_payment_webhook_success(client):

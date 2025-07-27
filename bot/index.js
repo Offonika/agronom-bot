@@ -1,8 +1,7 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { Pool } = require('pg');
-const { photoHandler, messageHandler, startHandler, subscribeHandler } = require('./handlers');
-const crypto = require('node:crypto');
+const { photoHandler, messageHandler, startHandler, subscribeHandler, buyProHandler } = require('./handlers');
 
 const token = process.env.BOT_TOKEN_DEV;
 if (!token) {
@@ -37,6 +36,8 @@ bot.action('ask_expert', (ctx) => {
   ctx.answerCbQuery();
   return ctx.reply('Свяжитесь с экспертом для уточнения протокола.');
 });
+
+bot.action('buy_pro', (ctx) => buyProHandler(ctx, pool));
 
 bot.launch().then(() => console.log('Bot started'));
 
