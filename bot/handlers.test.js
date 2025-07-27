@@ -287,7 +287,9 @@ test('retryHandler returns result', { concurrency: false }, async () => {
 
 test('historyHandler paginates', { concurrency: false }, async () => {
   const replies = [];
-  const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
+  const events = [];
+  const pool = { query: async (...a) => events.push(a) };
+  const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch({
     'http://localhost:8000/v1/photos/history?limit=10&offset=0': {
       json: async () => [
@@ -295,12 +297,25 @@ test('historyHandler paginates', { concurrency: false }, async () => {
       ],
     },
   }, async () => {
-    await historyHandler(ctx, 0);
+    await historyHandler(ctx, 0, pool);
   });
   assert.ok(replies[0].msg.includes('1.'));
   const kb = replies[0].opts.reply_markup.inline_keyboard;
   assert.equal(kb[0][0].callback_data, 'info|1');
   assert.equal(kb[kb.length - 1][1].callback_data, 'history|10');
+  assert.equal(events[0][1][1], 'history_open');
+});
+
+test('historyHandler logs page event', { concurrency: false }, async () => {
+  const events = [];
+  const pool = { query: async (...a) => events.push(a) };
+  const ctx = { from: { id: 2 }, reply: async () => {} };
+  await withMockFetch({
+    'http://localhost:8000/v1/photos/history?limit=10&offset=10': { json: async () => [] },
+  }, async () => {
+    await historyHandler(ctx, 10, pool);
+  });
+  assert.equal(events[0][1][1], 'history_page');
 });
 
 test('helpHandler returns link', { concurrency: false }, async () => {
