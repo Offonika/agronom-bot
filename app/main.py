@@ -135,6 +135,11 @@ class PaymentCreateResponse(BaseModel):
     url: str
 
 
+class PaymentStatusResponse(BaseModel):
+    status: str
+    pro_expires_at: datetime | None = None
+
+
 class PartnerOrderRequest(BaseModel):
     order_id: str
     user_tg_id: int
@@ -497,6 +502,27 @@ async def create_payment(
         db.commit()
 
     return PaymentCreateResponse(payment_id=external_id, url=url)
+
+
+@app.get(
+    "/v1/payments/{payment_id}",
+    response_model=PaymentStatusResponse,
+    responses={401: {"model": ErrorResponse}},
+)
+async def payment_status(
+    payment_id: str,
+    _: None = Depends(require_api_headers),
+):
+    """Return payment status and PRO expiration date."""
+    with SessionLocal() as db:
+        payment = db.query(Payment).filter_by(external_id=payment_id).first()
+        if not payment:
+            raise HTTPException(status_code=404, detail="NOT_FOUND")
+        exp = db.execute(
+            text("SELECT pro_expires_at FROM users WHERE id=:uid"),
+            {"uid": payment.user_id},
+        ).scalar()
+    return PaymentStatusResponse(status=payment.status, pro_expires_at=exp)
 
 
 @app.post(

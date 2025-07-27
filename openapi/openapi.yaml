@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: 1.5.0
+  version: 1.6.0
   description: |
     Telegram-бот «Карманный агроном» — API v1.4.0.
     Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
@@ -159,6 +159,18 @@ components:
         months:
           type: integer
           default: 1
+
+    PaymentStatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, success, fail, cancel, bank_error]
+        pro_expires_at:
+          type: string
+          format: date-time
+          nullable: true
 
     ErrorResponse:
       type: object
@@ -342,6 +354,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/payments/{payment_id}:
+    get:
+      summary: Payment status
+      operationId: getPaymentStatus
+      tags: [payments]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - in: path
+          name: payment_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatusResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
 
   /v1/payments/sbp/webhook:
     post:

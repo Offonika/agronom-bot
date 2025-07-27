@@ -3,7 +3,7 @@ const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 const crypto = require('node:crypto');
 
-async function buyProHandler(ctx, pool) {
+async function buyProHandler(ctx, pool, intervalMs = 3000) {
   ctx.answerCbQuery();
   if (ctx.from) {
     logEvent(pool, ctx.from.id, 'paywall_click_buy');
@@ -14,11 +14,18 @@ async function buyProHandler(ctx, pool) {
       headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
     });
     const data = await resp.json();
-    return ctx.reply('Оплатите подписку', {
+    ctx.paymentId = data.payment_id;
+    const reply = ctx.reply('Оплатите подписку', {
       reply_markup: {
         inline_keyboard: [[{ text: 'Оплатить 199 ₽ через СБП', url: data.url }]],
       },
     });
+    if (intervalMs > 0) {
+      ctx.pollPromise = pollPaymentStatus(ctx, data.payment_id, intervalMs).catch(
+        (e) => console.error('poll error', e)
+      );
+    }
+    return reply;
   } catch (err) {
     console.error('payment error', err);
     return ctx.reply('Ошибка создания платежа');
@@ -174,10 +181,36 @@ function subscribeHandler(ctx, pool) {
   return sendPaywall(ctx, pool);
 }
 
+async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
+  for (let i = 0; i < 20; i += 1) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const resp = await fetch(`${API_BASE}/v1/payments/${paymentId}`, {
+        headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (['success', 'fail', 'cancel'].includes(data.status)) {
+        if (data.status === 'success') {
+          const dt = new Date(data.pro_expires_at);
+          const date = dt.toLocaleDateString('ru-RU');
+          await ctx.reply(`Оплата прошла ✅, PRO активен до ${date}`);
+        } else {
+          await ctx.reply('Оплата не удалась ❌');
+        }
+        break;
+      }
+    } catch (e) {
+      console.error('status check error', e);
+    }
+  }
+}
+
 module.exports = {
   photoHandler,
   messageHandler,
   startHandler,
   subscribeHandler,
   buyProHandler,
+  pollPaymentStatus,
 };
