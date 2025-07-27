@@ -16,6 +16,7 @@
 | [security_checklist.md](./security_checklist.md) | Меры защиты, подписи, лимиты |
 | [test_plan.md](./test_plan.md) | План тестирования: позитивные/негативные кейсы |
 | [partner_agrostore.md](./partner_agrostore.md) | Интеграция с AgroStore, deep‑link, SLA, подписи |
+| [payment_flow.md](./payment_flow.md) | Запуск песочницы оплаты SBP |
 
 ---
 
