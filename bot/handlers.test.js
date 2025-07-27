@@ -168,6 +168,13 @@ test('startHandler logs paywall clicks', { concurrency: false }, async () => {
   ]);
 });
 
+test('startHandler replies with onboarding text', { concurrency: false }, async () => {
+  let msg = '';
+  const ctx = { reply: async (m) => { msg = m; }, startPayload: undefined, from: { id: 1 } };
+  await startHandler(ctx, { query: async () => {} });
+  assert.equal(msg, 'Отправьте фото листа для диагностики');
+});
+
 test('buyProHandler returns payment link', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };

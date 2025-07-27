@@ -22,7 +22,17 @@ const pool = new Pool({
 });
 const bot = new Telegraf(token);
 
-bot.start((ctx) => startHandler(ctx, pool));
+bot.telegram.setMyCommands([
+  { command: 'start', description: 'Начать работу' },
+  { command: 'help', description: 'Помощь' },
+  { command: 'history', description: 'История запросов' },
+  { command: 'subscribe', description: 'Купить PRO' },
+]);
+
+bot.start(async (ctx) => {
+  await startHandler(ctx, pool);
+  await bot.telegram.setChatMenuButton(ctx.chat.id, { type: 'commands' });
+});
 
 bot.command('subscribe', (ctx) => subscribeHandler(ctx, pool));
 
