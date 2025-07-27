@@ -6,6 +6,7 @@ const { execFileSync } = require('child_process');
 const connection = { connectionString: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = 'retry-diagnosis';
 
+const MAX_RETRIES = parseInt(process.env.RETRY_LIMIT || '3', 10);
 const queue = new Queue(queueName, { connection });
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -51,7 +52,10 @@ new Worker(
           );
           success += 1;
         } catch (err) {
-          await client.query("UPDATE photos SET status='retrying' WHERE id=$1", [row.id]);
+          await client.query(
+            "UPDATE photos SET retry_attempts = retry_attempts + 1, status = CASE WHEN retry_attempts + 1 >= $2 THEN 'failed' ELSE 'retrying' END WHERE id=$1",
+            [row.id, MAX_RETRIES]
+          );
           failed += 1;
         }
       }

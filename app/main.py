@@ -150,6 +150,7 @@ class PhotoStatusResponse(BaseModel):
     crop: str | None = None
     disease: str | None = None
     protocol: ProtocolResponse | None = None
+    retry_attempts: int
 
 
 class PartnerOrderRequest(BaseModel):
@@ -696,4 +697,5 @@ async def photo_status(photo_id: int, _: None = Depends(require_api_headers)):
         crop=photo.crop,
         disease=photo.disease,
         protocol=proto,
+        retry_attempts=photo.retry_attempts,
     )
