@@ -39,10 +39,12 @@ from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol, import_csv_to_db
 from app.services.storage import init_storage, upload_photo
 from app.services import create_sbp_link
+from app.logger import setup_logging
 
 settings = Settings()
 init_db(settings)
 init_storage(settings)
+setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -282,6 +284,9 @@ async def diagnose(
             and used > FREE_MONTHLY_LIMIT
             and (not pro or pro < now_utc)
         ):
+            if pro and pro < now_utc:
+                db.add(Event(user_id=user_id, event="pro_expired"))
+                db.commit()
             return JSONResponse(
                 status_code=402,
                 content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
@@ -499,6 +504,7 @@ async def create_payment(
             status="pending",
         )
         db.add(payment)
+        db.add(Event(user_id=body.user_id, event="payment_created"))
         db.commit()
 
     return PaymentCreateResponse(payment_id=external_id, url=url)
@@ -583,6 +589,7 @@ async def payments_webhook(
                 {"uid": payment.user_id, "exp": new_exp},
             )
             db.add(Event(user_id=payment.user_id, event="payment_success"))
+            db.add(Event(user_id=payment.user_id, event="pro_activated"))
         else:
             db.add(Event(user_id=payment.user_id, event="payment_fail"))
 
