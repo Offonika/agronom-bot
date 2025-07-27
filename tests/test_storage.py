@@ -8,7 +8,17 @@ from moto import mock_aws
 from fastapi import HTTPException
 from app.services import storage
 from app.config import Settings
-from app.services.storage import upload_photo, get_public_url
+from app.services.storage import upload_photo, get_public_url, get_client
+
+
+@mock_aws
+def test_lazy_client_initialization():
+    storage.init_storage(Settings(_env_file=None))
+    assert storage._client is None
+    first = get_client()
+    assert first is storage._client
+    again = get_client()
+    assert again is first
 
 
 @mock_aws
