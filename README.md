@@ -127,6 +127,7 @@ agronom-bot/
    S3_ENDPOINT=http://localhost:9000
    S3_ACCESS_KEY=minio
    S3_SECRET_KEY=minio123
+   REDIS_URL=redis://localhost:6379
    ```
 
 2. Создайте виртуальное окружение под **Python 3.12** (в нём уже есть SQLite 3.35+):
