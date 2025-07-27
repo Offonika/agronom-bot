@@ -110,6 +110,15 @@ async function photoHandler(pool, ctx) {
     const data = await apiResp.json();
     console.log('API response', data);
 
+    if (data.status === 'pending') {
+      await ctx.reply('Диагноз в процессе обработки. Результат появится позже.', {
+        reply_markup: {
+          inline_keyboard: [[{ text: '🔄 Проверить позже', callback_data: `retry|${data.id}` }]],
+        },
+      });
+      return;
+    }
+
     let text =
       `Культура: ${data.crop}\n` +
       `Диагноз: ${data.disease}\n` +
@@ -181,6 +190,61 @@ function subscribeHandler(ctx, pool) {
   return sendPaywall(ctx, pool);
 }
 
+async function retryHandler(ctx, photoId) {
+  try {
+    const resp = await fetch(`${API_BASE}/v1/photos/${photoId}/status`, {
+      headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
+    });
+    if (!resp.ok) {
+      await ctx.reply('Ошибка запроса статуса');
+      return;
+    }
+    const data = await resp.json();
+    if (data.status === 'pending' || data.status === 'retrying') {
+      await ctx.reply('Диагноз в процессе обработки. Результат появится позже.', {
+        reply_markup: {
+          inline_keyboard: [[{ text: '🔄 Проверить позже', callback_data: `retry|${photoId}` }]],
+        },
+      });
+      return;
+    }
+
+    let text =
+      `Культура: ${data.crop}\n` +
+      `Диагноз: ${data.disease}\n` +
+      `Уверенность модели: ${(data.confidence * 100).toFixed(1)}%`;
+    if (data.protocol_status) {
+      text += `\n${data.protocol_status}`;
+    }
+
+    let keyboard;
+    if (data.protocol) {
+      const cb = [
+        'proto',
+        data.protocol.product,
+        data.protocol.dosage_value,
+        data.protocol.dosage_unit,
+        data.protocol.phi,
+      ].join('|');
+      const row = [{ text: 'Показать протокол', callback_data: cb }];
+      if (data.protocol.id) {
+        const urlBase = process.env.PARTNER_LINK_BASE || 'https://agrostore.example/agronom';
+        const uid = crypto.createHash('sha256').update(String(ctx.from.id)).digest('hex');
+        const link = `${urlBase}?pid=${data.protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
+        row.push({ text: 'Купить препарат', url: link });
+      }
+      keyboard = { inline_keyboard: [row] };
+    } else {
+      keyboard = { inline_keyboard: [[{ text: 'Задать вопрос эксперту', callback_data: 'ask_expert' }]] };
+    }
+
+    await ctx.reply(text, { reply_markup: keyboard });
+  } catch (err) {
+    console.error('retry error', err);
+    await ctx.reply('Ошибка запроса статуса');
+  }
+}
+
 async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
   for (let i = 0; i < 20; i += 1) {
     await new Promise((r) => setTimeout(r, intervalMs));
@@ -212,5 +276,6 @@ module.exports = {
   startHandler,
   subscribeHandler,
   buyProHandler,
+  retryHandler,
   pollPaymentStatus,
 };
