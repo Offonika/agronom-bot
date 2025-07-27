@@ -1,7 +1,15 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { Pool } = require('pg');
-const { photoHandler, messageHandler, startHandler, subscribeHandler, buyProHandler, retryHandler } = require('./handlers');
+const {
+  photoHandler,
+  messageHandler,
+  startHandler,
+  subscribeHandler,
+  buyProHandler,
+  retryHandler,
+  historyHandler,
+} = require('./handlers');
 
 const token = process.env.BOT_TOKEN_DEV;
 if (!token) {
@@ -17,6 +25,8 @@ const bot = new Telegraf(token);
 bot.start((ctx) => startHandler(ctx, pool));
 
 bot.command('subscribe', (ctx) => subscribeHandler(ctx, pool));
+
+bot.command('history', (ctx) => historyHandler(ctx, 0));
 
 bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
@@ -44,6 +54,19 @@ bot.command('retry', (ctx) => {
 });
 
 bot.action(/^retry\|/, (ctx) => {
+  const [, id] = ctx.callbackQuery.data.split('|');
+  ctx.answerCbQuery();
+  return retryHandler(ctx, id);
+});
+
+bot.action(/^history\|/, (ctx) => {
+  const [, off] = ctx.callbackQuery.data.split('|');
+  const offset = Math.max(parseInt(off, 10) || 0, 0);
+  ctx.answerCbQuery();
+  return historyHandler(ctx, offset);
+});
+
+bot.action(/^info\|/, (ctx) => {
   const [, id] = ctx.callbackQuery.data.split('|');
   ctx.answerCbQuery();
   return retryHandler(ctx, id);
