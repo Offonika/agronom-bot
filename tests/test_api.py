@@ -1,6 +1,8 @@
 import json
 import base64
 import os
+from datetime import datetime, timezone
+
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
@@ -287,6 +289,91 @@ def test_payment_webhook_success(client):
         assert row.status == "success"
         event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
         assert event.event == "payment_success"
+
+
+def test_payment_webhook_updates_pro_expiration(client):
+    """PRO expires_at is set after successful webhook."""
+    from app.db import SessionLocal
+    from app.models import Payment
+
+    paid_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+    with SessionLocal() as session:
+        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1, 1)"))
+        payment = Payment(
+            user_id=1,
+            amount=100,
+            currency="RUB",
+            provider="sbp",
+            external_id="p3",
+            prolong_months=1,
+            status="pending",
+        )
+        session.add(payment)
+        session.commit()
+
+    payload = {
+        "external_id": "p3",
+        "status": "success",
+        "paid_at": paid_at.isoformat().replace("+00:00", "Z"),
+    }
+    sig = compute_signature("test-hmac-secret", payload)
+    payload["signature"] = sig
+    resp = client.post(
+        "/v1/payments/sbp/webhook",
+        headers=HEADERS | {"X-Signature": sig},
+        json=payload,
+    )
+    assert resp.status_code == 200
+
+    with SessionLocal() as session:
+        expires = session.execute(
+            text("SELECT pro_expires_at FROM users WHERE id=1")
+        ).scalar()
+        assert expires is not None
+        if isinstance(expires, str):
+            expires = datetime.fromisoformat(expires)
+        assert expires > paid_at
+
+
+def test_payment_webhook_cancel(client):
+    """Webhook with status=cancel records failure."""
+    from app.db import SessionLocal
+    from app.models import Payment, Event
+
+    with SessionLocal() as session:
+        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1, 1)"))
+        payment = Payment(
+            user_id=1,
+            amount=100,
+            currency="RUB",
+            provider="sbp",
+            external_id="p4",
+            prolong_months=1,
+            status="pending",
+        )
+        session.add(payment)
+        session.commit()
+
+    payload = {
+        "external_id": "p4",
+        "status": "cancel",
+        "paid_at": "2024-01-01T00:00:00Z",
+    }
+    sig = compute_signature("test-hmac-secret", payload)
+    payload["signature"] = sig
+    resp = client.post(
+        "/v1/payments/sbp/webhook",
+        headers=HEADERS | {"X-Signature": sig},
+        json=payload,
+    )
+    assert resp.status_code == 200
+
+    with SessionLocal() as session:
+        row = session.query(Payment).filter_by(external_id="p4").first()
+        assert row.status == "cancel"
+        event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
+        assert event.event == "payment_fail"
 
 
 @pytest.mark.asyncio
