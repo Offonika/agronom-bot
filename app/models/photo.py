@@ -23,3 +23,4 @@ class Photo(Base):
     )
     ts = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     deleted = Column(Boolean, default=False)
+    retry_attempts = Column(Integer, nullable=False, server_default="0")

@@ -82,6 +82,9 @@ components:
           example: "Бета"
         protocol:
           $ref: '#/components/schemas/ProtocolResponse'
+        retry_attempts:
+          type: integer
+          description: Number of failed retry attempts
 
     ProtocolResponse:
       type: object
@@ -174,7 +177,7 @@ components:
 
     PhotoStatusResponse:
       type: object
-      required: [status, updated_at]
+      required: [status, updated_at, retry_attempts]
       properties:
         status:
           type: string
