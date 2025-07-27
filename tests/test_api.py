@@ -1,10 +1,11 @@
 import json
 import base64
+import os
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
+from sqlalchemy import text
 from app.main import compute_signature, verify_hmac
-import os
 from app.services.protocols import import_csv_to_db
 
 
@@ -247,25 +248,45 @@ def test_create_payment(client):
 
 
 def test_payment_webhook_success(client):
+    from app.db import SessionLocal
+    from app.models import Payment, Event
+
+    with SessionLocal() as session:
+        session.execute(
+            text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1, 1)")
+        )
+        payment = Payment(
+            user_id=1,
+            amount=100,
+            currency="RUB",
+            provider="sbp",
+            external_id="p1",
+            prolong_months=1,
+            status="pending",
+        )
+        session.add(payment)
+        session.commit()
+
     payload = {
-        "payment_id": "123",
-        "amount": 100,
-        "currency": "RUB",
+        "external_id": "p1",
         "status": "success",
+        "paid_at": "2024-01-01T00:00:00Z",
     }
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
-    headers = {
-        "X-API-Key": os.getenv("API_KEY", "test-api-key"),
-        "X-API-Ver": "v1",
-        "X-Sign": sig,
-    }
+    headers = HEADERS | {"X-Signature": sig}
     resp = client.post(
         "/v1/payments/sbp/webhook",
         headers=headers,
         json=payload,
     )
     assert resp.status_code == 200
+
+    with SessionLocal() as session:
+        row = session.query(Payment).filter_by(external_id="p1").first()
+        assert row.status == "success"
+        event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
+        assert event.event == "payment_success"
 
 
 @pytest.mark.asyncio
@@ -319,18 +340,14 @@ async def test_verify_hmac_bad_payload_signature(client):
 
 def test_payment_webhook_missing_signature(client):
     payload = {
-        "payment_id": "123",
-        "amount": 100,
-        "currency": "RUB",
+        "external_id": "1",
         "status": "success",
+        "paid_at": "2024-01-01T00:00:00Z",
         "signature": "abc",
     }
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers={
-            "X-API-Key": os.getenv("API_KEY", "test-api-key"),
-            "X-API-Ver": "v1",
-        },
+        headers=HEADERS,
         json=payload,
     )
     assert resp.status_code in {400, 401, 404, 422}
@@ -338,23 +355,54 @@ def test_payment_webhook_missing_signature(client):
 
 def test_payment_webhook_bad_payload(client):
     payload = {
-        "payment_id": "123",
-        "amount": 100,
-        # missing currency
-        "status": "success",
+        "external_id": "123",
+        # missing status
+        "paid_at": "2024-01-01T00:00:00Z",
     }
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers={
-            "X-API-Key": os.getenv("API_KEY", "test-api-key"),
-            "X-API-Ver": "v1",
-            "X-Sign": sig,
-        },
+        headers=HEADERS | {"X-Signature": sig},
         json=payload,
     )
     assert resp.status_code in {400, 422}
+
+
+def test_payment_webhook_bad_signature_returns_403(client, monkeypatch):
+    from app.db import SessionLocal
+    from app.models import Payment
+
+    monkeypatch.setenv("SECURE_WEBHOOK", "1")
+
+    with SessionLocal() as session:
+        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1, 1)"))
+        payment = Payment(
+            user_id=1,
+            amount=100,
+            currency="RUB",
+            provider="sbp",
+            external_id="p2",
+            prolong_months=1,
+            status="pending",
+        )
+        session.add(payment)
+        session.commit()
+
+    payload = {
+        "external_id": "p2",
+        "status": "success",
+        "paid_at": "2024-01-01T00:00:00Z",
+    }
+    sig = compute_signature("test-hmac-secret", payload)
+    payload["signature"] = sig
+    headers = HEADERS | {"X-Signature": "bad"}
+    resp = client.post(
+        "/v1/payments/sbp/webhook",
+        headers=headers,
+        json=payload,
+    )
+    assert resp.status_code == 403
 
 
 def test_partner_order_success(client):

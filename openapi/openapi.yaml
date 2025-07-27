@@ -133,19 +133,16 @@ components:
 
     PaymentWebhook:
       type: object
-      required: [payment_id, amount, currency, status, signature]
+      required: [external_id, status, paid_at, signature]
       properties:
-        payment_id:
+        external_id:
           type: string
-        amount:
-          type: integer
-          description: value in kopeks
-        currency:
-          type: string
-          example: RUB
         status:
           type: string
           enum: [success, fail, cancel, bank_error]
+        paid_at:
+          type: string
+          format: date-time
         signature:
           type: string
           description: HMAC-SHA256 of payload

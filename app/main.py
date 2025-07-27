@@ -4,7 +4,8 @@ import hmac
 import hashlib
 import json
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import os
 import sqlite3
 
 from fastapi import (
@@ -30,6 +31,7 @@ from app.models import (
     Payment,
     PartnerOrder,
     Photo,
+    Event,
 )
 from uuid import uuid4
 
@@ -114,10 +116,9 @@ class ListPhotosResponse(BaseModel):
 
 
 class PaymentWebhook(BaseModel):
-    payment_id: str
-    amount: int
-    currency: str
+    external_id: str
     status: str
+    paid_at: datetime
     signature: str
 
 
@@ -268,6 +269,8 @@ async def diagnose(
             text("SELECT pro_expires_at FROM users WHERE id=:uid"),
             {"uid": user_id},
         ).scalar()
+        if isinstance(pro, str):
+            pro = datetime.fromisoformat(pro)
         now_utc = datetime.now(timezone.utc)
         if (
             PAYWALL_ENABLED
@@ -504,25 +507,61 @@ async def create_payment(
 async def payments_webhook(
     request: Request,
     _: None = Depends(require_api_headers),
-    x_sign: str = Header(..., alias="X-Sign"),
+    x_signature: str | None = Header(None, alias="X-Signature"),
 ):
     """Record SBP payment status from webhook."""
-    data, _, provided_sign = await verify_hmac(request, x_sign)
+    secure = os.getenv("SECURE_WEBHOOK")
+    if secure:
+        if not x_signature:
+            raise HTTPException(status_code=403, detail="FORBIDDEN")
+        try:
+            data, _, provided_sign = await verify_hmac(request, x_signature)
+        except HTTPException:
+            raise HTTPException(status_code=403, detail="FORBIDDEN")
+    else:
+        try:
+            data = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="BAD_REQUEST")
+        provided_sign = data.pop("signature", "")
+
     try:
         body = PaymentWebhook(**data, signature=provided_sign)
     except ValidationError:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
     with SessionLocal() as db:
-        payment = Payment(
-            user_id=1,
-            amount=body.amount,
-            provider="sbp",
-            status=body.status,
-            currency=body.currency,
-        )
+        payment = db.query(Payment).filter_by(external_id=body.external_id).first()
+        if not payment:
+            raise HTTPException(status_code=404, detail="NOT_FOUND")
+        payment.status = body.status
+        payment.updated_at = datetime.now(timezone.utc)
         db.add(payment)
+
+        if body.status == "success":
+            months = payment.prolong_months or 0
+            res = db.execute(
+                text("SELECT pro_expires_at FROM users WHERE id=:uid"),
+                {"uid": payment.user_id},
+            ).scalar()
+            current_exp = res or body.paid_at
+            if isinstance(current_exp, str):
+                current_exp = datetime.fromisoformat(current_exp)
+            if current_exp < body.paid_at:
+                current_exp = body.paid_at
+            new_exp = current_exp + timedelta(days=30 * months)
+            db.execute(
+                text(
+                    "UPDATE users SET pro_expires_at=:exp WHERE id=:uid"
+                ),
+                {"uid": payment.user_id, "exp": new_exp},
+            )
+            db.add(Event(user_id=payment.user_id, event="payment_success"))
+        else:
+            db.add(Event(user_id=payment.user_id, event="payment_fail"))
+
         db.commit()
+
     return {}
 
 
