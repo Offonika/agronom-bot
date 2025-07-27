@@ -4,7 +4,7 @@ info:
   title: Agronom Bot Internal API
   version: 1.7.0
   description: |
-    Telegram-бот «Карманный агроном» — API v1.4.0.
+    Telegram-бот «Карманный агроном» — API v1.7.0.
     Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
   contact:
     name: Ivan Gromov
