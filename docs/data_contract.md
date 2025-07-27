@@ -15,7 +15,7 @@ id PK, user_id FK, file_id TEXT, file_unique_id TEXT, width INT, height INT, fil
 3.3 protocols
 Без изменений
 3.4 payments
-id PK, user_id FK, amount INT, source TEXT, status payment_status, created_at TIMESTAMP
+id PK, user_id FK, amount INT, currency TEXT, status payment_status, created_at TIMESTAMP, updated_at TIMESTAMP, provider TEXT, external_id TEXT, prolong_months INT
 3.5 partner_orders
 id PK, user_id FK, order_id TEXT, protocol_id INT, price_kopeks INT, signature TEXT, created_at TIMESTAMP, status order_status
 3.6 photo_quota (NEW)

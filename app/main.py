@@ -466,8 +466,9 @@ async def payments_webhook(
         payment = Payment(
             user_id=1,
             amount=body.amount,
-            source="sbp",
+            provider="sbp",
             status=body.status,
+            currency=body.currency,
         )
         db.add(payment)
         db.commit()
