@@ -6,6 +6,7 @@ const {
   messageHandler,
   startHandler,
   subscribeHandler,
+  helpHandler,
   buyProHandler,
   retryHandler,
   historyHandler,
@@ -35,6 +36,8 @@ bot.start(async (ctx) => {
 });
 
 bot.command('subscribe', (ctx) => subscribeHandler(ctx, pool));
+
+bot.command('help', (ctx) => helpHandler(ctx));
 
 bot.command('history', (ctx) => historyHandler(ctx, 0));
 

@@ -7,6 +7,7 @@ const {
   messageHandler,
   subscribeHandler,
   startHandler,
+  helpHandler,
   buyProHandler,
   pollPaymentStatus,
   retryHandler,
@@ -287,4 +288,15 @@ test('historyHandler paginates', { concurrency: false }, async () => {
   const kb = replies[0].opts.reply_markup.inline_keyboard;
   assert.equal(kb[0][0].callback_data, 'info|1');
   assert.equal(kb[kb.length - 1][1].callback_data, 'history|10');
+});
+
+test('helpHandler returns link', { concurrency: false }, async () => {
+  process.env.PRIVACY_URL = 'https://example.com/policy';
+  const replies = [];
+  const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
+  await helpHandler(ctx);
+  assert.ok(replies[0].msg.includes('example.com/policy'));
+  const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
+  assert.equal(button.url, 'https://example.com/policy');
+  assert.equal(button.text, 'Открыть политику');
 });
