@@ -178,7 +178,7 @@ components:
       properties:
         status:
           type: string
-          enum: [pending, ok, retrying]
+          enum: [pending, ok, retrying, failed]
         updated_at:
           type: string
           format: date-time

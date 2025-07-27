@@ -277,6 +277,24 @@ def test_photo_status_completed(client):
     assert body["protocol"] is not None
 
 
+def test_photo_status_failed(client):
+    """Photo with failed status returns minimal fields."""
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        photo = Photo(user_id=1, file_id="test.jpg", status="failed")
+        session.add(photo)
+        session.commit()
+        pid = photo.id
+
+    resp = client.get(f"/v1/photos/{pid}", headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "failed"
+    assert "updated_at" in data
+
+
 def test_create_payment(client):
     payload = {"user_id": 1, "plan": "pro", "months": 1}
     resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
