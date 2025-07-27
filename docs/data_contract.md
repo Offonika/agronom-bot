@@ -25,9 +25,9 @@ user_id PK, month CHAR(7) PK, used INT, updated_at TIMESTAMP
 3.8 events (NEW)
 id PK, user_id INT, event TEXT, ts TIMESTAMP
 4 · Enum Definitions
-CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying');CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');CREATE TYPE error_code     AS ENUM ('NO_LEAF', 'LIMIT_EXCEEDED', 'GPT_TIMEOUT', 'BAD_REQUEST', 'UNAUTHORIZED');
+CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying','failed');CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');CREATE TYPE error_code     AS ENUM ('NO_LEAF', 'LIMIT_EXCEEDED', 'GPT_TIMEOUT', 'BAD_REQUEST', 'UNAUTHORIZED');
 5 · Data Lifecycle
-graph TDPENDING[photos.status=pending] -->|predict| OK[status=ok]PENDING -->|retry| RETRY[status=retrying]RETRY -->|predict| OKPhotos auto-delete from S3 after 90d. DB rows soft-deleted 30d later. Quota resets monthly.
+graph TDPENDING[photos.status=pending] -->|predict| OK[status=ok]PENDING -->|retry| RETRY[status=retrying]RETRY -->|error| FAILED[status=failed]RETRY -->|predict| OKPhotos auto-delete from S3 after 90d. DB rows soft-deleted 30d later. Quota resets monthly.
 6 · API ↔ DB Mapping (extract)
 /v1/ai/diagnose → insert photos/v1/limits → read photo_quota + count from photos/v1/payments/sbp/webhook → insert payments/v1/partner/orders → insert partner_orders (with signature)
 
