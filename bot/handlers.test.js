@@ -13,6 +13,14 @@ const {
   retryHandler,
   historyHandler,
 } = require('./handlers');
+const strings = require('../locales/ru.json');
+function tr(key, vars = {}) {
+  let text = strings[key];
+  for (const [k, v] of Object.entries(vars)) {
+    text = text.replace(`{${k}}`, v);
+  }
+  return text;
+}
 
 async function withMockFetch(responses, fn) {
   const origFetch = global.fetch;
@@ -144,7 +152,7 @@ test('photoHandler paywall on 402', { concurrency: false }, async () => {
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].msg, 'Бесплатный лимит 4 фото/мес исчерпан');
+  assert.equal(replies[0].msg, tr('paywall', { limit: 4 }));
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].callback_data, 'buy_pro');
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
@@ -155,7 +163,7 @@ test('subscribeHandler shows paywall', { concurrency: false }, async () => {
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
   process.env.FREE_PHOTO_LIMIT = '5';
   await subscribeHandler(ctx);
-  assert.equal(replies[0].msg, 'Бесплатный лимит 5 фото/мес исчерпан');
+  assert.equal(replies[0].msg, tr('paywall', { limit: 5 }));
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].callback_data, 'buy_pro');
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
@@ -186,7 +194,7 @@ test('startHandler replies with onboarding text', { concurrency: false }, async 
   let msg = '';
   const ctx = { reply: async (m) => { msg = m; }, startPayload: undefined, from: { id: 1 } };
   await startHandler(ctx, { query: async () => {} });
-  assert.equal(msg, 'Отправьте фото листа для диагностики');
+  assert.equal(msg, tr('start'));
 });
 
 test('buyProHandler returns payment link', { concurrency: false }, async () => {
@@ -203,7 +211,7 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   });
   const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(btn.url, 'http://pay');
-  assert.equal(btn.text, 'Оплатить 199 ₽ через СБП');
+  assert.equal(btn.text, tr('payment_button'));
   assert.equal(ctx.paymentId, 'p1');
 });
 
@@ -234,7 +242,7 @@ test('buyProHandler polls fail', { concurrency: false }, async () => {
     await buyProHandler(ctx, pool, 1);
     if (ctx.pollPromise) await ctx.pollPromise;
   });
-  assert.equal(replies[1].msg, 'Оплата не удалась ❌');
+  assert.equal(replies[1].msg, tr('payment_fail'));
 });
 
 test('paywall disabled does not reply', { concurrency: false }, async () => {
@@ -261,9 +269,9 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].msg, 'Диагноз в процессе обработки. Результат появится позже.');
+  assert.equal(replies[0].msg, tr('diag_pending'));
   const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
-  assert.equal(btn.text, '🔄 Проверить позже');
+  assert.equal(btn.text, tr('retry_button'));
   assert.equal(btn.callback_data, 'retry|42');
 });
 
@@ -326,5 +334,5 @@ test('helpHandler returns link', { concurrency: false }, async () => {
   assert.ok(replies[0].msg.includes('example.com/policy'));
   const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(button.url, 'https://example.com/policy');
-  assert.equal(button.text, 'Открыть политику');
+  assert.equal(button.text, tr('help_button'));
 });

@@ -2,6 +2,15 @@ const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 const crypto = require('node:crypto');
+const strings = require('../locales/ru.json');
+
+function msg(key, vars = {}) {
+  let text = strings[key] || '';
+  for (const [k, v] of Object.entries(vars)) {
+    text = text.replace(`{${k}}`, v);
+  }
+  return text;
+}
 
 async function buyProHandler(ctx, pool, intervalMs = 3000) {
   ctx.answerCbQuery();
@@ -15,9 +24,9 @@ async function buyProHandler(ctx, pool, intervalMs = 3000) {
     });
     const data = await resp.json();
     ctx.paymentId = data.payment_id;
-    const reply = ctx.reply('Оплатите подписку', {
+    const reply = ctx.reply(msg('payment_prompt'), {
       reply_markup: {
-        inline_keyboard: [[{ text: 'Оплатить 199 ₽ через СБП', url: data.url }]],
+        inline_keyboard: [[{ text: msg('payment_button'), url: data.url }]],
       },
     });
     if (intervalMs > 0) {
@@ -28,7 +37,7 @@ async function buyProHandler(ctx, pool, intervalMs = 3000) {
     return reply;
   } catch (err) {
     console.error('payment error', err);
-    return ctx.reply('Ошибка создания платежа');
+    return ctx.reply(msg('payment_error'));
   }
 }
 function paywallEnabled() {
@@ -59,7 +68,7 @@ function sendPaywall(ctx, pool) {
     logEvent(pool, ctx.from.id, 'paywall_shown');
   }
   const limit = getLimit();
-  return ctx.reply(`Бесплатный лимит ${limit} фото/мес исчерпан`, {
+  return ctx.reply(msg('paywall', { limit }), {
     reply_markup: {
       inline_keyboard: [
         [
@@ -111,9 +120,9 @@ async function photoHandler(pool, ctx) {
     console.log('API response', data);
 
     if (data.status === 'pending') {
-      await ctx.reply('Диагноз в процессе обработки. Результат появится позже.', {
+      await ctx.reply(msg('diag_pending'), {
         reply_markup: {
-          inline_keyboard: [[{ text: '🔄 Проверить позже', callback_data: `retry|${data.id}` }]],
+          inline_keyboard: [[{ text: msg('retry_button'), callback_data: `retry|${data.id}` }]],
         },
       });
       return;
@@ -157,7 +166,7 @@ async function photoHandler(pool, ctx) {
   } catch (err) {
     console.error('diagnose error', err);
     if (typeof ctx.reply === 'function') {
-      await ctx.reply('Ошибка диагностики');
+      await ctx.reply(msg('diagnose_error'));
     }
   }
 }
@@ -180,18 +189,17 @@ function startHandler(ctx, pool) {
   } else if (ctx.startPayload === 'faq') {
     logEvent(pool, ctx.from.id, 'paywall_click_faq');
   }
-  ctx.reply('Отправьте фото листа для диагностики');
+  ctx.reply(msg('start'));
 }
 
 function helpHandler(ctx) {
   const url =
     process.env.PRIVACY_URL ||
     'https://github.com/your-org/agronom-bot/blob/main/docs/privacy_policy.md';
-  const text =
-    `Используя бота, вы соглашаетесь с [политикой конфиденциальности](${url}).`;
+  const text = msg('help', { url });
   return ctx.reply(text, {
     parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: [[{ text: 'Открыть политику', url }]] },
+    reply_markup: { inline_keyboard: [[{ text: msg('help_button'), url }]] },
   });
 }
 
@@ -212,7 +220,7 @@ async function historyHandler(ctx, offset = 0, pool) {
     { headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER } },
   );
   if (!resp.ok) {
-    await ctx.reply('Ошибка получения истории');
+    await ctx.reply(msg('history_error'));
     return;
   }
   const data = await resp.json();
@@ -223,7 +231,7 @@ async function historyHandler(ctx, offset = 0, pool) {
       return `${idx + offset + 1}. ${date}, ${it.crop}, ${it.disease}, ${it.status}`;
     })
     .join('\n');
-  if (!text) text = 'История пуста';
+  if (!text) text = msg('history_empty');
   const keyboard = data.map((it) => [{ text: 'ℹ️', callback_data: `info|${it.photo_id}` }]);
   keyboard.push([
     { text: '◀️', callback_data: `history|${Math.max(offset - 10, 0)}` },
@@ -238,14 +246,14 @@ async function retryHandler(ctx, photoId) {
       headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
     });
     if (!resp.ok) {
-      await ctx.reply('Ошибка запроса статуса');
+      await ctx.reply(msg('status_error'));
       return;
     }
     const data = await resp.json();
     if (data.status === 'pending' || data.status === 'retrying') {
-      await ctx.reply('Диагноз в процессе обработки. Результат появится позже.', {
+      await ctx.reply(msg('diag_pending'), {
         reply_markup: {
-          inline_keyboard: [[{ text: '🔄 Проверить позже', callback_data: `retry|${photoId}` }]],
+          inline_keyboard: [[{ text: msg('retry_button'), callback_data: `retry|${photoId}` }]],
         },
       });
       return;
@@ -283,7 +291,7 @@ async function retryHandler(ctx, photoId) {
     await ctx.reply(text, { reply_markup: keyboard });
   } catch (err) {
     console.error('retry error', err);
-    await ctx.reply('Ошибка запроса статуса');
+    await ctx.reply(msg('status_error'));
   }
 }
 
@@ -300,9 +308,9 @@ async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
         if (data.status === 'success') {
           const dt = new Date(data.pro_expires_at);
           const date = dt.toLocaleDateString('ru-RU');
-          await ctx.reply(`Оплата прошла ✅, PRO активен до ${date}`);
+          await ctx.reply(msg('payment_success', { date }));
         } else {
-          await ctx.reply('Оплата не удалась ❌');
+          await ctx.reply(msg('payment_fail'));
         }
         break;
       }
