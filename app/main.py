@@ -142,6 +142,14 @@ class PaymentStatusResponse(BaseModel):
     pro_expires_at: datetime | None = None
 
 
+class PhotoStatusResponse(BaseModel):
+    status: str
+    updated_at: datetime
+    crop: str | None = None
+    disease: str | None = None
+    protocol: ProtocolResponse | None = None
+
+
 class PartnerOrderRequest(BaseModel):
     order_id: str
     user_tg_id: int
@@ -627,3 +635,41 @@ async def partner_orders(
         db.add(order)
         db.commit()
     return JSONResponse(status_code=202, content={"status": "queued"})
+
+
+@app.get(
+    "/v1/photos/{photo_id}",
+    response_model=PhotoStatusResponse,
+    responses={401: {"model": ErrorResponse}, 404: {"description": "Not found"}},
+)
+async def photo_status(photo_id: int, _: None = Depends(require_api_headers)):
+    """Return photo processing status and details."""
+    user_id = 1
+    with SessionLocal() as db:
+        photo = (
+            db.query(Photo)
+            .filter_by(id=photo_id, user_id=user_id, deleted=False)
+            .first()
+        )
+        if not photo:
+            raise HTTPException(status_code=404, detail="NOT_FOUND")
+
+    proto = None
+    if photo.status == "ok" and photo.crop and photo.disease:
+        p = find_protocol(photo.crop, photo.disease)
+        if p:
+            proto = ProtocolResponse(
+                id=p.id,
+                product=p.product,
+                dosage_value=float(p.dosage_value or 0),
+                dosage_unit=p.dosage_unit,
+                phi=p.phi,
+            )
+
+    return PhotoStatusResponse(
+        status=photo.status,
+        updated_at=photo.ts,
+        crop=photo.crop,
+        disease=photo.disease,
+        protocol=proto,
+    )

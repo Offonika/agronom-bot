@@ -232,6 +232,51 @@ def test_photos_unauthorized(client):
         assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
 
 
+def test_photo_status_pending(client):
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        photo = Photo(user_id=1, file_id="test.jpg", status="pending")
+        session.add(photo)
+        session.commit()
+        pid = photo.id
+
+    resp = client.get(f"/v1/photos/{pid}", headers=HEADERS)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "pending"
+    assert "updated_at" in data
+
+
+def test_photo_status_completed(client):
+    from app.db import SessionLocal
+    from app.models import Photo
+    from app.services.protocols import import_csv_to_db
+
+    import_csv_to_db()
+
+    with SessionLocal() as session:
+        photo = Photo(
+            user_id=1,
+            file_id="test.jpg",
+            status="ok",
+            crop="apple",
+            disease="powdery_mildew",
+        )
+        session.add(photo)
+        session.commit()
+        pid = photo.id
+
+    resp = client.get(f"/v1/photos/{pid}", headers=HEADERS)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["crop"] == "apple"
+    assert body["disease"] == "powdery_mildew"
+    assert body["protocol"] is not None
+
+
 def test_create_payment(client):
     payload = {"user_id": 1, "plan": "pro", "months": 1}
     resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
