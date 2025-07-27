@@ -10,12 +10,14 @@ const queue = new Queue(queueName, { connection });
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+const retryCron = process.env.RETRY_CRON || '0 1 * * *';
+
 async function schedule() {
   await queue.add(
     'retry',
     {},
     {
-      repeat: { cron: '0 1 * * *', tz: 'Europe/Moscow' },
+      repeat: { cron: retryCron, tz: 'Europe/Moscow' },
       removeOnComplete: true,
     }
   );
