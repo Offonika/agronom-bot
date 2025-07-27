@@ -2,6 +2,28 @@ const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 const crypto = require('node:crypto');
+
+async function buyProHandler(ctx, pool) {
+  ctx.answerCbQuery();
+  if (ctx.from) {
+    logEvent(pool, ctx.from.id, 'paywall_click_buy');
+  }
+  try {
+    const resp = await fetch(`${API_BASE}/v1/payments/create`, {
+      method: 'POST',
+      headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
+    });
+    const data = await resp.json();
+    return ctx.reply('Оплатите подписку', {
+      reply_markup: {
+        inline_keyboard: [[{ text: 'Оплатить 199 ₽ через СБП', url: data.url }]],
+      },
+    });
+  } catch (err) {
+    console.error('payment error', err);
+    return ctx.reply('Ошибка создания платежа');
+  }
+}
 function paywallEnabled() {
   return process.env.PAYWALL_ENABLED !== 'false';
 }
@@ -34,7 +56,7 @@ function sendPaywall(ctx, pool) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: 'Купить PRO (199 ₽/мес)', url: 'https://t.me/YourBot?start=paywall' },
+          { text: 'Купить PRO', callback_data: 'buy_pro' },
           { text: 'Подробнее', url: 'https://t.me/YourBot?start=faq' },
         ],
       ],
@@ -152,4 +174,10 @@ function subscribeHandler(ctx, pool) {
   return sendPaywall(ctx, pool);
 }
 
-module.exports = { photoHandler, messageHandler, startHandler, subscribeHandler };
+module.exports = {
+  photoHandler,
+  messageHandler,
+  startHandler,
+  subscribeHandler,
+  buyProHandler,
+};
