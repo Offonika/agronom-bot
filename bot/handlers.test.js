@@ -239,7 +239,7 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].msg, 'Диагноз в процессе обработки. Результат появится позже.');
+  assert.equal(replies[0].msg, 'Диагностика в процессе обработки. Результат будет позже');
   const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(btn.text, '🔄 Проверить позже');
   assert.equal(btn.callback_data, 'retry|42');
