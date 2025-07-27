@@ -312,6 +312,7 @@ test('historyHandler paginates', { concurrency: false }, async () => {
   assert.equal(kb[0][0].callback_data, 'info|1');
   assert.equal(kb[kb.length - 1][1].callback_data, 'history|10');
   assert.equal(events[0][1][1], 'history_open');
+  assert.equal(events[1][1][1], 'history_page_0');
 });
 
 test('historyHandler logs page event', { concurrency: false }, async () => {
@@ -323,7 +324,7 @@ test('historyHandler logs page event', { concurrency: false }, async () => {
   }, async () => {
     await historyHandler(ctx, 10, pool);
   });
-  assert.equal(events[0][1][1], 'history_page');
+  assert.equal(events[0][1][1], 'history_page_10');
 });
 
 test('helpHandler returns link', { concurrency: false }, async () => {
