@@ -190,6 +190,32 @@ function subscribeHandler(ctx, pool) {
   return sendPaywall(ctx, pool);
 }
 
+async function historyHandler(ctx, offset = 0) {
+  const resp = await fetch(
+    `${API_BASE}/v1/photos/history?limit=10&offset=${offset}`,
+    { headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER } },
+  );
+  if (!resp.ok) {
+    await ctx.reply('Ошибка получения истории');
+    return;
+  }
+  const data = await resp.json();
+  let text = data
+    .map((it, idx) => {
+      const dt = new Date(it.ts);
+      const date = dt.toLocaleDateString('ru-RU');
+      return `${idx + offset + 1}. ${date}, ${it.crop}, ${it.disease}, ${it.status}`;
+    })
+    .join('\n');
+  if (!text) text = 'История пуста';
+  const keyboard = data.map((it) => [{ text: 'ℹ️', callback_data: `info|${it.photo_id}` }]);
+  keyboard.push([
+    { text: '◀️', callback_data: `history|${Math.max(offset - 10, 0)}` },
+    { text: '▶️', callback_data: `history|${offset + 10}` },
+  ]);
+  await ctx.reply(text, { reply_markup: { inline_keyboard: keyboard } });
+}
+
 async function retryHandler(ctx, photoId) {
   try {
     const resp = await fetch(`${API_BASE}/v1/photos/${photoId}`, {
@@ -277,5 +303,6 @@ module.exports = {
   subscribeHandler,
   buyProHandler,
   retryHandler,
+  historyHandler,
   pollPaymentStatus,
 };

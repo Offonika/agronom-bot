@@ -10,6 +10,7 @@ const {
   buyProHandler,
   pollPaymentStatus,
   retryHandler,
+  historyHandler,
 } = require('./handlers');
 
 async function withMockFetch(responses, fn) {
@@ -261,4 +262,22 @@ test('retryHandler returns result', { concurrency: false }, async () => {
     await retryHandler(ctx, 42);
   });
   assert.ok(replies[0].msg.includes('Культура: apple'));
+});
+
+test('historyHandler paginates', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
+  await withMockFetch({
+    'http://localhost:8000/v1/photos/history?limit=10&offset=0': {
+      json: async () => [
+        { photo_id: 1, ts: '2025-01-01T00:00:00Z', crop: 'apple', disease: 'scab', status: 'ok' },
+      ],
+    },
+  }, async () => {
+    await historyHandler(ctx, 0);
+  });
+  assert.ok(replies[0].msg.includes('1.'));
+  const kb = replies[0].opts.reply_markup.inline_keyboard;
+  assert.equal(kb[0][0].callback_data, 'info|1');
+  assert.equal(kb[kb.length - 1][1].callback_data, 'history|10');
 });
