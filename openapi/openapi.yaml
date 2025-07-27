@@ -172,6 +172,23 @@ components:
           format: date-time
           nullable: true
 
+    PhotoStatusResponse:
+      type: object
+      required: [status, updated_at]
+      properties:
+        status:
+          type: string
+          enum: [pending, ok, retrying]
+        updated_at:
+          type: string
+          format: date-time
+        crop:
+          type: string
+        disease:
+          type: string
+        protocol:
+          $ref: '#/components/schemas/ProtocolResponse'
+
     ErrorResponse:
       type: object
       required: [code, message]
@@ -285,6 +302,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/photos/{photo_id}:
+    get:
+      summary: Get photo status
+      operationId: getPhotoStatus
+      tags: [photos]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - in: path
+          name: photo_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Photo details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoStatusResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
 
   /v1/limits:
     get:
