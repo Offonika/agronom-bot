@@ -4,17 +4,19 @@ from uuid import uuid4
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from botocore.client import BaseClient
 from fastapi import HTTPException
 
 from app.config import Settings
 
 
-
 BUCKET = os.getenv("S3_BUCKET", "agronom")
 _settings: Settings | None = None
 
+_client: BaseClient | None = None
 
-def _make_client() -> boto3.client:
+
+def _make_client() -> BaseClient:
     endpoint = os.getenv(
         "S3_ENDPOINT",
         _settings.s3_endpoint if _settings is not None else None,
@@ -40,14 +42,21 @@ def _make_client() -> boto3.client:
     )
 
 
-_client = _make_client()
+
+
+def get_client() -> BaseClient:
+    """Return a cached boto3 client, creating it if needed."""
+    global _client
+    if _client is None:
+        _client = _make_client()
+    return _client
 
 
 def init_storage(cfg: Settings) -> None:
     """Store settings and reinitialize the client."""
     global _settings, _client
     _settings = cfg
-    _client = _make_client()
+    _client = None
 
 
 def upload_photo(user_id: int, data: bytes) -> str:
@@ -59,7 +68,7 @@ def upload_photo(user_id: int, data: bytes) -> str:
         _settings.s3_bucket if _settings is not None else BUCKET,
     )
     try:
-        _client.put_object(
+        get_client().put_object(
             Bucket=bucket, Key=key, Body=data, ContentType="image/jpeg"
         )
     except (BotoCoreError, ClientError) as exc:
@@ -83,14 +92,14 @@ def get_public_url(key: str) -> str:
     if base:
         return f"{base.rstrip('/')}/{key}"
 
-    endpoint = _client.meta.endpoint_url or os.getenv(
+    endpoint = get_client().meta.endpoint_url or os.getenv(
         "S3_ENDPOINT",
         _settings.s3_endpoint if _settings is not None else None,
     )
     if endpoint:
         return f"{endpoint.rstrip('/')}/{bucket}/{key}"
 
-    region = _client.meta.region_name or os.getenv(
+    region = get_client().meta.region_name or os.getenv(
         "S3_REGION",
         _settings.s3_region if _settings is not None else "us-east-1",
     )
