@@ -9,6 +9,7 @@ const {
   startHandler,
   buyProHandler,
   pollPaymentStatus,
+  retryHandler,
 } = require('./handlers');
 
 async function withMockFetch(responses, fn) {
@@ -221,4 +222,43 @@ test('paywall disabled does not reply', { concurrency: false }, async () => {
   await subscribeHandler(ctx);
   assert.equal(replies.length, 0);
   delete process.env.PAYWALL_ENABLED;
+});
+
+test('photoHandler pending reply', { concurrency: false }, async () => {
+  const pool = { query: async () => {} };
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id5', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 200 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  await withMockFetch({
+    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    default: { json: async () => ({ status: 'pending', id: 42 }) },
+  }, async () => {
+    await photoHandler(pool, ctx);
+  });
+  assert.equal(replies[0].msg, 'Диагноз в процессе обработки. Результат появится позже.');
+  const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
+  assert.equal(btn.text, '🔄 Проверить позже');
+  assert.equal(btn.callback_data, 'retry|42');
+});
+
+test('retryHandler returns result', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
+  await withMockFetch({
+    'http://localhost:8000/v1/photos/42/status': {
+      json: async () => ({
+        status: 'ok',
+        crop: 'apple',
+        disease: 'scab',
+        confidence: 0.95,
+      }),
+    },
+  }, async () => {
+    await retryHandler(ctx, 42);
+  });
+  assert.ok(replies[0].msg.includes('Культура: apple'));
 });

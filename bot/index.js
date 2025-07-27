@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { Pool } = require('pg');
-const { photoHandler, messageHandler, startHandler, subscribeHandler, buyProHandler } = require('./handlers');
+const { photoHandler, messageHandler, startHandler, subscribeHandler, buyProHandler, retryHandler } = require('./handlers');
 
 const token = process.env.BOT_TOKEN_DEV;
 if (!token) {
@@ -35,6 +35,18 @@ bot.action(/^proto\|/, (ctx) => {
 bot.action('ask_expert', (ctx) => {
   ctx.answerCbQuery();
   return ctx.reply('Свяжитесь с экспертом для уточнения протокола.');
+});
+
+bot.command('retry', (ctx) => {
+  const [, id] = ctx.message.text.split(' ');
+  if (id) return retryHandler(ctx, id);
+  return ctx.reply('Укажите ID фото после команды /retry');
+});
+
+bot.action(/^retry\|/, (ctx) => {
+  const [, id] = ctx.callbackQuery.data.split('|');
+  ctx.answerCbQuery();
+  return retryHandler(ctx, id);
 });
 
 bot.action('buy_pro', (ctx) => buyProHandler(ctx, pool));
