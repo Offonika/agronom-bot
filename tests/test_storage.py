@@ -11,18 +11,37 @@ from app.config import Settings
 from app.services.storage import upload_photo, get_public_url, get_client
 
 
-@mock_aws
-def test_lazy_client_initialization():
-    storage.init_storage(Settings(_env_file=None))
-    assert storage._client is None
-    first = get_client()
-    assert first is storage._client
-    again = get_client()
-    assert again is first
+class _AsyncWrapper:
+    def __init__(self, client: boto3.client):
+        self._client = client
+        self.meta = client.meta
+
+    async def put_object(self, *args, **kwargs):
+        return self._client.put_object(*args, **kwargs)
 
 
-@mock_aws
-def test_upload_and_url():
+@pytest.fixture(autouse=True)
+def use_sync_client(monkeypatch):
+    async def _make():
+        return _AsyncWrapper(boto3.client("s3", region_name="us-east-1"))
+
+    monkeypatch.setattr(storage, "_make_client", _make)
+    storage._client = None
+
+
+@pytest.mark.asyncio
+async def test_lazy_client_initialization():
+    with mock_aws():
+        storage.init_storage(Settings(_env_file=None))
+        assert storage._client is None
+        first = await get_client()
+        assert first is storage._client
+        again = await get_client()
+        assert again is first
+
+
+@pytest.mark.asyncio
+async def test_upload_and_url():
     original_env = {
         "S3_BUCKET": os.environ.get("S3_BUCKET"),
         "S3_REGION": os.environ.get("S3_REGION"),
@@ -36,16 +55,17 @@ def test_upload_and_url():
         os.environ["S3_PUBLIC_URL"] = "http://localhost:9000"
         storage.init_storage(Settings(_env_file=None))
 
-        s3 = boto3.client("s3", region_name="us-east-1")
-        s3.create_bucket(Bucket="testbucket")
+        with mock_aws():
+            s3 = boto3.client("s3", region_name="us-east-1")
+            s3.create_bucket(Bucket="testbucket")
 
-        key = upload_photo(42, b"hello")
-        assert re.fullmatch(r"42/\d{14}-[0-9a-f]{32}\.jpg", key)
-        obj = s3.get_object(Bucket="testbucket", Key=key)
-        assert obj["Body"].read() == b"hello"
+            key = await upload_photo(42, b"hello")
+            assert re.fullmatch(r"42/\d{14}-[0-9a-f]{32}\.jpg", key)
+            obj = s3.get_object(Bucket="testbucket", Key=key)
+            assert obj["Body"].read() == b"hello"
 
-        url = get_public_url(key)
-        assert url == f"http://localhost:9000/{key}"
+            url = get_public_url(key)
+            assert url == f"http://localhost:9000/{key}"
     finally:
         for name, value in original_env.items():
             if value is None:
@@ -54,8 +74,8 @@ def test_upload_and_url():
                 os.environ[name] = value
 
 
-@mock_aws
-def test_upload_failure():
+@pytest.mark.asyncio
+async def test_upload_failure():
     original_env = {
         "S3_BUCKET": os.environ.get("S3_BUCKET"),
         "S3_REGION": os.environ.get("S3_REGION"),
@@ -69,10 +89,11 @@ def test_upload_failure():
         os.environ.pop("S3_PUBLIC_URL", None)
         storage.init_storage(Settings(_env_file=None))
 
-        # Intentionally do not create bucket to trigger error
-        with pytest.raises(HTTPException) as exc:
-            upload_photo(42, b"hello")
-        assert exc.value.status_code == 500
+        with mock_aws():
+            # Intentionally do not create bucket to trigger error
+            with pytest.raises(HTTPException) as exc:
+                await upload_photo(42, b"hello")
+            assert exc.value.status_code == 500
     finally:
         for name, value in original_env.items():
             if value is None:

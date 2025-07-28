@@ -14,7 +14,7 @@ from app.services.protocols import import_csv_to_db
 @pytest.fixture(autouse=True)
 def stub_upload(monkeypatch):
     """Prevent real S3 calls by stubbing upload_photo."""
-    def _stub(user_id: int, data: bytes) -> str:
+    async def _stub(user_id: int, data: bytes) -> str:
         return "1/stub.jpg"
 
     monkeypatch.setattr("app.services.storage.upload_photo", _stub)
