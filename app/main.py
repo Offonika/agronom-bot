@@ -207,14 +207,6 @@ async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")) -> Non
         raise HTTPException(status_code=400, detail=err.model_dump())
 
 
-def verify_hmac_signature(body: bytes, provided: str) -> str:
-    """Ensure the provided HMAC-SHA256 matches the payload."""
-    expected = hmac.new(HMAC_SECRET.encode(), body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, provided):
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-    return expected
-
-
 def compute_signature(secret: str, payload: dict) -> str:
     """Return hex HMAC-SHA256 for a JSON payload."""
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
