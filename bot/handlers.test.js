@@ -9,6 +9,7 @@ const {
   subscribeHandler,
   startHandler,
   helpHandler,
+  feedbackHandler,
   buyProHandler,
   pollPaymentStatus,
   retryHandler,
@@ -363,6 +364,20 @@ test('helpHandler returns links', { concurrency: false }, async () => {
   assert.equal(buttons[0][0].url, 'https://example.com/policy');
   assert.equal(buttons[1][0].url, 'https://example.com/offer');
   assert.equal(buttons[0][0].text, tr('help_button'));
+});
+
+test('feedbackHandler sends link and logs event', { concurrency: false }, async () => {
+  const replies = [];
+  const events = [];
+  const pool = { query: async (...a) => events.push(a) };
+  const ctx = { from: { id: 77 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
+  process.env.FEEDBACK_URL = 'https://fb.example/form';
+  await feedbackHandler(ctx, pool);
+  const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
+  assert.ok(btn.url.startsWith('https://fb.example/form'));
+  assert.ok(btn.url.includes('utm_source=telegram'));
+  assert.equal(events[0][1][1], 'feedback_open');
+  delete process.env.FEEDBACK_URL;
 });
 
 test('formatDiagnosis builds reply with protocol', () => {

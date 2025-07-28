@@ -213,6 +213,22 @@ function helpHandler(ctx) {
   });
 }
 
+function feedbackHandler(ctx, pool) {
+  const base = process.env.FEEDBACK_URL || 'https://example.com/feedback';
+  const url = new URL(base);
+  url.searchParams.set('utm_source', 'telegram');
+  url.searchParams.set('utm_medium', 'bot');
+  url.searchParams.set('utm_campaign', 'feedback');
+  if (ctx.from) {
+    logEvent(pool, ctx.from.id, 'feedback_open');
+  }
+  return ctx.reply('Будем рады вашему отзыву!', {
+    reply_markup: {
+      inline_keyboard: [[{ text: 'Оставить отзыв', url: url.toString() }]],
+    },
+  });
+}
+
 /**
  * Temporary stub for subscription command.
  */
@@ -311,6 +327,7 @@ module.exports = {
   startHandler,
   subscribeHandler,
   helpHandler,
+  feedbackHandler,
   buyProHandler,
   retryHandler,
   historyHandler,
