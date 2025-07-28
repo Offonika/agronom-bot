@@ -1,0 +1,40 @@
+name: Backup
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      PGPASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client awscli
+      - name: Dump database
+        run: |
+          pg_dump -h ${{ secrets.POSTGRES_HOST }} \
+            -p ${{ secrets.POSTGRES_PORT }} \
+            -U ${{ secrets.POSTGRES_USER }} \
+            ${{ secrets.POSTGRES_DB }} > db.sql
+      - name: Archive uploads
+        run: |
+          tar -czf uploads.tar.gz uploads 2>/dev/null || echo "No uploads directory"
+      - name: Create archive
+        run: |
+          tar -czf backup.tar.gz db.sql uploads.tar.gz
+      - name: Upload to Yandex Object Storage
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
+        run: |
+          date=$(date +%Y-%m-%d)
+          aws s3 cp backup.tar.gz s3://$S3_BUCKET/backups/agronom/${date}.tar.gz \
+            --endpoint-url ${{ secrets.S3_ENDPOINT }}
