@@ -37,3 +37,34 @@ jobs:
         run: npm ci --prefix bot
       - name: Run bot tests
         run: npm test --prefix bot
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt --ignore-vuln 0.0.0
+      - name: Install Node dependencies
+        run: npm ci --prefix bot
+      - name: Run npm audit
+        run: npm audit --prod --audit-level=high --prefix bot
+      - name: Build Docker image
+        run: docker build -t agronom-bot .
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@0.18.0
+        with:
+          image-ref: agronom-bot
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          exit-code: '1'
