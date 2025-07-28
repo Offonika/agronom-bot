@@ -43,3 +43,4 @@ app.db
 client/
 bot/node_modules/
 node_modules/
+dist/
