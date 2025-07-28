@@ -598,7 +598,7 @@ def test_payment_webhook_bad_payload(client):
     assert resp.status_code in {400, 422}
 
 
-def test_payment_webhook_bad_signature_returns_403(client, monkeypatch):
+def test_payment_webhook_bad_signature_returns_403(client, monkeypatch, caplog):
     from app.db import SessionLocal
     from app.models import Payment
 
@@ -626,12 +626,14 @@ def test_payment_webhook_bad_signature_returns_403(client, monkeypatch):
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
     headers = HEADERS | {"X-Signature": "bad"}
-    resp = client.post(
-        "/v1/payments/sbp/webhook",
-        headers=headers,
-        json=payload,
-    )
+    with caplog.at_level("WARNING"):
+        resp = client.post(
+            "/v1/payments/sbp/webhook",
+            headers=headers,
+            json=payload,
+        )
     assert resp.status_code == 403
+    assert any("audit: invalid webhook signature" in r.message for r in caplog.records)
 
 
 def test_partner_order_success(client):
