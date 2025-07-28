@@ -402,6 +402,7 @@ paths:
   /v1/photos/{photo_id}:
     get:
       summary: Get photo status
+      description: Retrieve status and metadata of a previously uploaded photo.
       operationId: getPhotoStatus
       tags: [photos]
       security:
@@ -464,6 +465,7 @@ paths:
   /v1/payments/create:
     post:
       summary: Create SBP payment
+      description: Initiate a new SBP transaction and return a URL for payment processing.
       operationId: createPayment
       tags: [payments]
       security:
@@ -501,6 +503,7 @@ paths:
   /v1/payments/{payment_id}:
     get:
       summary: Payment status
+      description: Check the current status of a previously created SBP payment.
       operationId: getPaymentStatus
       tags: [payments]
       security:
