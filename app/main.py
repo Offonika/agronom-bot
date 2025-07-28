@@ -49,6 +49,9 @@ init_storage(settings)
 setup_logging()
 logger = logging.getLogger(__name__)
 
+# Used to avoid calling ``File`` in function defaults (Ruff B008).
+OPTIONAL_FILE = File(None)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run startup tasks for the application."""
@@ -207,8 +210,8 @@ async def verify_hmac(request: Request, x_sign: str):
     raw_body = await request.body()
     try:
         data = json.loads(raw_body)
-    except Exception:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    except Exception as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
 
     provided_sign = data.pop("signature", None)
     if not provided_sign:
@@ -237,7 +240,7 @@ async def verify_hmac(request: Request, x_sign: str):
 async def diagnose(
     request: Request,
     user_id: int = Depends(require_api_headers),
-    image: UploadFile | None = File(None),
+    image: UploadFile | None = OPTIONAL_FILE,
     prompt_id: str | None = Form(None)
 ):
     """Diagnose plant disease from an uploaded image."""
@@ -450,8 +453,8 @@ async def list_photos(
             try:
                 last_id = int(cursor)
                 q = q.filter(Photo.id < last_id)
-            except ValueError:
-                raise HTTPException(status_code=400, detail="BAD_REQUEST")
+            except ValueError as err:
+                raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
 
         limit = min(limit, 50)
         rows = q.limit(limit).all()
@@ -609,14 +612,14 @@ async def payments_webhook(
 
     try:
         data = json.loads(raw_body)
-    except Exception:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    except Exception as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
     provided_sign = data.pop("signature", "")
 
     try:
         body = PaymentWebhook(**data, signature=provided_sign)
-    except ValidationError:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    except ValidationError as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
 
     with db_module.SessionLocal() as db:
         payment = db.query(Payment).filter_by(external_id=body.external_id).first()
@@ -668,8 +671,8 @@ async def partner_orders(
     data, sign, provided_sign = await verify_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)
-    except ValidationError:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    except ValidationError as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
 
     with db_module.SessionLocal() as db:
         order = PartnerOrder(
