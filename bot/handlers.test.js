@@ -351,15 +351,18 @@ test('historyHandler logs page event', { concurrency: false }, async () => {
   assert.equal(events[0][1][1], 'history_page_10');
 });
 
-test('helpHandler returns link', { concurrency: false }, async () => {
+test('helpHandler returns links', { concurrency: false }, async () => {
   process.env.PRIVACY_URL = 'https://example.com/policy';
+  process.env.OFFER_URL = 'https://example.com/offer';
   const replies = [];
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
   await helpHandler(ctx);
   assert.ok(replies[0].msg.includes('example.com/policy'));
-  const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
-  assert.equal(button.url, 'https://example.com/policy');
-  assert.equal(button.text, tr('help_button'));
+  assert.ok(replies[0].msg.includes('example.com/offer'));
+  const buttons = replies[0].opts.reply_markup.inline_keyboard;
+  assert.equal(buttons[0][0].url, 'https://example.com/policy');
+  assert.equal(buttons[1][0].url, 'https://example.com/offer');
+  assert.equal(buttons[0][0].text, tr('help_button'));
 });
 
 test('formatDiagnosis builds reply with protocol', () => {

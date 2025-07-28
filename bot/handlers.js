@@ -198,13 +198,18 @@ function startHandler(ctx, pool) {
 }
 
 function helpHandler(ctx) {
-  const url =
+  const policyUrl =
     process.env.PRIVACY_URL ||
     'https://github.com/your-org/agronom-bot/blob/main/docs/privacy_policy.md';
-  const text = msg('help', { url });
+  const offerUrl =
+    process.env.OFFER_URL ||
+    'https://github.com/your-org/agronom-bot/blob/main/docs/public_offer.md';
+  const text = msg('help', { policy_url: policyUrl, offer_url: offerUrl });
   return ctx.reply(text, {
     parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: [[{ text: msg('help_button'), url }]] },
+    reply_markup: {
+      inline_keyboard: [[{ text: msg('help_button'), url: policyUrl }], [{ text: msg('help_button'), url: offerUrl }]],
+    },
   });
 }
 
