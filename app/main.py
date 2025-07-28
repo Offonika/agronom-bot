@@ -41,6 +41,7 @@ from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol, import_csv_to_db
 from app.services.storage import init_storage, upload_photo, get_public_url
 from app.services import create_sbp_link
+from app.services.hmac import verifyHmac
 from app.logger import setup_logging
 
 settings = Settings()
@@ -629,20 +630,17 @@ async def payments_webhook(
     x_signature: str | None = Header(None, alias="X-Signature"),
 ):
     """Record SBP payment status from webhook."""
+    raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
-    if secure:
-        if not x_signature:
-            raise HTTPException(status_code=403, detail="FORBIDDEN")
-        try:
-            data, _, provided_sign = await verify_hmac(request, x_signature)
-        except HTTPException:
-            raise HTTPException(status_code=403, detail="FORBIDDEN")
-    else:
-        try:
-            data = await request.json()
-        except Exception:
-            raise HTTPException(status_code=400, detail="BAD_REQUEST")
-        provided_sign = data.pop("signature", "")
+    if secure and not verifyHmac(x_signature or "", raw_body, HMAC_SECRET):
+        logger.warning("audit: invalid webhook signature")
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
+
+    try:
+        data = json.loads(raw_body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+    provided_sign = data.pop("signature", "")
 
     try:
         body = PaymentWebhook(**data, signature=provided_sign)
