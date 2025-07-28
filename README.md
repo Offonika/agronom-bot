@@ -141,6 +141,11 @@ agronom-bot/
    RETRY_LIMIT=3
    ```
 
+`DATABASE_URL` и `BOT_DATABASE_URL` поддерживают форматы `postgresql://` и
+`postgresql+<driver>://` (например, `postgresql+psycopg://`). Скрипт
+`migrate_safe.sh` автоматически преобразует такие DSN к виду
+`postgresql://` перед передачей в `psql`.
+
 2. Создайте виртуальное окружение под **Python 3.12** (в нём уже есть SQLite 3.35+):
 
    ```bash

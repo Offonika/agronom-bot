@@ -6,6 +6,8 @@ set -euo pipefail
 # - Supports --dry-run to output the SQL plan without executing.
 
 DB_URL="${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/agronom}"
+# Normalize for psql: strip any driver prefix like postgresql+psycopg://
+DB_PSQL_URL=$(echo "$DB_URL" | sed -E 's#^postgresql\+[^:]+://#postgresql://#')
 
 if [[ "${1:-}" == "--dry-run" ]]; then
     alembic upgrade head --sql
@@ -23,7 +25,7 @@ CHECK_SQL="SELECT query FROM pg_stat_activity WHERE state = 'active'
   AND now() - query_start > interval '2 seconds'
   AND query ~* '^(alter|create|drop|truncate|reindex|cluster)';"
 
-BLOCKING=$(psql "$DB_URL" -Atc "$CHECK_SQL" || true)
+BLOCKING=$(psql "$DB_PSQL_URL" -Atc "$CHECK_SQL" || true)
 
 if [[ -n "$BLOCKING" ]]; then
     echo "Blocking DDL detected:\n$BLOCKING"
