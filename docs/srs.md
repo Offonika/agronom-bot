@@ -86,7 +86,7 @@ photos(id PK, user_id FK, file_id TEXT, crop TEXT, disease TEXT, confidence NUME
 protocols(id PK, crop TEXT, disease TEXT, product TEXT, dosage_value NUMERIC, dosage_unit TEXT, phi INT)
 payments(id PK, user_id FK, amount INT, source TEXT, status TEXT, created_at TIMESTAMP)
 photo_usage(user_id PK, month CHAR(7) PK, used INT, updated_at TIMESTAMP)
-idx: photos_user_ts(user_id, ts DESC)
+idx: photos_user_ts_idx(user_id, ts DESC)
 Counters reset monthly by worker (CRON `5 0 1 * *` Europe/Moscow).
 6. Sequence Diagrams (Text)
 6.1 Happy Path
