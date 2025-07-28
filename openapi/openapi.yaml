@@ -299,6 +299,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LimitReached'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Unexpected internal error
           content:
@@ -306,8 +312,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
       x-rateLimit:
-        limit: 30
-        window: second
+        ip_limit: 30
+        user_limit: 120
+        window: minute
 
   /v1/photos:
     get:

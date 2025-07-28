@@ -29,7 +29,7 @@ k6 load_diag.js — ~5 000 RPS, 5 мин; PASS: error < 1 %, latency P95 < 8 c
 8. API integration tests
 Postman collection v1.7 + CI:• Проверка кодов 200/400/401/402/502• Ajv‑валидация схем OpenAPI• Проверка paywall: /limits → 5/5 → diagnose = 402 → paywall
 9. Security checks
-• SSL Labs grade: A• SQL-injection• Проверка HMAC: signature в теле + заголовке• Rate-limiting (30 req/min per IP, 120 req/min per user (Pro unlimited)), бизнес-лимит (5/мес)
+• SSL Labs grade: A• SQL-injection• Проверка HMAC: signature в теле + заголовке• Rate-limiting (30 req/min per IP, 120 req/min per user, Pro не ограничен) → HTTP 429 и запись события• Бизнес-лимит (5/мес)
 10. Schedule & Roles
 (QA-инженер, DevOps, Security, Product Owner — см. Notion / JIRA)
 11. Risk & Mitigation
