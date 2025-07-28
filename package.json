@@ -3,7 +3,8 @@
     "worker": "node worker/usage_reset.js",
     "test": "node --test bot/handlers.test.js",
     "k6:test": "k6 run load/full_journey.js",
-    "rotate-secrets": "ts-node scripts/rotate_secrets.ts"
+    "rotate-secrets": "ts-node scripts/rotate_secrets.ts",
+    "sca": "npm audit --json > sca.json && npx --yes npm-audit-html -i sca.json -o sca.html"
   },
   "dependencies": {
     "bullmq": "^4.18.3",

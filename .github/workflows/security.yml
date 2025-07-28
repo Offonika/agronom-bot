@@ -1,0 +1,47 @@
+name: security
+
+on:
+  push:
+    branches: ["develop"]
+  pull_request:
+    branches: ["develop"]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          ./.codex/setup.sh
+          npm ci
+      - name: Start API
+        run: |
+          uvicorn app.main:app &
+          sleep 5
+      - name: OWASP ZAP Baseline Scan
+        run: |
+          docker run --network host -v ${{ github.workspace }}/zap:/zap/wrk/:rw -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:8000 -r zap.html
+      - name: Dependency analysis
+        run: npm run sca
+      - name: Ensure no critical vulnerabilities
+        run: |
+          crit=$(jq '.metadata.vulnerabilities.critical' sca.json)
+          if [ "$crit" -gt 0 ]; then
+            echo "Critical vulnerabilities found: $crit" && exit 1
+          fi
+      - name: Generate PDF report
+        run: |
+          cat zap.html sca.html > combined.html
+          npx --yes html-pdf combined.html security_report_v1.0.pdf
+      - uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: security_report_v1.0.pdf
