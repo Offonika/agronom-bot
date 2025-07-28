@@ -68,3 +68,19 @@ jobs:
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           exit-code: '1'
+
+  smoke-prod:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          ./.codex/setup.sh
+          pip install pytest-asyncio
+      - name: Run Smoke Tests
+        run: pytest -m smoke -q
