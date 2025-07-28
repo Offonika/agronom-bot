@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 import logging
-from functools import lru_cache
+from cachetools import TTLCache
 from pathlib import Path
 
 from sqlalchemy import inspect
@@ -98,8 +98,13 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
 # --------------------------------------------------------------------------- #
 # Runtime lookup with LRU-cache
 # --------------------------------------------------------------------------- #
-@lru_cache(maxsize=None)
+_cache = TTLCache(maxsize=1024, ttl=600)
+
+
 def _cache_protocol(crop: str, disease: str) -> Protocol | None:
+    key = (crop, disease)
+    if key in _cache:
+        return _cache[key]
     session = db.SessionLocal()
     proto = (
         session.query(Protocol)
@@ -107,7 +112,15 @@ def _cache_protocol(crop: str, disease: str) -> Protocol | None:
         .first()
     )
     session.close()
+    _cache[key] = proto
     return proto
+
+
+def _clear_cache() -> None:
+    _cache.clear()
+
+
+_cache_protocol.cache_clear = _clear_cache
 
 
 def find_protocol(crop: str, disease: str) -> Protocol | None:
