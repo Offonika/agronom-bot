@@ -18,6 +18,7 @@
 | [partner_agrostore.md](./partner_agrostore.md) | Интеграция с AgroStore, deep‑link, SLA, подписи |
 | [payment_flow.md](./payment_flow.md) | Платёжный flow и webhook SBP |
 | [retry_logic.md](./retry_logic.md) | Логика повторных попыток и очередь |
+| [alerting.md](./alerting.md) | Настройка Alertmanager и вебхуков |
 
 ---
 
