@@ -34,3 +34,10 @@ receivers:
    amtool alert add test_error rate=3
    ```
 3. Убедитесь, что сообщение появилось в каналах Slack и Telegram.
+
+## 4. SLO thresholds
+
+- **uptime** \u2265 99 %
+- **latency_p95** < 2 s
+
+![SLO dashboard](https://example.com/grafana_slo.png)
