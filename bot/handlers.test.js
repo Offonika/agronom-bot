@@ -55,6 +55,7 @@ async function withMockFetch(responses, fn) {
 }
 
 test('photoHandler stores info and replies', { concurrency: false }, async () => {
+  process.env.BETA_EXPERT_CHAT = 'true';
   const calls = [];
   const pool = { query: async (...args) => { calls.push(args); } };
   const replies = [];
@@ -73,6 +74,7 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
   assert.equal(calls.length, 1);
   assert.ok(replies[0].msg.includes('Культура'));
   assert.ok(replies[0].opts.reply_markup.inline_keyboard.length > 0);
+  delete process.env.BETA_EXPERT_CHAT;
 });
 
 test('messageHandler ignores non-photo', { concurrency: false }, () => {
@@ -118,7 +120,8 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
   assert.ok(buttons[1].url.includes('pid=1'));
 });
 
-test('photoHandler beta without protocol', { concurrency: false }, async () => {
+test('photoHandler shows expert button when enabled', { concurrency: false }, async () => {
+  process.env.BETA_EXPERT_CHAT = 'true';
   const pool = { query: async () => {} };
   const replies = [];
   const ctx = {
@@ -135,6 +138,26 @@ test('photoHandler beta without protocol', { concurrency: false }, async () => {
   });
   const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(button.callback_data, 'ask_expert');
+  assert.equal(button.text, 'Спросить эксперта');
+  delete process.env.BETA_EXPERT_CHAT;
+});
+
+test('photoHandler hides expert button when disabled', { concurrency: false }, async () => {
+  const pool = { query: async () => {} };
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id22', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 101 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  await withMockFetch({
+    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
+  }, async () => {
+    await photoHandler(pool, ctx);
+  });
+  assert.equal(replies[0].opts.reply_markup, undefined);
 });
 
 test('photoHandler paywall on 402', { concurrency: false }, async () => {
@@ -360,11 +383,22 @@ test('formatDiagnosis builds reply with protocol', () => {
   assert.ok(btns[1].url.includes('pid=10'));
 });
 
-test('formatDiagnosis builds reply without protocol', () => {
+test('formatDiagnosis builds reply without protocol when enabled', () => {
+  process.env.BETA_EXPERT_CHAT = 'true';
   const ctx = { from: { id: 2 } };
   const data = { crop: 'pear', disease: 'rot', confidence: 0.8 };
   const { text, keyboard } = formatDiagnosis(ctx, data);
   assert.ok(text.includes('Культура: pear'));
   const btn = keyboard.inline_keyboard[0][0];
+  assert.equal(btn.text, 'Спросить эксперта');
   assert.equal(btn.callback_data, 'ask_expert');
+  delete process.env.BETA_EXPERT_CHAT;
+});
+
+test('formatDiagnosis omits button when disabled', () => {
+  const ctx = { from: { id: 3 } };
+  const data = { crop: 'pear', disease: 'rot', confidence: 0.8 };
+  const { text, keyboard } = formatDiagnosis(ctx, data);
+  assert.ok(text.includes('Культура: pear'));
+  assert.equal(keyboard, undefined);
 });
