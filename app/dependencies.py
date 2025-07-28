@@ -41,16 +41,19 @@ def compute_signature(secret: str, payload: dict) -> str:
 async def verify_hmac(request: Request, x_sign: str):
     raw_body = await request.body()
     try:
-        data = json.loads(raw_body)
+        payload = json.loads(raw_body)
     except Exception as err:
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
 
-    provided_sign = data.pop("signature", None)
+    provided_sign = payload.get("signature")
     if not provided_sign:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
-    calculated = compute_signature(HMAC_SECRET, data)
+    payload.pop("signature", None)
+    body_for_sign = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    calculated = hmac.new(HMAC_SECRET.encode(), body_for_sign, hashlib.sha256).hexdigest()
+
     if not hmac.compare_digest(calculated, x_sign) or not hmac.compare_digest(calculated, provided_sign):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
 
-    return data, calculated, provided_sign
+    return payload, calculated, provided_sign
