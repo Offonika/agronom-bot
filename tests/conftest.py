@@ -7,11 +7,14 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./app.db")
 
 from fastapi.testclient import TestClient
 from app.main import app
+from app.config import Settings
+from app.db import init_db
 
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations():
     """Apply Alembic migrations before running tests."""
     subprocess.run(["alembic", "upgrade", "head"], check=True)
+    init_db(Settings())
 
 
 @pytest.fixture(scope="module")

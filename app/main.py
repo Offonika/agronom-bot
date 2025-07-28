@@ -24,7 +24,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError, field_validator
 
 from app.config import Settings
-from app.db import SessionLocal, init_db
+from app import db as db_module
+from app.db import init_db
 from zoneinfo import ZoneInfo
 from sqlalchemy import text
 
@@ -43,7 +44,6 @@ from app.services import create_sbp_link
 from app.logger import setup_logging
 
 settings = Settings()
-init_db(settings)
 init_storage(settings)
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -51,6 +51,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run startup tasks for the application."""
+    init_db(settings)
     import_csv_to_db()
     yield
 
@@ -262,7 +263,7 @@ async def diagnose(
 
     user_id = 1  # в MVP ключ привязан к одному пользователю
 
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         status = "ok"
         moscow_tz = ZoneInfo("Europe/Moscow")
         month_key = datetime.now(moscow_tz).strftime("%Y-%m")
@@ -461,7 +462,7 @@ async def list_photos(
     if limit <= 0:
         return ListPhotosResponse(items=[], next_cursor=None)
 
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         q = (
             db.query(Photo)
             .filter(Photo.user_id == user_id, Photo.deleted.is_(False))
@@ -511,7 +512,7 @@ async def list_photos_history(
     limit = max(0, min(limit, 50))
     offset = max(0, offset)
 
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         rows = (
             db.query(Photo)
             .filter(Photo.user_id == user_id, Photo.deleted.is_(False))
@@ -545,7 +546,7 @@ async def get_limits(
 ):
     """Return remaining free quota for the current month."""
     user_id = 1
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         moscow_tz = ZoneInfo("Europe/Moscow")
         month_key = datetime.now(moscow_tz).strftime("%Y-%m")
         used = db.execute(
@@ -579,7 +580,7 @@ async def create_payment(
     external_id = uuid4().hex
     url = create_sbp_link(external_id, amount, currency)
 
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         payment = Payment(
             user_id=body.user_id,
             amount=amount,
@@ -606,7 +607,7 @@ async def payment_status(
     _: None = Depends(require_api_headers),
 ):
     """Return payment status and PRO expiration date."""
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         payment = db.query(Payment).filter_by(external_id=payment_id).first()
         if not payment:
             raise HTTPException(status_code=404, detail="NOT_FOUND")
@@ -648,7 +649,7 @@ async def payments_webhook(
     except ValidationError:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         payment = db.query(Payment).filter_by(external_id=body.external_id).first()
         if not payment:
             raise HTTPException(status_code=404, detail="NOT_FOUND")
@@ -701,7 +702,7 @@ async def partner_orders(
     except ValidationError:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         order = PartnerOrder(
             user_id=body.user_tg_id,
             order_id=body.order_id,
@@ -723,7 +724,7 @@ async def partner_orders(
 async def photo_status(photo_id: int, _: None = Depends(require_api_headers)):
     """Return photo processing status and details."""
     user_id = 1
-    with SessionLocal() as db:
+    with db_module.SessionLocal() as db:
         photo = (
             db.query(Photo)
             .filter_by(id=photo_id, user_id=user_id, deleted=False)

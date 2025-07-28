@@ -10,7 +10,7 @@ from pathlib import Path
 from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError
 
-from app.db import SessionLocal
+from app import db
 from app.models import Protocol
 
 # CSV is stored in the repository root
@@ -50,7 +50,7 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
             logging.warning("CSV download failed: %s — using cached file", exc)
 
     # -------- 2. connect to DB -------------------------------------------------
-    session = SessionLocal()
+    session = db.SessionLocal()
 
     # DEBUG ─────────────────────────────────────────────────────────────────────
     engine = session.bind
@@ -100,7 +100,7 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=None)
 def _cache_protocol(crop: str, disease: str) -> Protocol | None:
-    session = SessionLocal()
+    session = db.SessionLocal()
     proto = (
         session.query(Protocol)
         .filter(Protocol.crop == crop, Protocol.disease == disease)
