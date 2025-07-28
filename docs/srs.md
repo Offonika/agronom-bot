@@ -148,6 +148,7 @@ expert_response_12h
 Prometheus metrics: diag_latency_seconds, diag_requests_total, gpt_timeout_total, payment_fail_total, queue_size_pending.
 Grafana dashboards: Diag‑health, Payments, System Load.
 Alerts: GPT timeouts > 5 % /5 мин → Slack #alerts.
+Alerts: error_rate > 2 % /5 мин, p95 /diagnose > 3 с, queue_size_pending > 100 → Slack и Telegram.
 queue_monitor.py логирует предупреждение, если фото в статусе pending старше 60 мин.
 11. Security Details
 Webhook SBP: HMAC‑SHA256 header X‑Sign, secret in Vault, rotate 90 дней.
