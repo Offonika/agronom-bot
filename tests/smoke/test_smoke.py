@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app, compute_signature
+from app.main import app
+from app.dependencies import compute_signature
 from sqlalchemy import text
 from app.db import SessionLocal
 from app.models import Photo
@@ -36,7 +37,7 @@ def test_start_to_diagnose():
 
 @pytest.mark.smoke
 def test_paywall_with_mock_payment(monkeypatch):
-    monkeypatch.setattr("app.main.FREE_MONTHLY_LIMIT", 0)
+    monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 0)
 
     headers = HEADERS | {"X-User-ID": "2"}
     with SessionLocal() as session:
