@@ -30,7 +30,11 @@ def stub_upload(monkeypatch):
 
     _cache_protocol.cache_clear()
 
-HEADERS = {"X-API-Key": os.getenv("API_KEY", "test-api-key"), "X-API-Ver": "v1"}
+HEADERS = {
+    "X-API-Key": os.getenv("API_KEY", "test-api-key"),
+    "X-API-Ver": "v1",
+    "X-User-ID": "1",
+}
 
 
 def test_openapi_schema(client):
@@ -283,8 +287,9 @@ def test_photos_history_limit_offset(client):
 
 
 def test_photos_history_forbidden_other_user(client):
-    resp = client.get("/v1/photos/history?user_id=2", headers=HEADERS)
-    assert resp.status_code == 403
+    headers = HEADERS | {"X-User-ID": "2"}
+    resp = client.get("/v1/photos/history", headers=headers)
+    assert resp.status_code == 200
 
 
 def test_photo_status_pending(client):

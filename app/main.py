@@ -180,8 +180,9 @@ class PartnerOrderRequest(BaseModel):
 async def require_api_headers(
     x_api_key: str = Header(..., alias="X-API-Key"),
     x_api_ver: str = Header(..., alias="X-API-Ver"),
-) -> None:
-    """Validate API key and version headers."""
+    x_user_id: int | None = Header(None, alias="X-User-ID"),
+) -> int:
+    """Validate API key and version headers and return user id."""
     if x_api_ver != "v1":
         err = ErrorResponse(code="BAD_REQUEST", message="Invalid API version")
         raise HTTPException(status_code=400, detail=err.model_dump())
@@ -191,13 +192,16 @@ async def require_api_headers(
         err = ErrorResponse(code="UNAUTHORIZED", message="Invalid API key")
         raise HTTPException(status_code=401, detail=err.model_dump())
 
+    return x_user_id or 1
+
 
 async def verify_headers(
     x_api_key: str = Header(..., alias="X-API-Key"),
     x_api_ver: str = Header(..., alias="X-API-Ver"),
-) -> None:
-    """(Deprecated) Validate API key and version."""
-    await require_api_headers(x_api_key, x_api_ver)
+    x_user_id: int | None = Header(None, alias="X-User-ID"),
+) -> int:
+    """(Deprecated) Validate API key and version and return user id."""
+    return await require_api_headers(x_api_key, x_api_ver, x_user_id)
 
 
 async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")) -> None:
@@ -255,14 +259,12 @@ async def verify_hmac(request: Request, x_sign: str):
 )
 async def diagnose(
     request: Request,
-    _: None = Depends(require_api_headers),
+    user_id: int = Depends(require_api_headers),
     image: UploadFile | None = File(None),
     prompt_id: str | None = Form(None)
 ):
     """Diagnose plant disease from an uploaded image."""
     # headers validated via dependency
-
-    user_id = 1  # в MVP ключ привязан к одному пользователю
 
     with db_module.SessionLocal() as db:
         status = "ok"
@@ -455,11 +457,9 @@ async def diagnose(
 async def list_photos(
     limit: int = 10,
     cursor: str | None = None,
-    _: None = Depends(require_api_headers),
+    user_id: int = Depends(require_api_headers),
 ):
     """Return paginated list of user's uploaded photos."""
-    
-    user_id = 1
     if limit <= 0:
         return ListPhotosResponse(items=[], next_cursor=None)
 
@@ -501,15 +501,10 @@ async def list_photos(
 async def list_photos_history(
     limit: int = 10,
     offset: int = 0,
-    user_id: int | None = None,
-    _: None = Depends(require_api_headers),
+    user_id: int = Depends(require_api_headers),
 ):
     """Return past photos ordered by ts DESC."""
 
-    if user_id and user_id != 1:
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
-
-    user_id = 1
     limit = max(0, min(limit, 50))
     offset = max(0, offset)
 
@@ -543,10 +538,9 @@ async def list_photos_history(
     responses={401: {"model": ErrorResponse}},
 )
 async def get_limits(
-    _: None = Depends(require_api_headers),
+    user_id: int = Depends(require_api_headers),
 ):
     """Return remaining free quota for the current month."""
-    user_id = 1
     with db_module.SessionLocal() as db:
         moscow_tz = ZoneInfo("Europe/Moscow")
         month_key = datetime.now(moscow_tz).strftime("%Y-%m")
@@ -719,9 +713,8 @@ async def partner_orders(
     response_model=PhotoStatusResponse,
     responses={401: {"model": ErrorResponse}, 404: {"description": "Not found"}},
 )
-async def photo_status(photo_id: int, _: None = Depends(require_api_headers)):
+async def photo_status(photo_id: int, user_id: int = Depends(require_api_headers)):
     """Return photo processing status and details."""
-    user_id = 1
     with db_module.SessionLocal() as db:
         photo = (
             db.query(Photo)
