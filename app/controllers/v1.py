@@ -11,7 +11,6 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError, field_validator
 from sqlalchemy import text
@@ -206,7 +205,7 @@ async def diagnose(
             if len(contents) > 2 * 1024 * 1024:
                 err = ErrorResponse(code="BAD_REQUEST", message="image too large")
                 return JSONResponse(status_code=400, content=err.model_dump())
-            key = await run_in_threadpool(upload_photo, user_id, contents)
+            key = await upload_photo(user_id, contents)
             file_id = key
             try:
                 result = call_gpt_vision_stub(key)
@@ -239,7 +238,7 @@ async def diagnose(
             if len(contents) > 2 * 1024 * 1024:
                 err = ErrorResponse(code="BAD_REQUEST", message="image too large")
                 return JSONResponse(status_code=400, content=err.model_dump())
-            key = await run_in_threadpool(upload_photo, user_id, contents)
+            key = await upload_photo(user_id, contents)
             file_id = key
             try:
                 result = call_gpt_vision_stub(key)
