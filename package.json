@@ -17,5 +17,8 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "@stoplight/spectral-cli": "^6.15.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
