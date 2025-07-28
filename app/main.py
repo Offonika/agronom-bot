@@ -195,21 +195,6 @@ async def require_api_headers(
     return x_user_id or 1
 
 
-async def verify_headers(
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    x_api_ver: str = Header(..., alias="X-API-Ver"),
-    x_user_id: int | None = Header(None, alias="X-User-ID"),
-) -> int:
-    """(Deprecated) Validate API key and version and return user id."""
-    return await require_api_headers(x_api_key, x_api_ver, x_user_id)
-
-
-async def verify_version(x_api_ver: str = Header(..., alias="X-API-Ver")) -> None:
-    """(Deprecated) Validate API version only."""
-    if x_api_ver != "v1":
-        err = ErrorResponse(code="BAD_REQUEST", message="Invalid API version")
-        raise HTTPException(status_code=400, detail=err.model_dump())
-
 
 def compute_signature(secret: str, payload: dict) -> str:
     """Return hex HMAC-SHA256 for a JSON payload."""
