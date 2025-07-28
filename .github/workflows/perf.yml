@@ -1,0 +1,42 @@
+name: perf
+
+on:
+  push:
+    branches: ["develop"]
+  pull_request:
+    branches: ["develop"]
+
+jobs:
+  k6-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Docker Compose stack
+        run: docker-compose up -d
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do
+            curl -sSf http://localhost:8000/docs && break
+            sleep 2
+          done
+      - name: Install helpers
+        run: sudo apt-get update && sudo apt-get install -y jq bc
+      - name: Run k6
+        id: k6
+        run: |
+          docker run --network host -v ${{ github.workspace }}/load:/scripts grafana/k6 run /scripts/full_journey.js > k6.log
+          tail -n 1 k6.log > summary.json
+          cat summary.json
+          echo "summary=$(cat summary.json)" >> "$GITHUB_OUTPUT"
+      - name: Check thresholds
+        run: |
+          summary='${{ steps.k6.outputs.summary }}'
+          error=$(echo "$summary" | jq -r '.error_rate')
+          p95=$(echo "$summary" | jq -r '.diagnose_p95')
+          echo "error_rate=$error p95=$p95"
+          if (( $(echo "$error > 0.01" | bc -l) )) || (( $(echo "$p95 > 2000" | bc -l) )); then
+            echo "Performance thresholds exceeded" && exit 1
+          fi
+      - name: Tear down
+        if: always()
+        run: docker-compose down
