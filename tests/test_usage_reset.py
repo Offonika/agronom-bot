@@ -3,12 +3,13 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
-from app.db import SessionLocal
 from app.models import PhotoUsage
 
 
 def test_usage_reset_cron():
     """Old monthly counters are zeroed by the reset worker."""
+    from app.db import SessionLocal
+
     old_month = "2020-01"
     with SessionLocal() as session:
         session.add(PhotoUsage(user_id=1, month=old_month, used=3))
