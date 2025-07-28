@@ -3,6 +3,7 @@ const { test } = require('node:test');
 
 process.env.FREE_PHOTO_LIMIT = '5';
 const {
+  formatDiagnosis,
   photoHandler,
   messageHandler,
   subscribeHandler,
@@ -336,4 +337,34 @@ test('helpHandler returns link', { concurrency: false }, async () => {
   const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(button.url, 'https://example.com/policy');
   assert.equal(button.text, tr('help_button'));
+});
+
+test('formatDiagnosis builds reply with protocol', () => {
+  const ctx = { from: { id: 1 } };
+  const data = {
+    crop: 'apple',
+    disease: 'scab',
+    confidence: 0.9,
+    protocol: {
+      id: 10,
+      product: 'Хорус',
+      dosage_value: 2,
+      dosage_unit: 'ml_10l',
+      phi: 15,
+    },
+  };
+  const { text, keyboard } = formatDiagnosis(ctx, data);
+  assert.ok(text.includes('Культура: apple'));
+  const btns = keyboard.inline_keyboard[0];
+  assert.equal(btns[0].callback_data, 'proto|Хорус|2|ml_10l|15');
+  assert.ok(btns[1].url.includes('pid=10'));
+});
+
+test('formatDiagnosis builds reply without protocol', () => {
+  const ctx = { from: { id: 2 } };
+  const data = { crop: 'pear', disease: 'rot', confidence: 0.8 };
+  const { text, keyboard } = formatDiagnosis(ctx, data);
+  assert.ok(text.includes('Культура: pear'));
+  const btn = keyboard.inline_keyboard[0][0];
+  assert.equal(btn.callback_data, 'ask_expert');
 });
