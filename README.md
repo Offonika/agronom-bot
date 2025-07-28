@@ -272,6 +272,11 @@ payment_flow.md — процесс оплаты и webhook SBP
 [privacy_policy.md](docs/privacy_policy.md) — политика конфиденциальности
 
 
+## Release 1.0 maintenance
+
+Bug fixes that must go into the `release/1.0.0` branch should be labeled `release-blocker` so they can be tracked before the final release.
+
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
