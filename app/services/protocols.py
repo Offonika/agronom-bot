@@ -16,6 +16,8 @@ from app.models import Protocol
 # CSV is stored in the repository root
 CSV_PATH = Path(__file__).resolve().parent.parent.parent / "protocols.csv"
 
+logger = logging.getLogger(__name__)
+
 
 # --------------------------------------------------------------------------- #
 # Utils
@@ -52,14 +54,15 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
 
     # DEBUG ─────────────────────────────────────────────────────────────────────
     engine = session.bind
-    insp = inspect(engine)
-    try:
-        search_path = engine.execute("SHOW search_path").scalar()
-    except Exception:  # noqa: BLE001
-        search_path = "n/a"
-    print("DEBUG  • DB url       →", engine.url)
-    print("DEBUG  • search_path  →", search_path)
-    print("DEBUG  • table list   →", insp.get_table_names())
+    if logger.isEnabledFor(logging.DEBUG):
+        insp = inspect(engine)
+        try:
+            search_path = engine.execute("SHOW search_path").scalar()
+        except Exception:  # noqa: BLE001
+            search_path = "n/a"
+        logger.debug("DB url       → %s", engine.url)
+        logger.debug("search_path  → %s", search_path)
+        logger.debug("table list   → %s", insp.get_table_names())
     # ───────────────────────────────────────────────────────────────────────────
 
     # -------- 3. if table missing → warn & exit --------------------------------
