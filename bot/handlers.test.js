@@ -6,15 +6,15 @@ const {
   formatDiagnosis,
   photoHandler,
   messageHandler,
+  retryHandler,
+} = require('./diagnosis');
+const {
   subscribeHandler,
-  startHandler,
-  helpHandler,
-  feedbackHandler,
   buyProHandler,
   pollPaymentStatus,
-  retryHandler,
-  historyHandler,
-} = require('./handlers');
+} = require('./payments');
+const { startHandler, helpHandler, feedbackHandler } = require('./commands');
+const { historyHandler } = require('./history');
 const strings = require('../locales/ru.json');
 function tr(key, vars = {}) {
   let text = strings[key];

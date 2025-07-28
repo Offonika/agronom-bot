@@ -1,16 +1,10 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { Pool } = require('pg');
-const {
-  photoHandler,
-  messageHandler,
-  startHandler,
-  subscribeHandler,
-  helpHandler,
-  buyProHandler,
-  retryHandler,
-  historyHandler,
-} = require('./handlers');
+const { photoHandler, messageHandler, retryHandler } = require('./diagnosis');
+const { subscribeHandler, buyProHandler } = require('./payments');
+const { historyHandler } = require('./history');
+const { startHandler, helpHandler } = require('./commands');
 
 const token = process.env.BOT_TOKEN_DEV;
 if (!token) {
