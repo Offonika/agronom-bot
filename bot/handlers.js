@@ -41,9 +41,9 @@ function formatDiagnosis(ctx, data) {
       row.push({ text: 'Купить препарат', url: link });
     }
     keyboard = { inline_keyboard: [row] };
-  } else {
+  } else if (process.env.BETA_EXPERT_CHAT === 'true') {
     keyboard = {
-      inline_keyboard: [[{ text: 'Задать вопрос эксперту', callback_data: 'ask_expert' }]],
+      inline_keyboard: [[{ text: 'Спросить эксперта', callback_data: 'ask_expert' }]],
     };
   }
 
