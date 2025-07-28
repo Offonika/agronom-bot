@@ -1,0 +1,32 @@
+name: Branch Protection
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/1.0.0
+
+jobs:
+  protect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set branch protection rules
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          curl -L -X PUT \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/$OWNER/$REPO/branches/release/1.0.0/protection \
+            -d '{
+              "required_status_checks": {
+                "strict": true,
+                "contexts": ["ci.yml", "perf.yml"]
+              },
+              "required_pull_request_reviews": {
+                "required_approving_review_count": 2
+              },
+              "enforce_admins": true,
+              "restrictions": null
+            }'
