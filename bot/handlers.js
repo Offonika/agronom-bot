@@ -12,6 +12,44 @@ function msg(key, vars = {}) {
   return text;
 }
 
+function formatDiagnosis(ctx, data) {
+  let text =
+    `Культура: ${data.crop}\n` +
+    `Диагноз: ${data.disease}\n` +
+    `Уверенность модели: ${(data.confidence * 100).toFixed(1)}%`;
+  if (data.protocol_status) {
+    text += `\n${data.protocol_status}`;
+  }
+
+  let keyboard;
+  if (data.protocol) {
+    const cb = [
+      'proto',
+      data.protocol.product,
+      data.protocol.dosage_value,
+      data.protocol.dosage_unit,
+      data.protocol.phi,
+    ].join('|');
+    const row = [{ text: 'Показать протокол', callback_data: cb }];
+    if (data.protocol.id) {
+      const urlBase = process.env.PARTNER_LINK_BASE ||
+        'https://agrostore.example/agronom';
+      const uid = crypto.createHash('sha256')
+        .update(String(ctx.from.id))
+        .digest('hex');
+      const link = `${urlBase}?pid=${data.protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
+      row.push({ text: 'Купить препарат', url: link });
+    }
+    keyboard = { inline_keyboard: [row] };
+  } else {
+    keyboard = {
+      inline_keyboard: [[{ text: 'Задать вопрос эксперту', callback_data: 'ask_expert' }]],
+    };
+  }
+
+  return { text, keyboard };
+}
+
 async function buyProHandler(ctx, pool, intervalMs = 3000) {
   ctx.answerCbQuery();
   if (ctx.from) {
@@ -128,40 +166,7 @@ async function photoHandler(pool, ctx) {
       return;
     }
 
-    let text =
-      `Культура: ${data.crop}\n` +
-      `Диагноз: ${data.disease}\n` +
-      `Уверенность модели: ${(data.confidence * 100).toFixed(1)}%`;
-    if (data.protocol_status) {
-      text += `\n${data.protocol_status}`;
-    }
-
-    let keyboard;
-    if (data.protocol) {
-      const cb = [
-        'proto',
-        data.protocol.product,
-        data.protocol.dosage_value,
-        data.protocol.dosage_unit,
-        data.protocol.phi,
-      ].join('|');
-      const row = [{ text: 'Показать протокол', callback_data: cb }];
-      if (data.protocol.id) {
-        const urlBase = process.env.PARTNER_LINK_BASE ||
-          'https://agrostore.example/agronom';
-        const uid = crypto.createHash('sha256')
-          .update(String(ctx.from.id))
-          .digest('hex');
-        const link = `${urlBase}?pid=${data.protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
-        row.push({ text: 'Купить препарат', url: link });
-      }
-      keyboard = { inline_keyboard: [row] };
-    } else {
-      keyboard = {
-        inline_keyboard: [[{ text: 'Задать вопрос эксперту', callback_data: 'ask_expert' }]],
-      };
-    }
-
+    const { text, keyboard } = formatDiagnosis(ctx, data);
     await ctx.reply(text, { reply_markup: keyboard });
   } catch (err) {
     console.error('diagnose error', err);
@@ -261,35 +266,7 @@ async function retryHandler(ctx, photoId) {
       return;
     }
 
-    let text =
-      `Культура: ${data.crop}\n` +
-      `Диагноз: ${data.disease}\n` +
-      `Уверенность модели: ${(data.confidence * 100).toFixed(1)}%`;
-    if (data.protocol_status) {
-      text += `\n${data.protocol_status}`;
-    }
-
-    let keyboard;
-    if (data.protocol) {
-      const cb = [
-        'proto',
-        data.protocol.product,
-        data.protocol.dosage_value,
-        data.protocol.dosage_unit,
-        data.protocol.phi,
-      ].join('|');
-      const row = [{ text: 'Показать протокол', callback_data: cb }];
-      if (data.protocol.id) {
-        const urlBase = process.env.PARTNER_LINK_BASE || 'https://agrostore.example/agronom';
-        const uid = crypto.createHash('sha256').update(String(ctx.from.id)).digest('hex');
-        const link = `${urlBase}?pid=${data.protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
-        row.push({ text: 'Купить препарат', url: link });
-      }
-      keyboard = { inline_keyboard: [row] };
-    } else {
-      keyboard = { inline_keyboard: [[{ text: 'Задать вопрос эксперту', callback_data: 'ask_expert' }]] };
-    }
-
+    const { text, keyboard } = formatDiagnosis(ctx, data);
     await ctx.reply(text, { reply_markup: keyboard });
   } catch (err) {
     console.error('retry error', err);
@@ -323,6 +300,7 @@ async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
 }
 
 module.exports = {
+  formatDiagnosis,
   photoHandler,
   messageHandler,
   startHandler,
