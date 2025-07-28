@@ -160,11 +160,14 @@ agronom-bot/
    pip install -r ./requirements-dev.txt
    npm install
    export DATABASE_URL=sqlite:///./app.db  # или другая строка подключения
-   alembic upgrade head
+   # безопасное применение миграций
+   ./scripts/migrate_safe.sh
+   # посмотреть план без выполнения
+   ./scripts/migrate_safe.sh --dry-run
    ```
    Если пропустить этот шаг и таблица `protocols` не будет создана, функция
    `import_csv_to_db()` просто выдаст предупреждение в лог и посоветует
-   выполнить `alembic upgrade head` или запустить приложение с переменной
+   выполнить `./scripts/migrate_safe.sh` или запустить приложение с переменной
    `DB_CREATE_ALL=1`.
 
 4. Запустите API:
