@@ -1,7 +1,8 @@
 {
   "scripts": {
     "worker": "node worker/usage_reset.js",
-    "test": "node --test bot/handlers.test.js"
+    "test": "node --test bot/handlers.test.js",
+    "k6:test": "k6 run load/full_journey.js"
   },
   "dependencies": {
     "dotenv": "^17.2.1",
