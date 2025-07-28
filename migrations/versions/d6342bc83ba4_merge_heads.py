@@ -5,8 +5,8 @@ Revises: 632d4e7bf880, 83d28733f0ba
 Create Date: 2025-07-28 04:32:15.162612
 
 """
-from alembic import op
-import sqlalchemy as sa
+from alembic import op  # noqa: F401
+import sqlalchemy as sa  # noqa: F401
 
 
 
