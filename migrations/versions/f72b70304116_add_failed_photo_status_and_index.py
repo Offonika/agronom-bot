@@ -6,7 +6,7 @@ Create Date: 2025-07-27 10:07:49.392139
 
 """
 from alembic import op
-import sqlalchemy as sa
+import sqlalchemy as sa  # noqa: F401
 
 
 
