@@ -403,6 +403,7 @@ paths:
     get:
       summary: Get photo status
       operationId: getPhotoStatus
+      description: Retrieve processing status and details for the specified photo.
       tags: [photos]
       security:
         - ApiKeyAuth: []
@@ -465,6 +466,7 @@ paths:
     post:
       summary: Create SBP payment
       operationId: createPayment
+      description: Initiate a payment via SBP and return a payment link.
       tags: [payments]
       security:
         - ApiKeyAuth: []
@@ -502,6 +504,7 @@ paths:
     get:
       summary: Payment status
       operationId: getPaymentStatus
+      description: Retrieve the current status of a payment.
       tags: [payments]
       security:
         - ApiKeyAuth: []
