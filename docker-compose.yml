@@ -39,10 +39,12 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
   redis:
     image: redis:7
     restart: unless-stopped
+    volumes:
+      - redis-data:/data
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
@@ -51,34 +53,35 @@ services:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
     volumes:
-      - minio_data:/data
+      - minio-data:/data
     ports:
       - "9000:9000"
       - "9001:9001"
   prometheus:
     image: prom/prometheus
     volumes:
-      - prometheus_data:/prometheus
+      - prometheus-data:/prometheus
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
   loki:
     image: grafana/loki:2.9.7
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - loki_data:/loki
+      - loki-data:/loki
   grafana:
     image: grafana/grafana
     ports:
       - "3000:3000"
     volumes:
-      - grafana_data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
       - loki
 
 volumes:
-  postgres_data:
-  minio_data:
-  prometheus_data:
-  loki_data:
-  grafana_data:
+  postgres-data:
+  redis-data:
+  minio-data:
+  prometheus-data:
+  loki-data:
+  grafana-data:
