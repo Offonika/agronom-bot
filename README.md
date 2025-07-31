@@ -123,7 +123,7 @@ agronom-bot/
 
 Перед началом убедитесь, что у вас установлен Node.js версии 18 или выше.
 
-1. Скопируйте `.env.template` в `.env` и укажите параметры подключения к БД и S3. Минимально нужны:
+1. Скопируйте файл шаблона переменных окружения командой `cp .env.template .env` и укажите параметры подключения к БД и S3. Минимально нужны:
 
    ```env
    POSTGRES_USER=postgres
@@ -239,6 +239,8 @@ agronom-bot/
    ```bash
    spectral lint -r .spectral.yaml openapi/openapi.yaml
    ```
+
+8. Быстро поднять всю инфраструктуру можно командой `docker-compose up -d`. После запуска сервис Grafana будет доступен на [http://localhost:3000](http://localhost:3000). По умолчанию логин и пароль `admin`/`admin`. При необходимости укажите переменные `GF_SECURITY_ADMIN_USER` и `GF_SECURITY_ADMIN_PASSWORD` в `.env`.
 
 
 ### Добавление протокола обработки
