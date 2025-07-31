@@ -18,9 +18,9 @@ services:
     ports:
       - "8000:8000"
   bot:
-    image: node:18
-    working_dir: /usr/src/app
-    command: node bot/index.js
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
     volumes:
       - .:/usr/src/app
     env_file: .env
