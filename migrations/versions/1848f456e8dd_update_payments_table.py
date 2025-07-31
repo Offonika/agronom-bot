@@ -23,13 +23,9 @@ def upgrade() -> None:
     cols = {c["name"] for c in inspector.get_columns("payments")}
 
     if conn.dialect.name == "sqlite":
-        if "source" in cols:
-            op.execute("UPDATE payments SET provider = source")
         with op.batch_alter_table("payments") as batch_op:
             if "provider" not in cols:
                 batch_op.add_column(sa.Column("provider", sa.String))
-            if "source" in cols:
-                batch_op.drop_column("source")
             if "currency" not in cols:
                 batch_op.add_column(sa.Column("currency", sa.String))
             if "updated_at" not in cols:
@@ -38,6 +34,10 @@ def upgrade() -> None:
                 batch_op.add_column(sa.Column("external_id", sa.String))
             if "prolong_months" not in cols:
                 batch_op.add_column(sa.Column("prolong_months", sa.Integer))
+        if "source" in cols:
+            op.execute("UPDATE payments SET provider = source")
+            with op.batch_alter_table("payments") as batch_op:
+                batch_op.drop_column("source")
     else:
         if "provider" not in cols:
             op.add_column("payments", sa.Column("provider", sa.String))
