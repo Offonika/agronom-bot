@@ -1,5 +1,21 @@
 # AGENTS.md — Contributor Guide для Codex/AI-агентов
 
+## Quick English Overview
+
+This repository relies on **Codex** automation. Use **Python 3.12+** for the API
+and **Node.js 18+** for the bot.
+
+- Install Python deps with `pip install -r requirements.txt`.
+- Apply database migrations via `alembic upgrade head`.
+- Start the API with `uvicorn app.main:app --reload`.
+- Install bot deps with `npm ci --prefix bot` and run tests via
+  `npm test --prefix bot`.
+- Run linting with `ruff check app tests` and Python tests via `pytest`.
+
+Pull requests must target **develop** and pass all tests and linters. Update the
+documentation whenever behaviour or APIs change. See the detailed Russian guide
+below for full instructions.
+
 ## 📦 Проект: «Карманный агроном» — Telegram Bot (MVP)
 
 **Внимание:**  
