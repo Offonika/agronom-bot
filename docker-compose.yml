@@ -36,6 +36,12 @@ services:
       - minio
   postgres:
     image: postgres:14
+    environment:
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+      - POSTGRES_USER=...
+      - POSTGRES_PASSWORD=...
+      - POSTGRES_DB=...
     restart: unless-stopped
     env_file: .env
     volumes:
