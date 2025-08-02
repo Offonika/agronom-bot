@@ -88,7 +88,12 @@ bot.action('buy_pro', async (ctx) => {
   await buyProHandler(ctx, pool);
 });
 
-bot.launch().then(() => console.log('Bot started'));
+bot.launch()
+  .then(() => console.log('Bot started'))
+  .catch((err) => {
+    console.error('Bot launch failed', err);
+    process.exit(1);
+  });
 
 // Gracefully close DB connections on termination
 async function shutdown() {
