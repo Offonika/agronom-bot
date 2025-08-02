@@ -1,6 +1,5 @@
 import logging
 import os
-import traceback
 from datetime import datetime, timezone
 from typing import AsyncContextManager as AbstractAsyncContextManager
 from uuid import uuid4
@@ -93,8 +92,7 @@ async def upload_photo(user_id: int, data: bytes) -> str:
             Bucket=bucket, Key=key, Body=data, ContentType="image/jpeg"
         )
     except (BotoCoreError, ClientError) as exc:
-        logger.error("🔥 Ошибка при загрузке в S3: %s", exc)
-        traceback.print_exc()
+        logger.exception("🔥 Ошибка при загрузке в S3: %s", exc)
         raise HTTPException(
             status_code=500,
             detail="S3 upload failed",
