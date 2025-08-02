@@ -49,6 +49,9 @@ async def verify_hmac(request: Request, x_sign: str):
     except Exception as err:
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
 
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+
     provided_sign = payload.get("signature")
     if not provided_sign:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
