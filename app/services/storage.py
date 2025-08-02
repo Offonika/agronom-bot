@@ -1,12 +1,12 @@
-import os
-from datetime import datetime, timezone
-from uuid import uuid4
-import traceback
 import logging
+import os
+import traceback
+from datetime import datetime, timezone
+from typing import AsyncContextManager as AbstractAsyncContextManager
+from uuid import uuid4
 
 import aioboto3
 from aiobotocore.client import AioBaseClient
-from contextlib import AbstractAsyncContextManager
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException
 
