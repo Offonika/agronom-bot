@@ -1,33 +1,45 @@
 {
-  "dashboard": {
-    "title": "Service SLO 1.0",
-    "version": 1,
-    "panels": [
-      {
-        "title": "Uptime %",
-        "type": "stat",
-        "targets": [{"expr": "avg_over_time(up[30d])*100"}]
-      },
-      {
-        "title": "Latency p95",
-        "type": "stat",
-        "targets": [{"expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"}]
-      },
-      {
-        "title": "Error rate",
-        "type": "stat",
-        "targets": [{"expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))"}]
-      },
-      {
-        "title": "Queue depth",
-        "type": "stat",
-        "targets": [{"expr": "queue_size_pending"}]
-      },
-      {
-        "title": "Payment success %",
-        "type": "stat",
-        "targets": [{"expr": "sum(rate(payment_success_total[1h])) / sum(rate(payment_total[1h])) * 100"}]
-      }
-    ]
-  }
+  "title": "Service SLO 1.0",
+  "panels": [
+    {
+      "title": "Uptime %",
+      "type": "stat",
+      "targets": [
+        { "expr": "avg_over_time(up[30d]) * 100" }
+      ]
+    },
+    {
+      "title": "Latency p95",
+      "type": "stat",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))" }
+      ]
+    },
+    {
+      "title": "Error rate",
+      "type": "stat",
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))" }
+      ]
+    },
+    {
+      "title": "Queue depth",
+      "type": "stat",
+      "targets": [
+        { "expr": "queue_size_pending" }
+      ]
+    },
+    {
+      "title": "Payment success %",
+      "type": "stat",
+      "targets": [
+        { "expr": "sum(rate(payment_success_total[1h])) / sum(rate(payment_total[1h])) * 100" }
+      ]
+    }
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 36,
+  "version": 1,
+  "editable": true
 }

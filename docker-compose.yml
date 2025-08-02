@@ -86,8 +86,7 @@ services:
           - "9090:9090"   # ⬅️ Добавь этот проброс
     networks:
       - agronet
-    extra_hosts:
-      - "api:172.19.0.8"
+
   loki:
     image: grafana/loki:2.9.7
     command: -config.file=/etc/loki/local-config.yaml

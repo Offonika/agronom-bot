@@ -1,6 +1,9 @@
 import os
 from datetime import datetime, timezone
 from uuid import uuid4
+import traceback
+import logging
+logger = logging.getLogger("s3")
 
 import aioboto3
 from aiobotocore.client import AioBaseClient
@@ -74,6 +77,8 @@ async def upload_photo(user_id: int, data: bytes) -> str:
             Bucket=bucket, Key=key, Body=data, ContentType="image/jpeg"
         )
     except (BotoCoreError, ClientError) as exc:
+        logger.error("🔥 Ошибка при загрузке в S3: %s", exc)
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail="S3 upload failed",
