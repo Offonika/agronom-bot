@@ -11,6 +11,8 @@ and **Node.js 18+** for the bot.
 - Install bot deps with `npm ci --prefix bot` and run tests via
   `npm test --prefix bot`.
 - Run linting with `ruff check app tests` and Python tests via `pytest`.
+- In async FastAPI handlers, avoid blocking DB calls: wrap `SessionLocal`
+  work in `asyncio.to_thread` or use SQLAlchemy async sessions.
 
 Pull requests must target **develop** and pass all tests and linters. Update the
 documentation whenever behaviour or APIs change. See the detailed Russian guide
