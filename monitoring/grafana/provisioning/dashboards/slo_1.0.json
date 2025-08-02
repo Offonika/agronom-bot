@@ -3,40 +3,93 @@
   "panels": [
     {
       "title": "Uptime %",
-      "type": "stat",
+      "type": "timeseries",
       "targets": [
         { "expr": "avg_over_time(up[30d]) * 100" }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 99 }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": { "mode": "line" }
+          }
+        }
+      },
+      "description": "SLO target 99% uptime"
     },
     {
       "title": "Latency p95",
-      "type": "stat",
+      "type": "timeseries",
       "targets": [
         { "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))" }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": { "mode": "line" }
+          }
+        }
+      },
+      "description": "SLO target <2s latency"
     },
     {
       "title": "Error rate",
-      "type": "stat",
+      "type": "timeseries",
       "targets": [
-        { "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))" }
-      ]
+        { "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": { "mode": "line" }
+          }
+        }
+      },
+      "description": "SLO target <2% errors"
     },
     {
       "title": "Queue depth",
-      "type": "stat",
+      "type": "timeseries",
       "targets": [
         { "expr": "queue_size_pending" }
       ]
     },
     {
       "title": "Payment success %",
-      "type": "stat",
+      "type": "timeseries",
       "targets": [
         { "expr": "sum(rate(payment_success_total[1h])) / sum(rate(payment_total[1h])) * 100" }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percent" }
+      }
     }
   ],
+  "timepicker": { "time_options": ["7d", "30d", "90d"] },
+  "time": { "from": "now-30d", "to": "now" },
   "timezone": "browser",
   "refresh": "10s",
   "schemaVersion": 36,
