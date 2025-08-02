@@ -249,8 +249,9 @@ async def diagnose(
             return JSONResponse(status_code=400, content=err.model_dump())
         try:
             body = DiagnoseRequestBase64(**json_data)
-        except ValidationError:
-            err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+        except ValidationError as err:
+            message = "; ".join(e.get("msg", "") for e in err.errors())
+            err = ErrorResponse(code="BAD_REQUEST", message=message)
             return JSONResponse(status_code=400, content=err.model_dump())
         try:
             contents = base64.b64decode(body.image_base64, validate=True)
