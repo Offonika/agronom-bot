@@ -41,18 +41,18 @@ bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
 bot.on('message', messageHandler);
 
-bot.action(/^proto\|/, (ctx) => {
+bot.action(/^proto\|/, async (ctx) => {
   const [, product, val, unit, phi] = ctx.callbackQuery.data.split('|');
   const msg =
     `Препарат: ${product}\n` +
     `Доза: ${val} ${unit}\n` +
     `Срок ожидания (PHI): ${phi} дней`;
-  ctx.answerCbQuery();
+  await ctx.answerCbQuery();
   return ctx.reply(msg);
 });
 
-bot.action('ask_expert', (ctx) => {
-  ctx.answerCbQuery();
+bot.action('ask_expert', async (ctx) => {
+  await ctx.answerCbQuery();
   return ctx.reply('Свяжитесь с экспертом для уточнения протокола.');
 });
 
@@ -62,22 +62,22 @@ bot.command('retry', (ctx) => {
   return ctx.reply('Укажите ID фото после команды /retry');
 });
 
-bot.action(/^retry\|/, (ctx) => {
+bot.action(/^retry\|/, async (ctx) => {
   const [, id] = ctx.callbackQuery.data.split('|');
-  ctx.answerCbQuery();
+  await ctx.answerCbQuery();
   return retryHandler(ctx, id);
 });
 
-bot.action(/^history\|/, (ctx) => {
+bot.action(/^history\|/, async (ctx) => {
   const [, off] = ctx.callbackQuery.data.split('|');
   const offset = Math.max(parseInt(off, 10) || 0, 0);
-  ctx.answerCbQuery();
+  await ctx.answerCbQuery();
   return historyHandler(ctx, offset, pool);
 });
 
-bot.action(/^info\|/, (ctx) => {
+bot.action(/^info\|/, async (ctx) => {
   const [, id] = ctx.callbackQuery.data.split('|');
-  ctx.answerCbQuery();
+  await ctx.answerCbQuery();
   return retryHandler(ctx, id);
 });
 
