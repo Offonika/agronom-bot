@@ -769,6 +769,29 @@ def test_free_monthly_limit_env(monkeypatch, client):
     assert second.status_code == 402
 
 
+def test_usage_count_persists_when_paywall_hit(monkeypatch, client):
+    """Usage counter should increment even if paywall returns 402."""
+    monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 1)
+
+    first = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert second.status_code == 402
+
+    limits = client.get("/v1/limits", headers=HEADERS)
+    assert limits.status_code == 200
+    assert limits.json()["used_this_month"] == 2
+
+
 def test_sixth_diagnose_call_returns_402(client):
     """Ensure the 6th diagnose request fails with 402 by default."""
     for i in range(5):

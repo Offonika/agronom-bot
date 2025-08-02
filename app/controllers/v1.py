@@ -177,13 +177,15 @@ async def diagnose(
                 "updated_at = CURRENT_TIMESTAMP"
             )
             db.execute(stmt, params)
-            db.commit()
             used = db.execute(
                 text(
                     "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
                 ),
                 params,
             ).scalar_one()
+
+        db.commit()
+
         pro = db.execute(
             text("SELECT pro_expires_at FROM users WHERE id=:uid"),
             {"uid": user_id},
