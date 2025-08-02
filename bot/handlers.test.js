@@ -419,7 +419,8 @@ test('helpHandler returns links', { concurrency: false }, async () => {
   const buttons = replies[0].opts.reply_markup.inline_keyboard;
   assert.equal(buttons[0][0].url, 'https://example.com/policy');
   assert.equal(buttons[1][0].url, 'https://example.com/offer');
-  assert.equal(buttons[0][0].text, tr('help_button'));
+  assert.equal(buttons[0][0].text, tr('privacy_button'));
+  assert.equal(buttons[1][0].text, tr('offer_button'));
 });
 
 test('feedbackHandler sends link and logs event', { concurrency: false }, async () => {
