@@ -46,21 +46,27 @@ async def verify_hmac(request: Request, x_sign: str):
     raw_body = await request.body()
     try:
         payload = json.loads(raw_body)
-    except Exception as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+    except json.JSONDecodeError as err:
+        err_payload = ErrorResponse(code="BAD_REQUEST", message="Malformed JSON")
+        raise HTTPException(status_code=400, detail=err_payload.model_dump()) from err
 
     if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+        err = ErrorResponse(code="BAD_REQUEST", message="Invalid payload")
+        raise HTTPException(status_code=400, detail=err.model_dump())
 
     provided_sign = payload.get("signature")
     if not provided_sign:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+        err = ErrorResponse(code="BAD_REQUEST", message="Missing signature")
+        raise HTTPException(status_code=400, detail=err.model_dump())
 
     payload.pop("signature", None)
     body_for_sign = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
     calculated = hmac.new(HMAC_SECRET.encode(), body_for_sign, hashlib.sha256).hexdigest()
 
-    if not hmac.compare_digest(calculated, x_sign) or not hmac.compare_digest(calculated, provided_sign):
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    if not hmac.compare_digest(calculated, x_sign) or not hmac.compare_digest(
+        calculated, provided_sign
+    ):
+        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid signature")
+        raise HTTPException(status_code=401, detail=err.model_dump())
 
     return payload, calculated, provided_sign
