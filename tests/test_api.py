@@ -167,6 +167,9 @@ def test_diagnose_json_bad_prompt(client):
         json={"image_base64": "dGVzdA==", "prompt_id": "v2"},
     )
     assert resp.status_code == 400
+    data = resp.json()
+    assert data["code"] == "BAD_REQUEST"
+    assert "prompt_id" in data["message"]
 
 
 def test_diagnose_json_missing_prompt(client):
@@ -176,6 +179,9 @@ def test_diagnose_json_missing_prompt(client):
         json={"image_base64": "dGVzdA=="},
     )
     assert resp.status_code == 400
+    data = resp.json()
+    assert data["code"] == "BAD_REQUEST"
+    assert "Field required" in data["message"]
 
 
 def test_diagnose_invalid_base64(client):
