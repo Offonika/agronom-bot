@@ -10,10 +10,18 @@ const queue = new Queue(queueName, { connection });
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function schedule() {
+  const jobs = await queue.getRepeatableJobs();
+  const alreadyScheduled = jobs.some((job) => job.id === 'reset');
+  if (alreadyScheduled) {
+    console.log('Usage reset job already scheduled');
+    return;
+  }
+
   await queue.add(
     'reset',
     {},
     {
+      jobId: 'reset',
       repeat: { cron: '5 0 1 * *', tz: 'Europe/Moscow' },
       removeOnComplete: true,
     }
