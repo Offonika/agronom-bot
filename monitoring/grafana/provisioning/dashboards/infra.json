@@ -1,0 +1,52 @@
+{
+  "title": "Infrastructure",
+  "panels": [
+    {
+      "title": "CPU usage",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(container_cpu_usage_seconds_total{container=~\"api|bot\"}[5m])) by (container)" }
+      ]
+    },
+    {
+      "title": "Memory usage",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "container_memory_usage_bytes{container=~\"api|bot\"}" }
+      ]
+    },
+    {
+      "title": "Disk free %",
+      "type": "stat",
+      "targets": [
+        { "expr": "node_filesystem_avail_bytes / node_filesystem_size_bytes * 100" }
+      ]
+    },
+    {
+      "title": "Network receive",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(container_network_receive_bytes_total{container=~\"api|bot\"}[5m])) by (container)" }
+      ]
+    },
+    {
+      "title": "Network transmit",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(container_network_transmit_bytes_total{container=~\"api|bot\"}[5m])) by (container)" }
+      ]
+    },
+    {
+      "title": "Event loop lag",
+      "type": "stat",
+      "targets": [
+        { "expr": "event_loop_lag_seconds" }
+      ]
+    }
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 37,
+  "version": 1,
+  "editable": true
+}
