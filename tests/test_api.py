@@ -425,6 +425,35 @@ def test_create_payment_user_id_mismatch(client):
     assert resp.status_code == 401
 
 
+def test_payment_status_user_scoped(client):
+    from app.db import SessionLocal
+    from app.models import Payment
+
+    external_id = "paystatus1"
+    with SessionLocal() as session:
+        payment = Payment(
+            user_id=1,
+            amount=100,
+            currency="RUB",
+            provider="sbp",
+            external_id=external_id,
+            status="pending",
+        )
+        session.add(payment)
+        session.commit()
+
+    # owner can fetch status
+    resp_owner = client.get(f"/v1/payments/{external_id}", headers=HEADERS)
+    assert resp_owner.status_code == 200
+
+    # another user should receive 404
+    headers_other = HEADERS | {"X-User-ID": "2"}
+    resp_other = client.get(
+        f"/v1/payments/{external_id}", headers=headers_other
+    )
+    assert resp_other.status_code == 404
+
+
 def test_payment_webhook_success(client):
     from app.db import SessionLocal
     from app.models import Payment, Event

@@ -485,12 +485,16 @@ async def create_payment(body: PaymentCreateRequest, user_id: int = Depends(requ
 @router.get(
     "/v1/payments/{payment_id}",
     response_model=PaymentStatusResponse,
-    responses={401: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 404: {"description": "Not found"}},
 )
-async def payment_status(payment_id: str, _: None = Depends(require_api_headers)):
+async def payment_status(
+    payment_id: str, user_id: int = Depends(require_api_headers)
+):
     def _db_call() -> tuple[str, datetime | None]:
         with db_module.SessionLocal() as db:
-            payment = db.query(Payment).filter_by(external_id=payment_id).first()
+            payment = db.query(Payment).filter_by(
+                external_id=payment_id, user_id=user_id
+            ).first()
             if not payment:
                 raise HTTPException(status_code=404, detail="NOT_FOUND")
             exp = db.execute(
