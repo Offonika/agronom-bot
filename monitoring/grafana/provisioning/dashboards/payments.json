@@ -1,0 +1,45 @@
+{
+  "title": "Payments",
+  "panels": [
+    {
+      "title": "Total payments",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(payment_total[5m]))" }
+      ]
+    },
+    {
+      "title": "Successful payments",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(payment_success_total[5m]))" }
+      ]
+    },
+    {
+      "title": "Failed payments",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(payment_fail_total[5m]))" }
+      ]
+    },
+    {
+      "title": "Success %",
+      "type": "stat",
+      "targets": [
+        { "expr": "sum(rate(payment_success_total[5m])) / sum(rate(payment_total[5m])) * 100" }
+      ]
+    },
+    {
+      "title": "Payment latency p95",
+      "type": "stat",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(payment_latency_seconds_bucket[5m]))" }
+      ]
+    }
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 37,
+  "version": 1,
+  "editable": true
+}
