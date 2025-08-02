@@ -7,7 +7,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-def create_sbp_link(external_id: str, amount: int, currency: str) -> str:
+async def create_sbp_link(external_id: str, amount: int, currency: str) -> str:
     """Return SBP payment URL.
 
     In development returns a sandbox link. In production sends a request
@@ -26,9 +26,12 @@ def create_sbp_link(external_id: str, amount: int, currency: str) -> str:
     }
     headers = {"Authorization": f"Bearer {token}"} if token else None
     try:
-        resp = httpx.post(api_url, json=payload, headers=headers, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                api_url, json=payload, headers=headers, timeout=10
+            )
+            resp.raise_for_status()
+            data = resp.json()
         return data.get("url", f"https://sbp.example/pay/{external_id}")
     except httpx.HTTPError as exc:
         logger.error("SBP API request failed: %s", exc)

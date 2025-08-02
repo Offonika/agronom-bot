@@ -440,7 +440,7 @@ async def create_payment(body: PaymentCreateRequest, _: None = Depends(require_a
     amount = 19900 * body.months
     currency = "RUB"
     external_id = uuid4().hex
-    url = create_sbp_link(external_id, amount, currency)
+    url = await create_sbp_link(external_id, amount, currency)
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
