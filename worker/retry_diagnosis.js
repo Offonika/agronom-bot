@@ -17,10 +17,16 @@ const RETRY_LIMIT = parseInt(process.env.RETRY_LIMIT || '3', 10);
 console.log(`Retry diagnosis worker concurrency=${RETRY_CONCURRENCY}`);
 
 async function schedule() {
+  const jobs = await queue.getRepeatableJobs();
+  const alreadyScheduled = jobs.some((job) => job.id === 'retry');
+  if (alreadyScheduled) {
+    return;
+  }
   await queue.add(
     'retry',
     {},
     {
+      jobId: 'retry',
       repeat: { cron: retryCron, tz: 'Europe/Moscow' },
       removeOnComplete: true,
     }
