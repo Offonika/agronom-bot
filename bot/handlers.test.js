@@ -25,10 +25,11 @@ function tr(key, vars = {}) {
   return text;
 }
 
-async function withMockFetch(responses, fn) {
+async function withMockFetch(responses, fn, calls) {
   const origFetch = global.fetch;
   const open = [];
-  global.fetch = async (url) => {
+  global.fetch = async (url, opts = {}) => {
+    if (calls) calls.push({ url, opts });
     let resp;
     if (Object.prototype.hasOwnProperty.call(responses, url)) {
       resp = responses[url];
@@ -269,18 +270,30 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
   const pool = { query: async () => {} };
-  await withMockFetch({
-    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p1' }) },
-    default: { json: async () => ({ status: 'success', pro_expires_at: '2025-01-01T00:00:00Z' }) },
-  }, async () => {
-    await buyProHandler(ctx, pool, 0);
-    if (ctx.pollPromise) await ctx.pollPromise;
-    await new Promise(r => setTimeout(r, 20));
-  });
+  const calls = [];
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p1' }) },
+      default: { json: async () => ({ status: 'success', pro_expires_at: '2025-01-01T00:00:00Z' }) },
+    },
+    async () => {
+      await buyProHandler(ctx, pool, 0);
+      if (ctx.pollPromise) await ctx.pollPromise;
+      await new Promise((r) => setTimeout(r, 20));
+    },
+    calls,
+  );
   const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(btn.url, 'http://pay');
   assert.equal(btn.text, tr('payment_button'));
   assert.equal(ctx.paymentId, 'p1');
+  const req = calls.find((c) => c.url === 'http://localhost:8000/v1/payments/create');
+  assert.equal(req.opts.method, 'POST');
+  assert.equal(req.opts.headers['Content-Type'], 'application/json');
+  assert.equal(req.opts.headers['X-API-Key'], 'test-api-key');
+  assert.equal(req.opts.headers['X-API-Ver'], 'v1');
+  assert.equal(req.opts.headers['X-User-ID'], 1);
+  assert.deepEqual(JSON.parse(req.opts.body), { user_id: 1, plan: 'pro', months: 1 });
 });
 
 test('buyProHandler polls success', { concurrency: false }, async () => {
