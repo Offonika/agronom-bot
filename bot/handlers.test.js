@@ -16,6 +16,7 @@ const {
 const { startHandler, helpHandler, feedbackHandler } = require('./commands');
 const { historyHandler } = require('./history');
 const strings = require('../locales/ru.json');
+const { msg } = require('./utils');
 function tr(key, vars = {}) {
   let text = strings[key];
   for (const [k, v] of Object.entries(vars)) {
@@ -464,4 +465,11 @@ test('formatDiagnosis omits button when disabled', () => {
   const { text, keyboard } = formatDiagnosis(ctx, data);
   assert.ok(text.includes('Культура: pear'));
   assert.equal(keyboard, undefined);
+});
+
+test('msg replaces multiple occurrences of a variable', () => {
+  strings.repeat = '{word} and {word}';
+  const result = msg('repeat', { word: 'hi' });
+  assert.equal(result, 'hi and hi');
+  delete strings.repeat;
 });
