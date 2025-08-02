@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from uuid import uuid4
 import traceback
 import logging
-logger = logging.getLogger("s3")
 
 import aioboto3
 from aiobotocore.client import AioBaseClient
@@ -11,6 +10,9 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException
 
 from app.config import Settings
+
+
+logger = logging.getLogger("s3")
 
 
 BUCKET = os.getenv("S3_BUCKET", "agronom")
