@@ -161,6 +161,10 @@ def test_diagnose_without_protocol(client):
 
 
 def test_diagnose_json_bad_prompt(client):
+    before = client.get("/v1/limits", headers=HEADERS)
+    assert before.status_code == 200
+    used_before = before.json()["used_this_month"]
+
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -170,6 +174,10 @@ def test_diagnose_json_bad_prompt(client):
     data = resp.json()
     assert data["code"] == "BAD_REQUEST"
     assert "prompt_id" in data["message"]
+
+    after = client.get("/v1/limits", headers=HEADERS)
+    assert after.status_code == 200
+    assert after.json()["used_this_month"] == used_before
 
 
 def test_diagnose_json_missing_prompt(client):
@@ -185,12 +193,20 @@ def test_diagnose_json_missing_prompt(client):
 
 
 def test_diagnose_invalid_base64(client):
+    before = client.get("/v1/limits", headers=HEADERS)
+    assert before.status_code == 200
+    used_before = before.json()["used_this_month"]
+
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
         json={"image_base64": "dGVzdA==@@", "prompt_id": "v1"},
     )
     assert resp.status_code == 400
+
+    after = client.get("/v1/limits", headers=HEADERS)
+    assert after.status_code == 200
+    assert after.json()["used_this_month"] == used_before
 
 
 def test_diagnose_multipart_missing_image(client):
