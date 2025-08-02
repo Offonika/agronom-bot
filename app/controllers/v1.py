@@ -198,21 +198,6 @@ async def diagnose(
 
         return await asyncio.to_thread(_db)
 
-    used, pro = await _increment_usage()
-    now_utc = datetime.now(timezone.utc)
-    if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
-        if pro and pro < now_utc:
-            def _log() -> None:
-                with db_module.SessionLocal() as db:
-                    db.add(Event(user_id=user_id, event="pro_expired"))
-                    db.commit()
-
-            await asyncio.to_thread(_log)
-        return JSONResponse(
-            status_code=402,
-            content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
-        )
-
     status = "ok"
     file_id = ""
     crop = ""
@@ -227,6 +212,22 @@ async def diagnose(
         if len(contents) > 2 * 1024 * 1024:
             err = ErrorResponse(code="BAD_REQUEST", message="image too large")
             return JSONResponse(status_code=400, content=err.model_dump())
+
+        used, pro = await _increment_usage()
+        now_utc = datetime.now(timezone.utc)
+        if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
+            if pro and pro < now_utc:
+                def _log() -> None:
+                    with db_module.SessionLocal() as db:
+                        db.add(Event(user_id=user_id, event="pro_expired"))
+                        db.commit()
+
+                await asyncio.to_thread(_log)
+            return JSONResponse(
+                status_code=402,
+                content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
+            )
+
         key = await upload_photo(user_id, contents)
         file_id = key
         try:
@@ -261,6 +262,22 @@ async def diagnose(
         if len(contents) > 2 * 1024 * 1024:
             err = ErrorResponse(code="BAD_REQUEST", message="image too large")
             return JSONResponse(status_code=400, content=err.model_dump())
+
+        used, pro = await _increment_usage()
+        now_utc = datetime.now(timezone.utc)
+        if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
+            if pro and pro < now_utc:
+                def _log() -> None:
+                    with db_module.SessionLocal() as db:
+                        db.add(Event(user_id=user_id, event="pro_expired"))
+                        db.commit()
+
+                await asyncio.to_thread(_log)
+            return JSONResponse(
+                status_code=402,
+                content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
+            )
+
         key = await upload_photo(user_id, contents)
         file_id = key
         try:
