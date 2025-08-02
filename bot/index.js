@@ -29,7 +29,9 @@ bot.start(async (ctx) => {
   await bot.telegram.setChatMenuButton(ctx.chat.id, { type: 'commands' });
 });
 
-bot.command('subscribe', (ctx) => subscribeHandler(ctx, pool));
+bot.command('subscribe', async (ctx) => {
+  await subscribeHandler(ctx, pool);
+});
 
 bot.command('help', (ctx) => helpHandler(ctx));
 
@@ -79,7 +81,9 @@ bot.action(/^info\|/, (ctx) => {
   return retryHandler(ctx, id);
 });
 
-bot.action('buy_pro', (ctx) => buyProHandler(ctx, pool));
+bot.action('buy_pro', async (ctx) => {
+  await buyProHandler(ctx, pool);
+});
 
 bot.launch().then(() => console.log('Bot started'));
 
