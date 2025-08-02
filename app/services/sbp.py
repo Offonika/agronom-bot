@@ -1,6 +1,10 @@
 import os
+import logging
 
 import httpx
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_sbp_link(external_id: str, amount: int, currency: str) -> str:
@@ -26,5 +30,6 @@ def create_sbp_link(external_id: str, amount: int, currency: str) -> str:
         resp.raise_for_status()
         data = resp.json()
         return data.get("url", f"https://sbp.example/pay/{external_id}")
-    except Exception:
+    except httpx.HTTPError as exc:
+        logger.error("SBP API request failed: %s", exc)
         return f"https://sbp.example/pay/{external_id}"
