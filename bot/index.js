@@ -11,9 +11,12 @@ if (!token) {
   throw new Error('BOT_TOKEN_DEV not set');
 }
 
+const dbUrl = process.env.BOT_DATABASE_URL || process.env.DATABASE_URL;
+if (!dbUrl) {
+  throw new Error('DATABASE_URL not set');
+}
 const pool = new Pool({
-  connectionString:
-    process.env.BOT_DATABASE_URL || process.env.DATABASE_URL,
+  connectionString: dbUrl,
 });
 const bot = new Telegraf(token);
 
