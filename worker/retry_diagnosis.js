@@ -43,7 +43,7 @@ new Worker(
     let success = 0;
     let failed = 0;
     try {
-      const { rows } = await client.query("SELECT id, file_id FROM photos WHERE status='pending'");
+      const { rows } = await client.query("SELECT id, file_id FROM photos WHERE status IN ('pending','retrying')");
       processed = rows.length;
       for (const row of rows) {
         try {
