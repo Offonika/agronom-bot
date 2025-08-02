@@ -53,7 +53,9 @@ async function buyProHandler(ctx, pool, intervalMs = 3000) {
         'X-API-Key': API_KEY,
         'X-API-Ver': API_VER,
         'X-User-ID': ctx.from?.id,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ user_id: ctx.from.id, plan: 'pro', months: 1 }),
     });
     const data = await resp.json();
     ctx.paymentId = data.payment_id;
