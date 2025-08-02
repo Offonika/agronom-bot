@@ -240,6 +240,14 @@ def test_limits_unauthorized(client):
         assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
 
 
+def test_limits_missing_user_id(client):
+    headers = HEADERS.copy()
+    headers.pop("X-User-ID")
+    resp = client.get("/v1/limits", headers=headers)
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
+
+
 def test_photos_success(client):
     resp = client.get("/v1/photos", headers=HEADERS)
     assert resp.status_code == 200
@@ -655,6 +663,7 @@ def test_partner_order_success(client):
         headers={
             "X-API-Key": os.getenv("API_KEY", "test-api-key"),
             "X-API-Ver": "v1",
+            "X-User-ID": "1",
             "X-Sign": sig,
         },
         json=payload,
@@ -675,6 +684,7 @@ def test_partner_order_missing_signature(client):
         headers={
             "X-API-Key": os.getenv("API_KEY", "test-api-key"),
             "X-API-Ver": "v1",
+            "X-User-ID": "1",
         },
         json=payload,
     )
@@ -695,6 +705,7 @@ def test_partner_order_bad_payload(client):
         headers={
             "X-API-Key": os.getenv("API_KEY", "test-api-key"),
             "X-API-Ver": "v1",
+            "X-User-ID": "1",
             "X-Sign": sig,
         },
         json=payload,

@@ -2,10 +2,10 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: 1.7.0
+  version: 1.7.1
   description: |
-    Telegram-бот «Карманный агроном» — API v1.7.0.
-    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units.
+    Telegram-бот «Карманный агроном» — API v1.7.1.
+    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header.
   contact:
     name: Ivan Gromov
     url: https://github.com/agronom-bot
@@ -39,6 +39,12 @@ components:
       schema:
         type: string
         enum: [v1]
+    UserIdHeader:
+      name: X-User-ID
+      in: header
+      required: true
+      schema:
+        type: integer
 
   schemas:
     DiagnoseRequestMultipart:
@@ -265,6 +271,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
       requestBody:
         required: true
         content:
@@ -326,6 +333,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
         - name: limit
           in: query
           schema:
@@ -409,6 +417,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
         - in: path
           name: photo_id
           required: true
@@ -440,6 +449,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
       responses:
         '200':
           description: Текущие лимиты
@@ -472,6 +482,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
       requestBody:
         required: true
         content:
@@ -510,6 +521,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
         - in: path
           name: payment_id
           required: true
@@ -542,6 +554,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
       requestBody:
         required: true
         content:
@@ -563,6 +576,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
       requestBody:
         required: true
         content:

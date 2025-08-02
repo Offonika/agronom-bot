@@ -69,7 +69,11 @@ async function photoHandler(pool, ctx) {
     console.log('Sending to API', API_BASE + '/v1/ai/diagnose');
     const apiResp = await fetch(API_BASE + '/v1/ai/diagnose', {
       method: 'POST',
-      headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
+      headers: {
+        'X-API-Key': API_KEY,
+        'X-API-Ver': API_VER,
+        'X-User-ID': userId,
+      },
       body: form,
     });
     if (apiResp.status === 402) {
@@ -107,7 +111,11 @@ function messageHandler(ctx) {
 async function retryHandler(ctx, photoId) {
   try {
     const resp = await fetch(`${API_BASE}/v1/photos/${photoId}`, {
-      headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
+      headers: {
+        'X-API-Key': API_KEY,
+        'X-API-Ver': API_VER,
+        'X-User-ID': ctx.from?.id,
+      },
     });
     if (!resp.ok) {
       await ctx.reply(msg('status_error'));

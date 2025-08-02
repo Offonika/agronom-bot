@@ -30,7 +30,11 @@ async def require_api_headers(
         err = ErrorResponse(code="UNAUTHORIZED", message="Invalid API key")
         raise HTTPException(status_code=401, detail=err.model_dump())
 
-    return x_user_id or 1
+    if x_user_id is None:
+        err = ErrorResponse(code="UNAUTHORIZED", message="Missing user ID")
+        raise HTTPException(status_code=401, detail=err.model_dump())
+
+    return x_user_id
 
 
 def compute_signature(secret: str, payload: dict) -> str:

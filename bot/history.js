@@ -14,7 +14,13 @@ async function historyHandler(ctx, offset = 0, pool) {
   }
   const resp = await fetch(
     `${API_BASE}/v1/photos/history?limit=10&offset=${offset}`,
-    { headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER } },
+    {
+      headers: {
+        'X-API-Key': API_KEY,
+        'X-API-Ver': API_VER,
+        'X-User-ID': ctx.from?.id,
+      },
+    },
   );
   if (!resp.ok) {
     await ctx.reply(msg('history_error'));
