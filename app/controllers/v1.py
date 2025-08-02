@@ -23,8 +23,8 @@ from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol
 from app.services.storage import upload_photo, get_public_url
 from app.services import create_sbp_link
-from app.services.hmac import verifyHmac
-from app.dependencies import require_api_headers, verify_hmac, ErrorResponse
+from app.services.hmac import verify_hmac
+from app.dependencies import require_api_headers, verify_hmac as verify_request_hmac, ErrorResponse
 
 settings = Settings()
 logger = logging.getLogger(__name__)
@@ -494,7 +494,7 @@ async def payments_webhook(
 ):
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
-    if secure and not verifyHmac(x_signature or "", raw_body, HMAC_SECRET):
+    if secure and not verify_hmac(x_signature or "", raw_body, HMAC_SECRET):
         logger.warning("audit: invalid webhook signature")
         raise HTTPException(status_code=403, detail="FORBIDDEN")
 
@@ -555,7 +555,7 @@ async def partner_orders(
     _: None = Depends(require_api_headers),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    data, sign, provided_sign = await verify_hmac(request, x_sign)
+    data, sign, provided_sign = await verify_request_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)
     except ValidationError as err:
