@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -23,8 +24,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_storage(settings)
-    init_db(settings)
-    import_csv_to_db()
+    await asyncio.to_thread(init_db, settings)
+    await asyncio.to_thread(import_csv_to_db)
     yield
     await close_client()
 
