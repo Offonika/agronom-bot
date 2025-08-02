@@ -606,7 +606,9 @@ async def photo_status(photo_id: int, user_id: int = Depends(require_api_headers
         and photo_data["crop"]
         and photo_data["disease"]
     ):
-        p = find_protocol(photo_data["crop"], photo_data["disease"])
+        p = await asyncio.to_thread(
+            find_protocol, photo_data["crop"], photo_data["disease"]
+        )
         if p:
             proto = ProtocolResponse(
                 id=p.id,
