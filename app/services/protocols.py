@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import csv
 import logging
-from cachetools import TTLCache
 from pathlib import Path
 
+from cachetools import TTLCache
 from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError
 
