@@ -117,8 +117,50 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
   });
   const buttons = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(buttons[0].text, 'Показать протокол');
-  assert.equal(buttons[0].callback_data, 'proto|Скор 250 ЭК|2|ml_10l|30');
+  assert.equal(
+    buttons[0].callback_data,
+    'proto|%D0%A1%D0%BA%D0%BE%D1%80%20250%20%D0%AD%D0%9A|2|ml_10l|30'
+  );
   assert.ok(buttons[1].url.includes('pid=1'));
+});
+
+test('formatDiagnosis encodes special characters in callback_data', () => {
+  const ctx = { from: { id: 1 } };
+  const data = {
+    crop: 'c',
+    disease: 'd',
+    confidence: 0.9,
+    protocol: {
+      product: 'аб / в',
+      dosage_value: 1,
+      dosage_unit: 'ml',
+      phi: 10,
+    },
+  };
+  const { keyboard } = formatDiagnosis(ctx, data);
+  const cb = keyboard.inline_keyboard[0][0].callback_data;
+  assert.ok(cb.includes('%2F'));
+  assert.ok(cb.includes('%20'));
+});
+
+test('formatDiagnosis trims long product names and limits callback_data', () => {
+  const ctx = { from: { id: 1 } };
+  const longName = 'A'.repeat(120);
+  const data = {
+    crop: 'c',
+    disease: 'd',
+    confidence: 0.9,
+    protocol: {
+      product: longName,
+      dosage_value: 1,
+      dosage_unit: 'ml',
+      phi: 10,
+    },
+  };
+  const { keyboard } = formatDiagnosis(ctx, data);
+  const cb = keyboard.inline_keyboard[0][0].callback_data;
+  assert.ok(cb.length <= 64);
+  assert.ok(!cb.includes('AAAAAA'));
 });
 
 test('photoHandler shows expert button when enabled', { concurrency: false }, async () => {
@@ -397,7 +439,10 @@ test('formatDiagnosis builds reply with protocol', () => {
   const { text, keyboard } = formatDiagnosis(ctx, data);
   assert.ok(text.includes('Культура: apple'));
   const btns = keyboard.inline_keyboard[0];
-  assert.equal(btns[0].callback_data, 'proto|Хорус|2|ml_10l|15');
+  assert.equal(
+    btns[0].callback_data,
+    'proto|%D0%A5%D0%BE%D1%80%D1%83%D1%81|2|ml_10l|15'
+  );
   assert.ok(btns[1].url.includes('pid=10'));
 });
 

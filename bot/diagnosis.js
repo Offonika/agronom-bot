@@ -17,13 +17,29 @@ function formatDiagnosis(ctx, data) {
 
   let keyboard;
   if (data.protocol) {
-    const cb = [
-      'proto',
-      data.protocol.product,
-      data.protocol.dosage_value,
-      data.protocol.dosage_unit,
-      data.protocol.phi,
-    ].join('|');
+    const encode = (v) => encodeURIComponent(String(v));
+    const safeSlice = (str, max) => {
+      if (str.length <= max) return str;
+      let s = str.slice(0, max);
+      const pct = s.lastIndexOf('%');
+      if (pct > -1 && pct > s.length - 3) {
+        s = s.slice(0, pct);
+      }
+      return s;
+    };
+    let product = data.protocol.product || '';
+    if (product.length > 32) {
+      product = crypto.createHash('sha256').update(product).digest('hex');
+    }
+    const other = [
+      encode(data.protocol.dosage_value),
+      encode(data.protocol.dosage_unit),
+      encode(data.protocol.phi),
+    ];
+    const base = ['proto', '', ...other].join('|');
+    const avail = 64 - base.length;
+    const prodEncoded = safeSlice(encode(product), Math.max(avail, 0));
+    const cb = ['proto', prodEncoded, ...other].join('|').slice(0, 64);
     const row = [{ text: 'Показать протокол', callback_data: cb }];
     if (data.protocol.id) {
       const urlBase = process.env.PARTNER_LINK_BASE ||
@@ -84,9 +100,10 @@ async function photoHandler(pool, ctx) {
     console.log('API response', data);
 
     if (data.status === 'pending') {
+      const cb = `retry|${encodeURIComponent(String(data.id))}`.slice(0, 64);
       await ctx.reply(msg('diag_pending'), {
         reply_markup: {
-          inline_keyboard: [[{ text: msg('retry_button'), callback_data: `retry|${data.id}` }]],
+          inline_keyboard: [[{ text: msg('retry_button'), callback_data: cb }]],
         },
       });
       return;
@@ -123,9 +140,10 @@ async function retryHandler(ctx, photoId) {
     }
     const data = await resp.json();
     if (data.status === 'pending' || data.status === 'retrying') {
+      const cb = `retry|${encodeURIComponent(String(photoId))}`.slice(0, 64);
       await ctx.reply(msg('diag_pending'), {
         reply_markup: {
-          inline_keyboard: [[{ text: msg('retry_button'), callback_data: `retry|${photoId}` }]],
+          inline_keyboard: [[{ text: msg('retry_button'), callback_data: cb }]],
         },
       });
       return;
