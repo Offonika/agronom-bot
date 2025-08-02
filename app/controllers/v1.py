@@ -313,7 +313,7 @@ async def diagnose(
             status_code=202, content={"id": photo_id, "status": "pending"}
         )
 
-    proto = find_protocol(crop, disease)
+    proto = await asyncio.to_thread(find_protocol, crop, disease)
     if proto:
         proto_resp = ProtocolResponse(
             id=proto.id,
