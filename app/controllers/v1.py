@@ -525,7 +525,8 @@ async def payments_webhook(
 
     try:
         data = json.loads(raw_body)
-    except Exception as err:
+    except (json.JSONDecodeError, TypeError) as err:
+        logger.exception("failed to parse webhook body as JSON")
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
     provided_sign = data.pop("signature", "")
 
