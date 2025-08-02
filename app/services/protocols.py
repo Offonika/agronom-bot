@@ -50,49 +50,45 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
             logging.warning("CSV download failed: %s — using cached file", exc)
 
     # -------- 2. connect to DB -------------------------------------------------
-    session = db.SessionLocal()
+    with db.SessionLocal() as session:
+        # DEBUG ─────────────────────────────────────────────────────────────────
+        engine = session.bind
+        if logger.isEnabledFor(logging.DEBUG):
+            insp = inspect(engine)
+            try:
+                search_path = session.execute(text("SHOW search_path")).scalar()
+            except Exception:  # noqa: BLE001
+                search_path = "n/a"
+            logger.debug("DB url       → %s", engine.url)
+            logger.debug("search_path  → %s", search_path)
+            logger.debug("table list   → %s", insp.get_table_names())
+        # ───────────────────────────────────────────────────────────────────────
 
-    # DEBUG ─────────────────────────────────────────────────────────────────────
-    engine = session.bind
-    if logger.isEnabledFor(logging.DEBUG):
-        insp = inspect(engine)
+        # -------- 3. if table missing → warn & exit ----------------------------
         try:
-            search_path = session.execute(text("SHOW search_path")).scalar()
-        except Exception:  # noqa: BLE001
-            search_path = "n/a"
-        logger.debug("DB url       → %s", engine.url)
-        logger.debug("search_path  → %s", search_path)
-        logger.debug("table list   → %s", insp.get_table_names())
-    # ───────────────────────────────────────────────────────────────────────────
-
-    # -------- 3. if table missing → warn & exit --------------------------------
-    try:
-        count = session.query(Protocol).count()
-    except OperationalError:
-        logging.warning(
-            "Table 'protocols' not found. "
-            "Run 'alembic upgrade head' or set DB_CREATE_ALL=1"
-        )
-        session.close()
-        return
-
-    # -------- 4. initial import ------------------------------------------------
-    if count == 0 and path.exists():
-        rows = load_csv(path)
-        for r in rows:
-            proto = Protocol(
-                crop=r["crop"],
-                disease=r["disease"],
-                product=r["product"],
-                dosage_value=r["dosage_value"],
-                dosage_unit=r["dosage_unit"],
-                phi=int(r["phi"]),
+            count = session.query(Protocol).count()
+        except OperationalError:
+            logging.warning(
+                "Table 'protocols' not found. "
+                "Run 'alembic upgrade head' or set DB_CREATE_ALL=1"
             )
-            session.add(proto)
-        session.commit()
-        logging.info("Imported %s protocols from CSV", len(rows))
+            return
 
-    session.close()
+        # -------- 4. initial import --------------------------------------------
+        if count == 0 and path.exists():
+            rows = load_csv(path)
+            for r in rows:
+                proto = Protocol(
+                    crop=r["crop"],
+                    disease=r["disease"],
+                    product=r["product"],
+                    dosage_value=r["dosage_value"],
+                    dosage_unit=r["dosage_unit"],
+                    phi=int(r["phi"]),
+                )
+                session.add(proto)
+            session.commit()
+            logging.info("Imported %s protocols from CSV", len(rows))
 
 
 # --------------------------------------------------------------------------- #
