@@ -3,7 +3,7 @@ const strings = require('../locales/ru.json');
 function msg(key, vars = {}) {
   let text = strings[key] || '';
   for (const [k, v] of Object.entries(vars)) {
-    text = text.replace(`{${k}}`, v);
+    text = text.replaceAll(`{${k}}`, v);
   }
   return text;
 }
