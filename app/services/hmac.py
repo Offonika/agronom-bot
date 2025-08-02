@@ -5,7 +5,7 @@ import hmac
 import hashlib
 
 
-def verifyHmac(sig_header: str, body: bytes, secret: str) -> bool:
+def verify_hmac(sig_header: str, body: bytes, secret: str) -> bool:
     """Return ``True`` if HMAC-SHA256 signature matches the body."""
     if not sig_header:
         return False
