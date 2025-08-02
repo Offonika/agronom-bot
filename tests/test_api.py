@@ -586,6 +586,20 @@ async def test_verify_hmac_bad_payload_signature(client):
     assert exc.value.status_code == 401
 
 
+@pytest.mark.asyncio
+async def test_verify_hmac_bad_json(client):
+    payload = [1, 2, 3]
+    body = json.dumps(payload).encode()
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request = Request({"type": "http"}, receive)
+    with pytest.raises(HTTPException) as exc:
+        await verify_hmac(request, "sig")
+    assert exc.value.status_code == 400
+
+
 def test_payment_webhook_missing_signature(client):
     payload = {
         "external_id": "1",
