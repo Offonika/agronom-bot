@@ -236,7 +236,7 @@ async def diagnose(
             disease = result.get("disease", "")
             conf = result.get("confidence", 0.0)
             status = "ok"
-        except Exception as exc:  # noqa: BLE001
+        except (TimeoutError, ValueError, json.JSONDecodeError) as exc:
             logger.exception("GPT error", exc_info=exc)
             crop = ""
             disease = ""
@@ -245,7 +245,7 @@ async def diagnose(
     else:
         try:
             json_data = await request.json()
-        except Exception:  # noqa: BLE001
+        except (json.JSONDecodeError, ValueError, RuntimeError):
             err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
             return JSONResponse(status_code=400, content=err.model_dump())
         try:
@@ -286,7 +286,7 @@ async def diagnose(
             disease = result.get("disease", "")
             conf = result.get("confidence", 0.0)
             status = "ok"
-        except Exception as exc:  # noqa: BLE001
+        except (TimeoutError, ValueError, json.JSONDecodeError) as exc:
             logger.exception("GPT error", exc_info=exc)
             crop = ""
             disease = ""
