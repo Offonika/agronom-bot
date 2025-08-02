@@ -49,7 +49,11 @@ async function buyProHandler(ctx, pool, intervalMs = 3000) {
   try {
     const resp = await fetch(`${API_BASE}/v1/payments/create`, {
       method: 'POST',
-      headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
+      headers: {
+        'X-API-Key': API_KEY,
+        'X-API-Ver': API_VER,
+        'X-User-ID': ctx.from?.id,
+      },
     });
     const data = await resp.json();
     ctx.paymentId = data.payment_id;
@@ -75,7 +79,11 @@ async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
     await new Promise((r) => setTimeout(r, intervalMs));
     try {
       const resp = await fetch(`${API_BASE}/v1/payments/${paymentId}`, {
-        headers: { 'X-API-Key': API_KEY, 'X-API-Ver': API_VER },
+        headers: {
+          'X-API-Key': API_KEY,
+          'X-API-Ver': API_VER,
+          'X-User-ID': ctx.from?.id,
+        },
       });
       if (!resp.ok) continue;
       const data = await resp.json();

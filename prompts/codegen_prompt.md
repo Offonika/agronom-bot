@@ -4,7 +4,7 @@
 Не выдумывай схем и эндпоинтов — используй только те, что описаны.
 
 Каждый эндпоинт должен:
-- требовать заголовок `X-API-Key` и `X-API-Ver: v1`
+- требовать заголовки `X-API-Key`, `X-User-ID` и `X-API-Ver: v1`
 - возвращать `ErrorResponse` с `.code` из enum: `LIMIT_EXCEEDED`, `BAD_REQUEST`, `GPT_TIMEOUT`, `UNAUTHORIZED`
 
 Если используется HMAC-подпись:

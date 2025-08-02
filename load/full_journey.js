@@ -17,6 +17,7 @@ function headers(extra = {}) {
     {
       'X-API-Key': API_KEY,
       'X-API-Ver': API_VER,
+      'X-User-ID': '1',
       'Content-Type': 'application/json',
     },
     extra,

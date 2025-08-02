@@ -4,7 +4,7 @@
 > Требуется Node.js 18+ для работы Telegram-бота и тестов.
 
 > Минималистичный AI-бот для диагностики болезней растений и рекомендаций по протоколу обработки.  
-> Версия API: **v1.7.0** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
+> Версия API: **v1.7.1** | Документация: в папке `docs/` | OpenAPI: `openapi/openapi.yaml`
 
 ---
 
@@ -30,7 +30,7 @@
 - Хранилище: **S3 (VK S3 или MinIO)**
 - Очередь: **Bull / Celery / Redis (опционально)**
 - Аналитика: **Prometheus, Grafana, Loki**
-- Безопасность: `X-API-Key`, `X-API-Ver`, `X-Sign`, HMAC‑SHA256
+- Безопасность: `X-API-Key`, `X-API-Ver`, `X-User-ID`, `X-Sign`, HMAC‑SHA256
 
 ---
 
@@ -38,7 +38,7 @@
 
 | Тариф      | Диагнозов в месяц | Защита |
 |------------|-------------------|--------|
-| Free       | FREE_MONTHLY_LIMIT (по умолчанию 5) | `X-API-Key` + `X-API-Ver` |
+| Free       | FREE_MONTHLY_LIMIT (по умолчанию 5) | `X-API-Key` + `X-API-Ver` + `X-User-ID` |
 | Pro        | ∞                 | —      |
 
 Все эндпоинты валидируются через OpenAPI + Spectral.
@@ -79,6 +79,7 @@ API-ключ берётся из переменной окружения `API_KE
 curl -X POST http://localhost:8000/v1/ai/diagnose \
   -H "X-API-Key: $API_KEY" \
   -H "X-API-Ver: v1" \
+  -H "X-User-ID: 1" \
   -H "Content-Type: application/json" \
   -d '{"image_base64":"dGVzdA==","prompt_id":"v1"}'
 ```
