@@ -1,6 +1,6 @@
+import os
 import logging
 from datetime import datetime, timezone, timedelta
-import os
 from sqlalchemy import create_engine, text
 
 from app.logger import setup_logging
