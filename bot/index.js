@@ -35,7 +35,7 @@ bot.command('subscribe', async (ctx) => {
 
 bot.command('help', (ctx) => helpHandler(ctx));
 
-bot.command('history', (ctx) => historyHandler(ctx, 0, pool));
+bot.command('history', async (ctx) => historyHandler(ctx, 0, pool));
 
 bot.on('photo', (ctx) => photoHandler(pool, ctx));
 

@@ -8,9 +8,17 @@ const API_VER = process.env.API_VER || 'v1';
 async function historyHandler(ctx, offset = 0, pool) {
   if (ctx.from && pool) {
     if (offset === 0) {
-      logEvent(pool, ctx.from.id, 'history_open');
+      try {
+        await logEvent(pool, ctx.from.id, 'history_open');
+      } catch (err) {
+        console.error('logEvent history_open error', err);
+      }
     }
-    logEvent(pool, ctx.from.id, `history_page_${offset}`);
+    try {
+      await logEvent(pool, ctx.from.id, `history_page_${offset}`);
+    } catch (err) {
+      console.error('logEvent history_page error', err);
+    }
   }
   const resp = await fetch(
     `${API_BASE}/v1/photos/history?limit=10&offset=${offset}`,
