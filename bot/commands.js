@@ -21,7 +21,7 @@ function helpHandler(ctx) {
   return ctx.reply(text, {
     parse_mode: 'Markdown',
     reply_markup: {
-      inline_keyboard: [[{ text: msg('help_button'), url: policyUrl }], [{ text: msg('help_button'), url: offerUrl }]],
+      inline_keyboard: [[{ text: msg('privacy_button'), url: policyUrl }], [{ text: msg('offer_button'), url: offerUrl }]],
     },
   });
 }
