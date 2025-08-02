@@ -36,3 +36,6 @@ async def create_sbp_link(external_id: str, amount: int, currency: str) -> str:
     except httpx.HTTPError as exc:
         logger.error("SBP API request failed: %s", exc)
         return f"https://sbp.example/pay/{external_id}"
+    except ValueError as exc:
+        logger.error("SBP API response parsing failed: %s", exc)
+        return f"https://sbp.example/pay/{external_id}"
