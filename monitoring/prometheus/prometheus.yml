@@ -3,8 +3,11 @@ global:
 
 scrape_configs:
   - job_name: api
+    metrics_path: /metrics
     static_configs:
       - targets: ['api:8000']
+
   - job_name: bot
+    metrics_path: /metrics
     static_configs:
       - targets: ['bot:3000']

@@ -12,6 +12,9 @@ from app.services.storage import init_storage
 from app.logger import setup_logging
 from app.controllers import v1
 
+# 👇 Prometheus инструментатор
+from prometheus_fastapi_instrumentator import Instrumentator
+
 settings = Settings()
 init_storage(settings)
 setup_logging()
@@ -32,3 +35,6 @@ app = FastAPI(
 )
 
 app.include_router(v1.router)
+
+# 👇 Добавляем метрики
+Instrumentator().instrument(app).expose(app)

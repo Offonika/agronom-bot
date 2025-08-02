@@ -1,0 +1,82 @@
+{
+  "id": null,
+  "title": "Agronom Bot – Diag Overview",
+  "timezone": "browser",
+  "schemaVersion": 37,
+  "version": 2,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Diagnosis Requests / sec",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(diag_requests_total[1m])",
+          "legendFormat": "requests/sec"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "GPT Timeouts / sec",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(gpt_timeout_total[1m])",
+          "legendFormat": "timeouts/sec"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Quota Rejections / sec",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(quota_reject_total[1m])",
+          "legendFormat": "rejects/sec"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Diagnosis Latency (p95)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(diag_latency_seconds_bucket[5m]))",
+          "legendFormat": "p95"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Node.js Event Loop Lag",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_lag_seconds",
+          "legendFormat": "lag"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Node.js Heap Used (MB)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "nodejs_heap_size_used_bytes / 1024 / 1024",
+          "legendFormat": "heap used (MB)"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 }
+    }
+  ]
+}

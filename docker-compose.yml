@@ -17,6 +17,9 @@ services:
       - minio
     ports:
       - "8000:8000"
+    networks:
+      - agronet
+
   bot:
     build:
       context: .
@@ -34,23 +37,32 @@ services:
       - postgres
       - redis
       - minio
+    networks:
+      - agronet
   postgres:
-    image: postgres:14
+    image: postgres:15
     environment:
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
-      - POSTGRES_USER=...
-      - POSTGRES_PASSWORD=...
-      - POSTGRES_DB=...
+      - POSTGRES_USER=agronom_user
+      - POSTGRES_PASSWORD=GbygkhYbd67
+      - POSTGRES_DB=agronom_bot
+
     restart: unless-stopped
     env_file: .env
+    ports:
+      - 5433:5432
+    networks:
+      - agronet
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
   redis:
     image: redis:7
     restart: unless-stopped
     volumes:
       - redis-data:/data
+    networks:
+      - agronet
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
@@ -63,16 +75,26 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    networks:
+      - agronet
   prometheus:
     image: prom/prometheus
     volumes:
       - prometheus-data:/prometheus
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+          - "9090:9090"   # ⬅️ Добавь этот проброс
+    networks:
+      - agronet
+    extra_hosts:
+      - "api:172.19.0.8"
   loki:
     image: grafana/loki:2.9.7
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - loki-data:/loki
+    networks:
+      - agronet
   grafana:
     image: grafana/grafana
     ports:
@@ -83,11 +105,17 @@ services:
     depends_on:
       - prometheus
       - loki
+    networks:
+      - agronet
+    
 
 volumes:
-  postgres-data:
+  pg_data:            # 🔧 Добавить этот том!
   redis-data:
   minio-data:
   prometheus-data:
   loki-data:
   grafana-data:
+
+networks:
+  agronet:

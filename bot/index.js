@@ -92,3 +92,21 @@ async function shutdown() {
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
 
+// Prometheus метрики
+const client = require('prom-client');
+const http = require('http');
+
+client.collectDefaultMetrics(); // собираем базовые метрики
+
+// Запускаем HTTP-сервер на порту 3000 для Prometheus
+http.createServer(async (req, res) => {
+  if (req.url === '/metrics') {
+    res.setHeader('Content-Type', client.register.contentType);
+    res.end(await client.register.metrics());
+  } else {
+    res.statusCode = 404;
+    res.end('Not found');
+  }
+}).listen(3000, () => {
+  console.log('Metrics server listening on :3000');
+});
