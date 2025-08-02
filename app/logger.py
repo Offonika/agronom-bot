@@ -1,4 +1,4 @@
-import json
+import json  # JSON serialization
 import logging
 from datetime import datetime, timezone
 
