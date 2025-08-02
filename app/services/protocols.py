@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 from cachetools import TTLCache
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 
 from app import db
@@ -57,7 +57,7 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
     if logger.isEnabledFor(logging.DEBUG):
         insp = inspect(engine)
         try:
-            search_path = engine.execute("SHOW search_path").scalar()
+            search_path = session.execute(text("SHOW search_path")).scalar()
         except Exception:  # noqa: BLE001
             search_path = "n/a"
         logger.debug("DB url       → %s", engine.url)
