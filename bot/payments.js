@@ -42,7 +42,7 @@ async function sendPaywall(ctx, pool) {
 }
 
 async function buyProHandler(ctx, pool, intervalMs = 3000) {
-  ctx.answerCbQuery();
+  await ctx.answerCbQuery();
   if (ctx.from) {
     await logEvent(pool, ctx.from.id, 'paywall_click_buy');
   }
