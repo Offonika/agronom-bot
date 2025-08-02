@@ -408,6 +408,29 @@ test('historyHandler logs page event', { concurrency: false }, async () => {
   assert.equal(events[0][1][1], 'history_page_10');
 });
 
+test('historyHandler handles malformed responses', { concurrency: false }, async () => {
+  for (const bad of [{ bad: 'data' }, 'oops']) {
+    const replies = [];
+    let logged = '';
+    const ctx = { reply: async (msg) => replies.push(msg) };
+    const origErr = console.error;
+    console.error = (...args) => {
+      logged = args.join(' ');
+    };
+    await withMockFetch(
+      {
+        'http://localhost:8000/v1/photos/history?limit=10&offset=0': { json: async () => bad },
+      },
+      async () => {
+        await historyHandler(ctx, 0);
+      },
+    );
+    console.error = origErr;
+    assert.equal(replies[0], msg('history_error'));
+    assert.ok(logged.includes('Unexpected history response'));
+  }
+});
+
 test('helpHandler returns links', { concurrency: false }, async () => {
   process.env.PRIVACY_URL = 'https://example.com/policy';
   process.env.OFFER_URL = 'https://example.com/offer';

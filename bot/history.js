@@ -27,6 +27,11 @@ async function historyHandler(ctx, offset = 0, pool) {
     return;
   }
   const data = await resp.json();
+  if (!Array.isArray(data)) {
+    console.error('Unexpected history response', data);
+    await ctx.reply(msg('history_error'));
+    return;
+  }
   let text = data
     .map((it, idx) => {
       const dt = new Date(it.ts);
