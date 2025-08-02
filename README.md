@@ -235,6 +235,21 @@ agronom-bot/
     Тесты игнорируют файл `.env`, так как `Settings(_env_file=None)` передаётся в
     хранилище. Локальные переменные вроде `S3_ENDPOINT` не повлияют на результат.
 
+### Асинхронный доступ к БД
+
+Эндпоинты FastAPI работают в асинхронном режиме. Чтобы не блокировать
+event loop, оборачивайте синхронный `SessionLocal` в `asyncio.to_thread` или
+используйте асинхронный движок SQLAlchemy.
+
+```python
+def _db_task():
+    with db.SessionLocal() as session:
+        session.add(obj)
+        session.commit()
+
+await asyncio.to_thread(_db_task)
+```
+
 7. Проверьте спецификацию OpenAPI линтером Spectral:
 
    ```bash
