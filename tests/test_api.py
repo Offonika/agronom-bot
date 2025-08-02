@@ -403,6 +403,12 @@ def test_create_payment(client):
         assert event.event == "payment_created"
 
 
+def test_create_payment_user_id_mismatch(client):
+    payload = {"user_id": 2, "plan": "pro", "months": 1}
+    resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
+    assert resp.status_code == 401
+
+
 def test_payment_webhook_success(client):
     from app.db import SessionLocal
     from app.models import Payment, Event

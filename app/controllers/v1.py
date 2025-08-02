@@ -433,7 +433,11 @@ async def get_limits(user_id: int = Depends(require_api_headers)):
     response_model=PaymentCreateResponse,
     responses={401: {"model": ErrorResponse}},
 )
-async def create_payment(body: PaymentCreateRequest, _: None = Depends(require_api_headers)):
+async def create_payment(body: PaymentCreateRequest, user_id: int = Depends(require_api_headers)):
+    if body.user_id != user_id:
+        err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
+        raise HTTPException(status_code=401, detail=err.model_dump())
+
     if body.plan.lower() != "pro":
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
