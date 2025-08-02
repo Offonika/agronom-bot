@@ -757,6 +757,33 @@ def test_diagnose_json_no_protocol_beta(client):
     assert data["protocol_status"] == "Бета"
 
 
+def test_diagnose_missing_protocols_table(client):
+    """Diagnose should gracefully handle a missing protocols table."""
+    from app.db import SessionLocal
+    from sqlalchemy import text
+    from app.models import Protocol
+
+    with SessionLocal() as session:
+        session.execute(text("DROP TABLE IF EXISTS protocols"))
+        session.commit()
+
+    try:
+        resp = client.post(
+            "/v1/ai/diagnose",
+            headers=HEADERS,
+            json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["protocol"] is None
+        assert data["protocol_status"] == "Бета"
+    finally:
+        with SessionLocal() as session:
+            Protocol.__table__.create(bind=session.bind, checkfirst=True)
+            session.commit()
+        import_csv_to_db()
+
+
 def test_free_monthly_limit_env(monkeypatch, client):
     monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 1)
     resp = client.get("/v1/limits", headers=HEADERS)

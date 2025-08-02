@@ -106,12 +106,17 @@ def _cache_protocol(crop: str, disease: str) -> Protocol | None:
     if key in _cache:
         return _cache[key]
     session = db.SessionLocal()
-    proto = (
-        session.query(Protocol)
-        .filter(Protocol.crop == crop, Protocol.disease == disease)
-        .first()
-    )
-    session.close()
+    try:
+        proto = (
+            session.query(Protocol)
+            .filter(Protocol.crop == crop, Protocol.disease == disease)
+            .first()
+        )
+    except OperationalError as exc:
+        logger.warning("Protocols table query failed: %s", exc)
+        return None
+    finally:
+        session.close()
     _cache[key] = proto
     return proto
 
