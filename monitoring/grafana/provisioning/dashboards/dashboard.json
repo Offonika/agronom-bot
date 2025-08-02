@@ -3,7 +3,7 @@
   "title": "Agronom Bot – Diag Overview",
   "timezone": "browser",
   "schemaVersion": 37,
-  "version": 2,
+  "version": 3,
   "refresh": "10s",
   "panels": [
     {
@@ -77,6 +77,83 @@
         }
       ],
       "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 }
+    },
+    {
+      "type": "stat",
+      "title": "HTTP Error Rate",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+          "legendFormat": "error rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.02 }
+            ]
+          }
+        }
+      },
+      "alert": {
+        "name": "High HTTP Error Rate",
+        "noDataState": "no_data",
+        "execErrState": "alerting",
+        "for": "5m",
+        "conditions": [
+          {
+            "evaluator": { "type": "gt", "params": [0.02] },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "type": "last" },
+            "type": "query"
+          }
+        ]
+      },
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Size Pending",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "queue_size_pending",
+          "legendFormat": "pending"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "alert": {
+        "name": "Queue Size Pending High",
+        "noDataState": "no_data",
+        "execErrState": "alerting",
+        "for": "5m",
+        "conditions": [
+          {
+            "evaluator": { "type": "gt", "params": [100] },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "type": "last" },
+            "type": "query"
+          }
+        ]
+      },
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 }
     }
   ]
 }
