@@ -21,12 +21,12 @@ async function logEvent(pool, userId, ev) {
   }
 }
 
-function sendPaywall(ctx, pool) {
+async function sendPaywall(ctx, pool) {
   if (!paywallEnabled()) {
     return;
   }
   if (ctx.from) {
-    logEvent(pool, ctx.from.id, 'paywall_shown');
+    await logEvent(pool, ctx.from.id, 'paywall_shown');
   }
   const limit = getLimit();
   return ctx.reply(msg('paywall', { limit }), {
@@ -44,7 +44,7 @@ function sendPaywall(ctx, pool) {
 async function buyProHandler(ctx, pool, intervalMs = 3000) {
   ctx.answerCbQuery();
   if (ctx.from) {
-    logEvent(pool, ctx.from.id, 'paywall_click_buy');
+    await logEvent(pool, ctx.from.id, 'paywall_click_buy');
   }
   try {
     const resp = await fetch(`${API_BASE}/v1/payments/create`, {
@@ -103,7 +103,7 @@ async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
   }
 }
 
-function subscribeHandler(ctx, pool) {
+async function subscribeHandler(ctx, pool) {
   return sendPaywall(ctx, pool);
 }
 
