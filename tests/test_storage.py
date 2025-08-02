@@ -2,6 +2,7 @@ import os
 import re
 import boto3
 import pytest
+import pytest_asyncio
 
 from moto import mock_aws
 
@@ -19,20 +20,31 @@ class _AsyncWrapper:
     async def put_object(self, *args, **kwargs):
         return self._client.put_object(*args, **kwargs)
 
+    async def __aenter__(self):
+        return self
 
-@pytest.fixture(autouse=True)
-def use_sync_client(monkeypatch):
+    async def __aexit__(self, exc_type, exc, tb):
+        self._client.close()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def use_sync_client(monkeypatch):
     async def _make():
-        return _AsyncWrapper(boto3.client("s3", region_name="us-east-1"))
+        ctx = _AsyncWrapper(boto3.client("s3", region_name="us-east-1"))
+        storage._client_ctx = ctx
+        return await ctx.__aenter__()
 
     monkeypatch.setattr(storage, "_make_client", _make)
     storage._client = None
+    storage._client_ctx = None
+    yield
+    await storage.close_client()
 
 
 @pytest.mark.asyncio
 async def test_lazy_client_initialization():
     with mock_aws():
-        storage.init_storage(Settings(_env_file=None))
+        await storage.init_storage(Settings(_env_file=None))
         assert storage._client is None
         first = await get_client()
         assert first is storage._client
@@ -53,7 +65,7 @@ async def test_upload_and_url():
         os.environ["S3_REGION"] = "us-east-1"
         os.environ.pop("S3_ENDPOINT", None)
         os.environ["S3_PUBLIC_URL"] = "http://localhost:9000"
-        storage.init_storage(Settings(_env_file=None))
+        await storage.init_storage(Settings(_env_file=None))
 
         with mock_aws():
             s3 = boto3.client("s3", region_name="us-east-1")
@@ -74,6 +86,37 @@ async def test_upload_and_url():
                 os.environ[name] = value
 
 
+class DummyClient:
+    def __init__(self):
+        self.closed = False
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_close_client_closes():
+    dummy = DummyClient()
+    storage._client = await dummy.__aenter__()
+    storage._client_ctx = dummy
+    await storage.close_client()
+    assert dummy.closed
+    assert storage._client is None
+
+
+@pytest.mark.asyncio
+async def test_init_storage_closes_existing_client():
+    dummy = DummyClient()
+    storage._client = await dummy.__aenter__()
+    storage._client_ctx = dummy
+    await storage.init_storage(Settings(_env_file=None))
+    assert dummy.closed
+    assert storage._client is None
+
+
 @pytest.mark.asyncio
 async def test_upload_failure():
     original_env = {
@@ -87,7 +130,7 @@ async def test_upload_failure():
         os.environ["S3_REGION"] = "us-east-1"
         os.environ.pop("S3_ENDPOINT", None)
         os.environ.pop("S3_PUBLIC_URL", None)
-        storage.init_storage(Settings(_env_file=None))
+        await storage.init_storage(Settings(_env_file=None))
 
         with mock_aws():
             # Intentionally do not create bucket to trigger error

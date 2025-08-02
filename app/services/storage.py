@@ -6,6 +6,7 @@ import logging
 
 import aioboto3
 from aiobotocore.client import AioBaseClient
+from contextlib import AbstractAsyncContextManager
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException
 
@@ -18,6 +19,7 @@ logger = logging.getLogger("s3")
 BUCKET = os.getenv("S3_BUCKET", "agronom")
 _settings: Settings | None = None
 
+_client_ctx: AbstractAsyncContextManager[AioBaseClient] | None = None
 _client: AioBaseClient | None = None
 
 
@@ -38,13 +40,16 @@ async def _make_client() -> AioBaseClient:
         "S3_SECRET_KEY",
         _settings.s3_secret_key if _settings is not None else None,
     )
-    client_ctx = aioboto3.Session().client(
+    session = aioboto3.Session()
+    client_ctx = session.client(
         "s3",
         endpoint_url=endpoint,
         region_name=region,
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
     )
+    global _client_ctx
+    _client_ctx = client_ctx
     return await client_ctx.__aenter__()
 
 
@@ -58,11 +63,20 @@ async def get_client() -> AioBaseClient:
     return _client
 
 
-def init_storage(cfg: Settings) -> None:
-    """Store settings and reinitialize the client."""
-    global _settings, _client
-    _settings = cfg
+async def close_client() -> None:
+    """Close the cached S3 client if it exists."""
+    global _client, _client_ctx
+    if _client_ctx is not None:
+        await _client_ctx.__aexit__(None, None, None)
     _client = None
+    _client_ctx = None
+
+
+async def init_storage(cfg: Settings) -> None:
+    """Store settings and reinitialize the client."""
+    global _settings
+    _settings = cfg
+    await close_client()
 
 
 async def upload_photo(user_id: int, data: bytes) -> str:
