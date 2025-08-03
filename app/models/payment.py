@@ -14,6 +14,7 @@ class Payment(Base):
     currency = Column(String)
     provider = Column(String)
     external_id = Column(String)
+    autopay_charge_id = Column(String, unique=True, nullable=True)
     prolong_months = Column(Integer)
     autopay = Column(Boolean, default=False)
     autopay_binding_id = Column(String, nullable=True)

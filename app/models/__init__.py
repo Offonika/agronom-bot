@@ -6,6 +6,7 @@ from .partner_order import PartnerOrder
 from .protocol import Protocol
 from .photo_usage import PhotoUsage
 from .event import Event
+from .user import User
 
 __all__ = [
     "Base",
@@ -16,4 +17,5 @@ __all__ = [
     "PartnerOrder",
     "Protocol",
     "Event",
+    "User",
 ]
