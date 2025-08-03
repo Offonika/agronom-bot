@@ -1,13 +1,13 @@
 const { msg } = require('./utils');
 const { logEvent, sendPaywall } = require('./payments');
 
-function startHandler(ctx, pool) {
+async function startHandler(ctx, pool) {
   if (ctx.startPayload === 'paywall') {
-    logEvent(pool, ctx.from.id, 'paywall_click_buy');
+    await logEvent(pool, ctx.from.id, 'paywall_click_buy');
   } else if (ctx.startPayload === 'faq') {
-    logEvent(pool, ctx.from.id, 'paywall_click_faq');
+    await logEvent(pool, ctx.from.id, 'paywall_click_faq');
   }
-  ctx.reply(msg('start'));
+  await ctx.reply(msg('start'));
 }
 
 function helpHandler(ctx) {
@@ -26,16 +26,16 @@ function helpHandler(ctx) {
   });
 }
 
-function feedbackHandler(ctx, pool) {
+async function feedbackHandler(ctx, pool) {
   const base = process.env.FEEDBACK_URL || 'https://example.com/feedback';
   const url = new URL(base);
   url.searchParams.set('utm_source', 'telegram');
   url.searchParams.set('utm_medium', 'bot');
   url.searchParams.set('utm_campaign', 'feedback');
   if (ctx.from) {
-    logEvent(pool, ctx.from.id, 'feedback_open');
+    await logEvent(pool, ctx.from.id, 'feedback_open');
   }
-  return ctx.reply('Будем рады вашему отзыву!', {
+  await ctx.reply('Будем рады вашему отзыву!', {
     reply_markup: {
       inline_keyboard: [[{ text: 'Оставить отзыв', url: url.toString() }]],
     },
