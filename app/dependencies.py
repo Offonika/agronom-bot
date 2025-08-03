@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from app.config import Settings
 
 settings = Settings()
-HMAC_SECRET = settings.hmac_secret
+HMAC_SECRET_PARTNER = settings.hmac_secret_partner
 
 
 class ErrorResponse(BaseModel):
@@ -60,7 +60,7 @@ async def verify_hmac(request: Request, x_sign: str):
         raise HTTPException(status_code=400, detail=err.model_dump())
 
     payload.pop("signature", None)
-    calculated = compute_signature(HMAC_SECRET, payload)
+    calculated = compute_signature(HMAC_SECRET_PARTNER, payload)
 
     if not hmac.compare_digest(calculated, x_sign) or not hmac.compare_digest(
         calculated, provided_sign
