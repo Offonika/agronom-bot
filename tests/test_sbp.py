@@ -7,11 +7,9 @@ import hashlib
 
 import httpx
 import pytest
-from sqlalchemy import text
-
 from app.config import Settings
 from app.db import SessionLocal
-from app.models import Payment
+from app.models import Payment, User
 from app.dependencies import compute_signature
 from app.services.sbp import create_sbp_link
 
@@ -75,21 +73,20 @@ async def test_create_sbp_link_autopay_returns_binding(monkeypatch):
 
 
 def _ensure_user(session):
-    try:
-        session.execute(text("ALTER TABLE users ADD COLUMN autopay_enabled BOOLEAN DEFAULT 1"))
-    except Exception:
-        session.rollback()
-    session.execute(
-        text("INSERT OR IGNORE INTO users (id, tg_id, autopay_enabled) VALUES (1, 1, 1)")
-    )
-    session.execute(text("UPDATE users SET autopay_enabled=1 WHERE id=1"))
+    user = session.get(User, 1)
+    if not user:
+        user = User(id=1, tg_id=1, autopay_enabled=True)
+        session.add(user)
+    else:
+        user.autopay_enabled = True
     session.commit()
 
 
 def test_create_payment_with_autopay(client):
     with SessionLocal() as session:
-        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1,1)"))
-        session.commit()
+        if not session.get(User, 1):
+            session.add(User(id=1, tg_id=1))
+            session.commit()
     resp = client.post(
         "/v1/payments/create",
         headers=HEADERS,
@@ -107,8 +104,9 @@ def test_create_payment_with_autopay(client):
 def test_autopay_webhook_success(client, monkeypatch):
     monkeypatch.setenv("SECURE_WEBHOOK", "1")
     with SessionLocal() as session:
-        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1, 1)"))
-        session.commit()
+        if not session.get(User, 1):
+            session.add(User(id=1, tg_id=1))
+            session.commit()
 
     payload = {
         "autopay_charge_id": "CHG-1",
@@ -130,13 +128,22 @@ def test_autopay_webhook_success(client, monkeypatch):
     )
     assert resp.status_code == 200
     with SessionLocal() as session:
-        payment = session.query(Payment).filter_by(external_id="CHG-1").first()
+        payment = (
+            session.query(Payment)
+            .filter_by(autopay_charge_id="CHG-1")
+            .first()
+        )
         assert payment is not None
         assert payment.status == "success"
         assert payment.autopay is True
         assert payment.autopay_binding_id == "BND-1"
-        exp = session.execute(text("SELECT pro_expires_at FROM users WHERE id=1")) .scalar()
-        assert exp is not None
+        assert payment.autopay_charge_id == "CHG-1"
+        user = session.get(User, 1)
+        assert user and user.autopay_enabled is True
+        assert user.pro_expires_at is not None
+        user.pro_expires_at = None
+        user.autopay_enabled = False
+        session.commit()
 
 
 def test_autopay_webhook_bad_signature(client, monkeypatch):
@@ -172,8 +179,8 @@ def test_autopay_cancel_success(client):
     )
     assert resp.status_code == 204
     with SessionLocal() as session:
-        val = session.execute(text("SELECT autopay_enabled FROM users WHERE id=1")).scalar()
-        assert val in (0, False)
+        user = session.get(User, 1)
+        assert user and user.autopay_enabled in (0, False)
 
 
 def test_autopay_cancel_user_mismatch(client):
@@ -187,5 +194,5 @@ def test_autopay_cancel_user_mismatch(client):
     )
     assert resp.status_code == 401
     with SessionLocal() as session:
-        val = session.execute(text("SELECT autopay_enabled FROM users WHERE id=1")).scalar()
-        assert val in (1, True)
+        user = session.get(User, 1)
+        assert user and user.autopay_enabled in (1, True)

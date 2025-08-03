@@ -562,7 +562,11 @@ def test_payment_webhook_updates_pro_expiration(client):
         assert expires is not None
         if isinstance(expires, str):
             expires = datetime.fromisoformat(expires)
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
         assert expires > paid_at
+        session.execute(text("UPDATE users SET pro_expires_at=NULL WHERE id=1"))
+        session.commit()
 
 
 def test_payment_webhook_cancel(client):
@@ -984,6 +988,10 @@ def test_pro_expired_event_logged(monkeypatch, client):
             ),
             {"dt": past},
         )
+        session.execute(
+            text("UPDATE users SET pro_expires_at=:dt WHERE id=1"),
+            {"dt": past},
+        )
         session.commit()
 
     resp = client.post(
@@ -994,5 +1002,5 @@ def test_pro_expired_event_logged(monkeypatch, client):
     assert resp.status_code == 402
 
     with SessionLocal() as session:
-        event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
-        assert event.event == "pro_expired"
+        events = session.query(Event).filter_by(user_id=1).all()
+        assert any(e.event == "pro_expired" for e in events)

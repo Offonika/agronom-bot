@@ -141,6 +141,8 @@ async def diagnose(
                 ).scalar()
                 if isinstance(pro, str):
                     pro = datetime.fromisoformat(pro)
+                if pro and getattr(pro, "tzinfo", None) is None:
+                    pro = pro.replace(tzinfo=timezone.utc)
                 return used, pro
 
         return await asyncio.to_thread(_db)

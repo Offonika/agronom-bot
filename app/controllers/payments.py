@@ -8,12 +8,11 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import text
 
 from app import db as db_module
 from app.config import Settings
 from app.dependencies import ErrorResponse, require_api_headers, compute_signature
-from app.models import Event, Payment
+from app.models import Event, Payment, User
 from app.services import create_sbp_link
 from app.services.hmac import verify_hmac
 
@@ -128,13 +127,15 @@ async def create_payment(request: Request, user_id: int = Depends(require_api_he
 async def payment_status(payment_id: str, user_id: int = Depends(require_api_headers)):
     def _db_call() -> tuple[str, datetime | None]:
         with db_module.SessionLocal() as db:
-            payment = db.query(Payment).filter_by(external_id=payment_id, user_id=user_id).first()
+            payment = (
+                db.query(Payment)
+                .filter_by(external_id=payment_id, user_id=user_id)
+                .first()
+            )
             if not payment:
                 raise HTTPException(status_code=404, detail="NOT_FOUND")
-            exp = db.execute(
-                text("SELECT pro_expires_at FROM users WHERE id=:uid"),
-                {"uid": payment.user_id},
-            ).scalar()
+            user = db.get(User, payment.user_id)
+            exp = user.pro_expires_at if user else None
             return payment.status, exp
 
     status, exp = await asyncio.to_thread(_db_call)
@@ -188,20 +189,20 @@ async def payments_webhook(
 
             if body.status == "success":
                 months = payment.prolong_months or 0
-                res = db.execute(
-                    text("SELECT pro_expires_at FROM users WHERE id=:uid"),
-                    {"uid": payment.user_id},
-                ).scalar()
-                current_exp = res or body.paid_at
+                user = db.get(User, payment.user_id)
+                current_exp = (
+                    user.pro_expires_at if user and user.pro_expires_at else body.paid_at
+                )
                 if isinstance(current_exp, str):
                     current_exp = datetime.fromisoformat(current_exp)
+                if current_exp.tzinfo is None:
+                    current_exp = current_exp.replace(tzinfo=timezone.utc)
                 if current_exp < body.paid_at:
                     current_exp = body.paid_at
                 new_exp = current_exp + timedelta(days=30 * months)
-                db.execute(
-                    text("UPDATE users SET pro_expires_at=:exp WHERE id=:uid"),
-                    {"uid": payment.user_id, "exp": new_exp},
-                )
+                if user:
+                    user.pro_expires_at = new_exp
+                    db.add(user)
                 db.add(Event(user_id=payment.user_id, event="payment_success"))
                 db.add(Event(user_id=payment.user_id, event="pro_activated"))
             else:
@@ -251,7 +252,11 @@ async def autopay_webhook(
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
-            payment = db.query(Payment).filter_by(external_id=body.autopay_charge_id).first()
+            payment = (
+                db.query(Payment)
+                .filter_by(autopay_charge_id=body.autopay_charge_id)
+                .first()
+            )
             if not payment:
                 payment = Payment(
                     user_id=body.user_id,
@@ -259,6 +264,7 @@ async def autopay_webhook(
                     currency="RUB",
                     provider="sbp",
                     external_id=body.autopay_charge_id,
+                    autopay_charge_id=body.autopay_charge_id,
                     prolong_months=1,
                     status=body.status,
                     autopay=True,
@@ -270,23 +276,25 @@ async def autopay_webhook(
                 payment.updated_at = datetime.now(timezone.utc)
                 payment.autopay = True
                 payment.autopay_binding_id = body.binding_id
+                payment.autopay_charge_id = body.autopay_charge_id
                 db.add(payment)
 
             if body.status == "success":
-                res = db.execute(
-                    text("SELECT pro_expires_at FROM users WHERE id=:uid"),
-                    {"uid": body.user_id},
-                ).scalar()
-                current_exp = res or body.charged_at
+                user = db.get(User, body.user_id)
+                current_exp = (
+                    user.pro_expires_at if user and user.pro_expires_at else body.charged_at
+                )
                 if isinstance(current_exp, str):
                     current_exp = datetime.fromisoformat(current_exp)
+                if current_exp.tzinfo is None:
+                    current_exp = current_exp.replace(tzinfo=timezone.utc)
                 if current_exp < body.charged_at:
                     current_exp = body.charged_at
                 new_exp = current_exp + timedelta(days=30)
-                db.execute(
-                    text("UPDATE users SET pro_expires_at=:exp WHERE id=:uid"),
-                    {"uid": body.user_id, "exp": new_exp},
-                )
+                if user:
+                    user.pro_expires_at = new_exp
+                    user.autopay_enabled = True
+                    db.add(user)
                 db.add(Event(user_id=body.user_id, event="payment_success"))
                 db.add(Event(user_id=body.user_id, event="pro_activated"))
             else:
@@ -323,10 +331,10 @@ async def cancel_autopay(
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
-            db.execute(
-                text("UPDATE users SET autopay_enabled=false WHERE id=:uid"),
-                {"uid": body.user_id},
-            )
+            user = db.get(User, body.user_id)
+            if user:
+                user.autopay_enabled = False
+                db.add(user)
             db.add(Event(user_id=body.user_id, event="autopay_disabled"))
             db.commit()
 
