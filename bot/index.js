@@ -45,7 +45,12 @@ bot.on('photo', (ctx) => photoHandler(pool, ctx));
 bot.on('message', messageHandler);
 
 bot.action(/^proto\|/, async (ctx) => {
-  const [, product, val, unit, phi] = ctx.callbackQuery.data.split('|');
+  const parts = ctx.callbackQuery.data.split('|');
+  if (parts.length < 5) {
+    await ctx.answerCbQuery();
+    return ctx.reply('Некорректный формат данных.');
+  }
+  const [, product, val, unit, phi] = parts;
   const msg =
     `Препарат: ${product}\n` +
     `Доза: ${val} ${unit}\n` +
