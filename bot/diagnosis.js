@@ -96,7 +96,23 @@ async function photoHandler(pool, ctx) {
       await sendPaywall(ctx, pool);
       return;
     }
-    const data = await apiResp.json();
+    if (!apiResp.ok) {
+      console.error('API error status', apiResp.status);
+      if (typeof ctx.reply === 'function') {
+        await ctx.reply(msg('diagnose_error'));
+      }
+      return;
+    }
+    let data;
+    try {
+      data = await apiResp.json();
+    } catch (err) {
+      console.error('Failed to parse API response', err);
+      if (typeof ctx.reply === 'function') {
+        await ctx.reply(msg('diagnose_error'));
+      }
+      return;
+    }
     console.log('API response', data);
 
     if (data.status === 'pending') {
