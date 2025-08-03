@@ -244,6 +244,7 @@ payments(
   amount INT,
   source TEXT,              -- "SBP:Tinkoff"
   autopay BOOLEAN DEFAULT FALSE,
+  autopay_binding_id TEXT,
   status TEXT,
   created_at TIMESTAMP DEFAULT now()
 );

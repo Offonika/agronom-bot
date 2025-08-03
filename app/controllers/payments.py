@@ -50,11 +50,13 @@ class PaymentCreateRequest(BaseModel):
     user_id: int
     plan: str
     months: int = Field(default=1, ge=1, le=MAX_MONTHS)
+    autopay: bool | None = None
 
 
 class PaymentCreateResponse(BaseModel):
     payment_id: str
     url: str
+    autopay_binding_id: str | None = None
 
 
 class PaymentStatusResponse(BaseModel):
@@ -91,7 +93,9 @@ async def create_payment(request: Request, user_id: int = Depends(require_api_he
     amount = 19900 * body.months
     currency = "RUB"
     external_id = uuid4().hex
-    url = await create_sbp_link(external_id, amount, currency)
+    url, binding_id = await create_sbp_link(
+        external_id, amount, currency, autopay=bool(body.autopay)
+    )
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
@@ -103,13 +107,17 @@ async def create_payment(request: Request, user_id: int = Depends(require_api_he
                 external_id=external_id,
                 prolong_months=body.months,
                 status="pending",
+                autopay=bool(body.autopay),
+                autopay_binding_id=binding_id,
             )
             db.add(payment)
             db.add(Event(user_id=body.user_id, event="payment_created"))
             db.commit()
 
     await asyncio.to_thread(_db_call)
-    return PaymentCreateResponse(payment_id=external_id, url=url)
+    return PaymentCreateResponse(
+        payment_id=external_id, url=url, autopay_binding_id=binding_id
+    )
 
 
 @router.get(
@@ -253,11 +261,15 @@ async def autopay_webhook(
                     external_id=body.autopay_charge_id,
                     prolong_months=1,
                     status=body.status,
+                    autopay=True,
+                    autopay_binding_id=body.binding_id,
                 )
                 db.add(payment)
             else:
                 payment.status = body.status
                 payment.updated_at = datetime.now(timezone.utc)
+                payment.autopay = True
+                payment.autopay_binding_id = body.binding_id
                 db.add(payment)
 
             if body.status == "success":

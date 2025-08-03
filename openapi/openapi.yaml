@@ -195,6 +195,9 @@ components:
         months:
           type: integer
           default: 1
+        autopay:
+          type: boolean
+          nullable: true
 
     PaymentStatusResponse:
       type: object
@@ -504,6 +507,9 @@ paths:
                   url:
                     type: string
                     example: https://sbp.example/pay
+                  autopay_binding_id:
+                    type: string
+                    nullable: true
         '401':
           description: Unauthorized
           content:

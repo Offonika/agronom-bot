@@ -168,6 +168,12 @@ autopay
 
 BOOLEAN DEFAULT FALSE
 
+autopay_binding_id
+
+TEXT
+
+binding identifier
+
 prolong_months
 
 INT
