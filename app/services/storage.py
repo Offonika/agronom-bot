@@ -1,5 +1,6 @@
 import logging
 import os
+from asyncio import Lock
 from datetime import datetime, timezone
 from typing import AsyncContextManager as AbstractAsyncContextManager
 from uuid import uuid4
@@ -20,6 +21,7 @@ _settings: Settings | None = None
 
 _client_ctx: AbstractAsyncContextManager[AioBaseClient] | None = None
 _client: AioBaseClient | None = None
+_client_lock: Lock = Lock()
 
 
 async def _make_client() -> AioBaseClient:
@@ -57,9 +59,13 @@ async def _make_client() -> AioBaseClient:
 async def get_client() -> AioBaseClient:
     """Return a cached aioboto3 client, creating it if needed."""
     global _client
-    if _client is None:
-        _client = await _make_client()
-    return _client
+    if _client is not None:
+        return _client
+
+    async with _client_lock:
+        if _client is None:
+            _client = await _make_client()
+        return _client
 
 
 async def close_client() -> None:
