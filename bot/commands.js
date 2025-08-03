@@ -1,5 +1,5 @@
 const { msg } = require('./utils');
-const { logEvent, sendPaywall } = require('./payments');
+const { logEvent } = require('./payments');
 
 async function startHandler(ctx, pool) {
   if (ctx.startPayload === 'paywall') {
