@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     database_url: str = Field("sqlite:///./app.db", alias="DATABASE_URL")
     db_create_all: bool = Field(False, alias="DB_CREATE_ALL")
 
+    redis_url: str = Field("redis://localhost:6379", alias="REDIS_URL")
+
     s3_bucket: str = "agronom"
     s3_endpoint: str | None = None
     s3_region: str = "us-east-1"

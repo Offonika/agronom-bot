@@ -6,7 +6,7 @@ from pydantic import BaseModel, ValidationError
 from app import db as db_module
 from app.dependencies import (
     ErrorResponse,
-    require_api_headers,
+    rate_limit,
     verify_partner_hmac,
 )
 from app.models import PartnerOrder
@@ -29,7 +29,7 @@ class PartnerOrderRequest(BaseModel):
 )
 async def partner_orders(
     request: Request,
-    _: None = Depends(require_api_headers),
+    _: None = Depends(rate_limit),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
     data, sign, provided_sign = await verify_partner_hmac(request, x_sign)

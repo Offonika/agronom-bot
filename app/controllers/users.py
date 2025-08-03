@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from app import db as db_module
 from app.config import Settings
-from app.dependencies import ErrorResponse, compute_signature, require_api_headers
+from app.dependencies import ErrorResponse, compute_signature, rate_limit
 from app.models import Event, Payment, Photo, User
 
 settings = Settings()
@@ -24,7 +24,7 @@ router = APIRouter()
 async def export_user(
     user_id: int,
     x_sign: str = Header(..., alias="X-Sign"),
-    auth_user: int = Depends(require_api_headers),
+    auth_user: int = Depends(rate_limit),
 ):
     payload = {"user_id": user_id}
     expected_sign = compute_signature(HMAC_SECRET, payload)
@@ -73,7 +73,7 @@ async def export_user(
 async def delete_user(
     request: Request,
     x_sign: str = Header(..., alias="X-Sign"),
-    auth_user: int = Depends(require_api_headers),
+    auth_user: int = Depends(rate_limit),
 ):
     try:
         payload = await request.json()
