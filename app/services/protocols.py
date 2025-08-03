@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import logging
 from pathlib import Path
+import threading
 
 from cachetools import TTLCache
 from sqlalchemy import inspect, text
@@ -97,14 +98,15 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
 
 # --------------------------------------------------------------------------- #
 # Runtime lookup with LRU-cache
-# --------------------------------------------------------------------------- #
 _cache = TTLCache(maxsize=1024, ttl=600)
+_cache_lock = threading.RLock()
 
 
 def _cache_protocol(crop: str, disease: str) -> Protocol | None:
     key = (crop, disease)
-    if key in _cache:
-        return _cache[key]
+    with _cache_lock:
+        if key in _cache:
+            return _cache[key]
     session = db.SessionLocal()
     try:
         proto = (
@@ -117,12 +119,14 @@ def _cache_protocol(crop: str, disease: str) -> Protocol | None:
         return None
     finally:
         session.close()
-    _cache[key] = proto
+    with _cache_lock:
+        _cache[key] = proto
     return proto
 
 
 def _clear_cache() -> None:
-    _cache.clear()
+    with _cache_lock:
+        _cache.clear()
 
 
 _cache_protocol.cache_clear = _clear_cache
