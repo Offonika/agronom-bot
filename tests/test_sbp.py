@@ -37,9 +37,10 @@ async def test_create_sbp_link_handles_http_error(monkeypatch, caplog):
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
     with caplog.at_level("ERROR"):
-        url = await create_sbp_link("123", 100, "RUB")
+        url, binding = await create_sbp_link("123", 100, "RUB")
 
     assert url == "https://sbp.example/pay/123"
+    assert binding is None
     assert "boom" in caplog.text
 
 
@@ -65,6 +66,14 @@ async def test_create_sbp_link_non_blocking(monkeypatch):
     assert duration < 0.2
 
 
+@pytest.mark.asyncio
+async def test_create_sbp_link_autopay_returns_binding(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "development")
+    url, binding = await create_sbp_link("123", 100, "RUB", autopay=True)
+    assert url.startswith("https://sandbox/pay")
+    assert binding == "BND-123"
+
+
 def _ensure_user(session):
     try:
         session.execute(text("ALTER TABLE users ADD COLUMN autopay_enabled BOOLEAN DEFAULT 1"))
@@ -75,6 +84,24 @@ def _ensure_user(session):
     )
     session.execute(text("UPDATE users SET autopay_enabled=1 WHERE id=1"))
     session.commit()
+
+
+def test_create_payment_with_autopay(client):
+    with SessionLocal() as session:
+        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1,1)"))
+        session.commit()
+    resp = client.post(
+        "/v1/payments/create",
+        headers=HEADERS,
+        json={"user_id": 1, "plan": "pro", "months": 1, "autopay": True},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data.get("autopay_binding_id") is not None
+    with SessionLocal() as session:
+        payment = session.query(Payment).filter_by(external_id=data["payment_id"]).first()
+        assert payment.autopay is True
+        assert payment.autopay_binding_id == data["autopay_binding_id"]
 
 
 def test_autopay_webhook_success(client, monkeypatch):
@@ -106,6 +133,8 @@ def test_autopay_webhook_success(client, monkeypatch):
         payment = session.query(Payment).filter_by(external_id="CHG-1").first()
         assert payment is not None
         assert payment.status == "success"
+        assert payment.autopay is True
+        assert payment.autopay_binding_id == "BND-1"
         exp = session.execute(text("SELECT pro_expires_at FROM users WHERE id=1")) .scalar()
         assert exp is not None
 

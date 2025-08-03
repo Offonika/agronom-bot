@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Enum, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String
 
 from app.models.base import Base
 
@@ -15,6 +15,8 @@ class Payment(Base):
     provider = Column(String)
     external_id = Column(String)
     prolong_months = Column(Integer)
+    autopay = Column(Boolean, default=False)
+    autopay_binding_id = Column(String, nullable=True)
     status = Column(
         Enum(
             "pending",
