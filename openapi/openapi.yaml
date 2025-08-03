@@ -2,9 +2,9 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: 1.7.1
+  version: "1.8"
   description: |
-    Telegram-бот «Карманный агроном» — API v1.7.1.
+    Telegram-бот «Карманный агроном» — API v1.8.
     Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header.
   contact:
     name: Ivan Gromov
@@ -183,6 +183,37 @@ components:
           type: string
           description: HMAC-SHA256 of payload
 
+    AutopayWebhook:
+      type: object
+      required: [autopay_charge_id, binding_id, user_id, amount, status, charged_at, signature]
+      properties:
+        autopay_charge_id:
+          type: string
+          example: CHG-1
+        binding_id:
+          type: string
+          example: BND-1
+        user_id:
+          type: integer
+        amount:
+          type: integer
+        status:
+          type: string
+          enum: [success, fail]
+        charged_at:
+          type: string
+          format: date-time
+        signature:
+          type: string
+          description: HMAC-SHA256 of payload
+
+    AutopayCancelRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+
     PaymentCreateRequest:
       type: object
       required: [user_id, plan]
@@ -198,6 +229,7 @@ components:
         autopay:
           type: boolean
           nullable: true
+          description: Enable SBP Autopay binding
 
     PaymentStatusResponse:
       type: object
@@ -510,6 +542,7 @@ paths:
                   autopay_binding_id:
                     type: string
                     nullable: true
+                    description: Identifier of SBP Autopay binding
         '401':
           description: Unauthorized
           content:
@@ -572,6 +605,67 @@ paths:
           description: Accepted
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/payments/sbp/autopay/webhook:
+    post:
+      summary: SBP autopay webhook
+      operationId: handleAutopayWebhook
+      description: Process SBP Autopay callback and update payment status.
+      tags: [payments]
+      security:
+        - HmacAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutopayWebhook'
+      responses:
+        '200':
+          description: Accepted
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/payments/sbp/autopay/cancel:
+    post:
+      summary: Cancel SBP autopay
+      operationId: cancelAutopay
+      description: Disable SBP Autopay for the user.
+      tags: [payments]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutopayCancelRequest'
+      responses:
+        '204':
+          description: Autopay canceled
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
           content:
             application/json:
               schema:
