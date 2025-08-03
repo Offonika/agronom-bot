@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from app.config import Settings
 
 
-logger = logging.getLogger("s3")
+logger = logging.getLogger("s3")  # Logger for S3 interactions
 
 
 BUCKET = os.getenv("S3_BUCKET", "agronom")
