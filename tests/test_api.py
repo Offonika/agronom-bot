@@ -425,6 +425,13 @@ def test_create_payment_user_id_mismatch(client):
     assert resp.status_code == 401
 
 
+@pytest.mark.parametrize("months", [0, 13])
+def test_create_payment_invalid_months(client, months):
+    payload = {"user_id": 1, "plan": "pro", "months": months}
+    resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
+    assert resp.status_code == 400
+
+
 def test_payment_status_user_scoped(client):
     from app.db import SessionLocal
     from app.models import Payment
