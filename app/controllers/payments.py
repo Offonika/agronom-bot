@@ -6,7 +6,7 @@ import hmac
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import text
 
@@ -30,6 +30,20 @@ class PaymentWebhook(BaseModel):
     status: str
     paid_at: datetime
     signature: str
+
+
+class AutopayWebhook(BaseModel):
+    autopay_charge_id: str
+    binding_id: str
+    user_id: int
+    amount: int
+    status: str
+    charged_at: datetime
+    signature: str
+
+
+class AutopayCancelRequest(BaseModel):
+    user_id: int
 
 
 class PaymentCreateRequest(BaseModel):
@@ -189,3 +203,120 @@ async def payments_webhook(
 
     await asyncio.to_thread(_db_call)
     return {}
+
+
+@router.post(
+    "/sbp/autopay/webhook",
+    status_code=200,
+    responses={
+        401: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+    },
+)
+async def autopay_webhook(
+    request: Request,
+    _: None = Depends(require_api_headers),
+    x_signature: str | None = Header(None, alias="X-Signature"),
+):
+    raw_body = await request.body()
+    secure = os.getenv("SECURE_WEBHOOK")
+    if secure and not verify_hmac(x_signature or "", raw_body, HMAC_SECRET):
+        logger.warning("audit: invalid webhook signature")
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
+
+    try:
+        data = json.loads(raw_body)
+    except (json.JSONDecodeError, TypeError) as err:
+        logger.exception("failed to parse webhook body as JSON")
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+    provided_sign = data.pop("signature", "")
+    expected_sign = compute_signature(HMAC_SECRET, data)
+    if not hmac.compare_digest(provided_sign, expected_sign):
+        logger.warning("audit: invalid payload signature")
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
+
+    try:
+        body = AutopayWebhook(**data, signature=provided_sign)
+    except ValidationError as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+
+    def _db_call() -> None:
+        with db_module.SessionLocal() as db:
+            payment = db.query(Payment).filter_by(external_id=body.autopay_charge_id).first()
+            if not payment:
+                payment = Payment(
+                    user_id=body.user_id,
+                    amount=body.amount,
+                    currency="RUB",
+                    provider="sbp",
+                    external_id=body.autopay_charge_id,
+                    prolong_months=1,
+                    status=body.status,
+                )
+                db.add(payment)
+            else:
+                payment.status = body.status
+                payment.updated_at = datetime.now(timezone.utc)
+                db.add(payment)
+
+            if body.status == "success":
+                res = db.execute(
+                    text("SELECT pro_expires_at FROM users WHERE id=:uid"),
+                    {"uid": body.user_id},
+                ).scalar()
+                current_exp = res or body.charged_at
+                if isinstance(current_exp, str):
+                    current_exp = datetime.fromisoformat(current_exp)
+                if current_exp < body.charged_at:
+                    current_exp = body.charged_at
+                new_exp = current_exp + timedelta(days=30)
+                db.execute(
+                    text("UPDATE users SET pro_expires_at=:exp WHERE id=:uid"),
+                    {"uid": body.user_id, "exp": new_exp},
+                )
+                db.add(Event(user_id=body.user_id, event="payment_success"))
+                db.add(Event(user_id=body.user_id, event="pro_activated"))
+            else:
+                db.add(Event(user_id=body.user_id, event="autopay_fail"))
+
+            db.commit()
+
+    await asyncio.to_thread(_db_call)
+    return {}
+
+
+@router.post(
+    "/sbp/autopay/cancel",
+    status_code=204,
+    responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
+)
+async def cancel_autopay(
+    request: Request,
+    user_id: int = Depends(require_api_headers),
+):
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+
+    try:
+        body = AutopayCancelRequest.model_validate(payload)
+    except ValidationError as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+
+    if body.user_id != user_id:
+        err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
+        raise HTTPException(status_code=401, detail=err.model_dump())
+
+    def _db_call() -> None:
+        with db_module.SessionLocal() as db:
+            db.execute(
+                text("UPDATE users SET autopay_enabled=false WHERE id=:uid"),
+                {"uid": body.user_id},
+            )
+            db.add(Event(user_id=body.user_id, event="autopay_disabled"))
+            db.commit()
+
+    await asyncio.to_thread(_db_call)
+    return Response(status_code=204)
