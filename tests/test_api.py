@@ -400,7 +400,7 @@ def test_photo_status_failed(client):
     assert "updated_at" in data
 
 
-def test_create_payment(client):
+def test_create_payment_valid_json(client):
     payload = {"user_id": 1, "plan": "pro", "months": 1}
     resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
     assert resp.status_code == 200
@@ -417,6 +417,16 @@ def test_create_payment(client):
         assert row.status == "pending"
         event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
         assert event.event == "payment_created"
+
+
+def test_create_payment_invalid_json(client):
+    resp = client.post(
+        "/v1/payments/create",
+        headers=HEADERS | {"Content-Type": "application/json"},
+        data="{not-valid",
+    )
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "BAD_REQUEST"}
 
 
 def test_create_payment_user_id_mismatch(client):

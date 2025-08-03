@@ -55,7 +55,12 @@ class PaymentStatusResponse(BaseModel):
 )
 async def create_payment(request: Request, user_id: int = Depends(require_api_headers)):
     try:
-        body = PaymentCreateRequest.model_validate(await request.json())
+        payload = await request.json()
+    except json.JSONDecodeError as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+
+    try:
+        body = PaymentCreateRequest.model_validate(payload)
     except ValidationError as err:
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
 
