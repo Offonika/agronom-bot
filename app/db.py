@@ -2,8 +2,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models import Base
 from app.config import Settings
+from app.models import Base
 
 # Engine and session factory are created lazily via ``init_db``.
 engine: Engine | None = None
