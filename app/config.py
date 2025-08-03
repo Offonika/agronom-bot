@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
     hmac_secret: str = "test-hmac-secret"
+    hmac_secret_partner: str = "test-hmac-partner"
+    tinkoff_terminal_key: str = "tinkoff-terminal-key"
+    tinkoff_secret_key: str = "tinkoff-secret-key"
     free_monthly_limit: int = 5
     paywall_enabled: bool = Field(True, alias="PAYWALL_ENABLED")
 

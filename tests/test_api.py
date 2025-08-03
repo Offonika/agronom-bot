@@ -9,6 +9,7 @@ from starlette.requests import Request
 from sqlalchemy import text
 from app.dependencies import compute_signature, verify_hmac
 from app.services.protocols import import_csv_to_db
+from app.config import Settings
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +36,8 @@ HEADERS = {
     "X-API-Ver": "v1",
     "X-User-ID": "1",
 }
+
+PARTNER_SECRET = Settings().hmac_secret_partner
 
 
 def test_openapi_schema(client):
@@ -612,7 +615,7 @@ def test_payment_webhook_cancel(client):
 @pytest.mark.asyncio
 async def test_verify_hmac_returns_signature(client):
     payload = {"foo": "bar"}
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(PARTNER_SECRET, payload)
     payload["signature"] = sig
     body = json.dumps(payload).encode()
 
@@ -629,7 +632,7 @@ async def test_verify_hmac_returns_signature(client):
 @pytest.mark.asyncio
 async def test_verify_hmac_bad_header_signature(client):
     payload = {"foo": "bar"}
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(PARTNER_SECRET, payload)
     payload["signature"] = sig
     body = json.dumps(payload).encode()
 
@@ -645,7 +648,7 @@ async def test_verify_hmac_bad_header_signature(client):
 @pytest.mark.asyncio
 async def test_verify_hmac_bad_payload_signature(client):
     payload = {"foo": "bar"}
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(PARTNER_SECRET, payload)
     payload["signature"] = "invalid"
     body = json.dumps(payload).encode()
 
@@ -749,7 +752,7 @@ def test_partner_order_success(client):
         "protocol_id": 2,
         "price_kopeks": 100,
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(PARTNER_SECRET, payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/partner/orders",
@@ -791,7 +794,7 @@ def test_partner_order_bad_payload(client):
         # missing protocol_id
         "price_kopeks": 100,
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(PARTNER_SECRET, payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/partner/orders",

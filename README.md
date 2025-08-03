@@ -205,7 +205,10 @@ agronom-bot/
    - `PARTNER_LINK_BASE=https://agrostore.ru/agronom`
    - `PAYWALL_ENABLED=true`  # включить показ paywall
    - `BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom`  # строка подключения для бота
-   - `FREE_PHOTO_LIMIT=5`  # число бесплатных фото в месяц для Telegram-бота ([пример](.env.template#L86))
+   - `FREE_PHOTO_LIMIT=5`  # число бесплатных фото в месяц для Telegram-бота ([пример](.env.template#L89))
+   - `TINKOFF_TERMINAL_KEY=your-terminal-key`
+   - `TINKOFF_SECRET_KEY=your-secret-key`
+   - `HMAC_SECRET_PARTNER=test-hmac-partner`  # подпись AgroStore
 
   Бот подключается к PostgreSQL по DSN из `BOT_DATABASE_URL`.
 

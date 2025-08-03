@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
 from app import db as db_module
-from app.dependencies import ErrorResponse, require_api_headers, verify_hmac as verify_request_hmac
+from app.dependencies import ErrorResponse, require_api_headers, verify_hmac as verify_partner_hmac
 from app.models import PartnerOrder
 
 router = APIRouter(prefix="/partner")
@@ -28,7 +28,7 @@ async def partner_orders(
     _: None = Depends(require_api_headers),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    data, sign, provided_sign = await verify_request_hmac(request, x_sign)
+    data, sign, provided_sign = await verify_partner_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)
     except ValidationError as err:
