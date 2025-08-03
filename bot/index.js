@@ -105,14 +105,19 @@ async function init() {
 
 init();
 
-// Gracefully close DB connections on termination
+// Gracefully stop bot and close DB connections on termination
 async function shutdown() {
+  await bot.stop();
   await pool.end();
   process.exit(0);
 }
 
-process.once('SIGINT', shutdown);
-process.once('SIGTERM', shutdown);
+process.once('SIGINT', async () => {
+  await shutdown();
+});
+process.once('SIGTERM', async () => {
+  await shutdown();
+});
 
 // Prometheus метрики
 const client = require('prom-client');
