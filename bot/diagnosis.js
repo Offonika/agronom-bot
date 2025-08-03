@@ -78,6 +78,13 @@ async function photoHandler(pool, ctx) {
     const link = await ctx.telegram.getFileLink(file_id);
     console.log('Downloading photo from', link.href);
     const res = await fetch(link.href);
+    if (!res.ok) {
+      console.error('Photo download error', res.status);
+      if (typeof ctx.reply === 'function') {
+        await ctx.reply(msg('diagnose_error'));
+      }
+      return;
+    }
     const buffer = Buffer.from(await res.arrayBuffer());
     const form = new FormData();
     form.append('image', new Blob([buffer], { type: 'image/jpeg' }), 'photo.jpg');
