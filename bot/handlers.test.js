@@ -412,23 +412,29 @@ test('retryHandler returns result', { concurrency: false }, async () => {
 test('historyHandler paginates', { concurrency: false }, async () => {
   const replies = [];
   const events = [];
+  const calls = [];
   const pool = { query: async (...a) => events.push(a) };
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
-  await withMockFetch({
-    'http://localhost:8000/v1/photos/history?limit=10&offset=0': {
-      json: async () => [
-        { photo_id: 1, ts: '2025-01-01T00:00:00Z', crop: 'apple', disease: 'scab', status: 'ok' },
-      ],
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/photos/history?limit=10&offset=0': {
+        json: async () => [
+          { photo_id: 1, ts: '2025-01-01T00:00:00Z', crop: 'apple', disease: 'scab', status: 'ok' },
+        ],
+      },
     },
-  }, async () => {
-    await historyHandler(ctx, 0, pool);
-  });
+    async () => {
+      await historyHandler(ctx, 0, pool);
+    },
+    calls,
+  );
   assert.ok(replies[0].msg.includes('1.'));
   const kb = replies[0].opts.reply_markup.inline_keyboard;
   assert.equal(kb[0][0].callback_data, 'info|1');
   assert.equal(kb[kb.length - 1][1].callback_data, 'history|10');
   assert.equal(events[0][1][1], 'history_open');
   assert.equal(events[1][1][1], 'history_page_0');
+  assert.equal(calls[0].opts.headers['X-User-ID'], 1);
 });
 
 test('historyHandler logs page event', { concurrency: false }, async () => {
@@ -447,7 +453,7 @@ test('historyHandler handles malformed responses', { concurrency: false }, async
   for (const bad of [{ bad: 'data' }, 'oops']) {
     const replies = [];
     let logged = '';
-    const ctx = { reply: async (msg) => replies.push(msg) };
+    const ctx = { from: { id: 1 }, reply: async (msg) => replies.push(msg) };
     const origErr = console.error;
     console.error = (...args) => {
       logged = args.join(' ');
@@ -464,6 +470,17 @@ test('historyHandler handles malformed responses', { concurrency: false }, async
     assert.equal(replies[0], msg('history_error'));
     assert.ok(logged.includes('Unexpected history response'));
   }
+});
+
+test('historyHandler returns early without user', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const ctx = { reply: async (msg) => replies.push(msg) };
+  await withMockFetch({}, async () => {
+    await historyHandler(ctx);
+  }, calls);
+  assert.equal(replies[0], msg('history_error'));
+  assert.equal(calls.length, 0);
 });
 
 test('helpHandler returns links', { concurrency: false }, async () => {
