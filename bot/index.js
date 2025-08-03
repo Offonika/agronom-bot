@@ -4,7 +4,12 @@ const { Pool } = require('pg');
 const { photoHandler, messageHandler, retryHandler } = require('./diagnosis');
 const { subscribeHandler, buyProHandler } = require('./payments');
 const { historyHandler } = require('./history');
-const { startHandler, helpHandler } = require('./commands');
+const {
+  startHandler,
+  helpHandler,
+  cancelAutopayHandler,
+  autopayEnableHandler,
+} = require('./commands');
 
 const token = process.env.BOT_TOKEN_DEV;
 if (!token) {
@@ -27,6 +32,8 @@ async function init() {
       { command: 'help', description: 'Помощь' },
       { command: 'history', description: 'История запросов' },
       { command: 'subscribe', description: 'Купить PRO' },
+      { command: 'autopay_enable', description: 'Включить автоплатёж' },
+      { command: 'cancel_autopay', description: 'Отключить автоплатёж' },
     ]);
 
     bot.start(async (ctx) => {
@@ -39,6 +46,14 @@ async function init() {
     });
 
     bot.command('help', (ctx) => helpHandler(ctx));
+
+    bot.command('autopay_enable', async (ctx) => {
+      await autopayEnableHandler(ctx, pool);
+    });
+
+    bot.command('cancel_autopay', async (ctx) => {
+      await cancelAutopayHandler(ctx);
+    });
 
     bot.command('history', async (ctx) => historyHandler(ctx, 0, pool));
 

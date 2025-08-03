@@ -1,5 +1,5 @@
 const { msg } = require('./utils');
-const { logEvent } = require('./payments');
+const { logEvent, buyProHandler, cancelAutopay } = require('./payments');
 
 async function startHandler(ctx, pool) {
   if (ctx.startPayload === 'paywall') {
@@ -42,4 +42,18 @@ async function feedbackHandler(ctx, pool) {
   });
 }
 
-module.exports = { startHandler, helpHandler, feedbackHandler };
+async function cancelAutopayHandler(ctx) {
+  return cancelAutopay(ctx);
+}
+
+async function autopayEnableHandler(ctx, pool) {
+  return buyProHandler(ctx, pool, 3000, 60000, true);
+}
+
+module.exports = {
+  startHandler,
+  helpHandler,
+  feedbackHandler,
+  cancelAutopayHandler,
+  autopayEnableHandler,
+};
