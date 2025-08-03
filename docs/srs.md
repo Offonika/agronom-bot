@@ -1,195 +1,463 @@
 System Requirements Specification (SRS)
-Telegram‑бот «Карманный агроном» (MVP)
-Версия 1.5 — 26 июля 2025 г.
-1. Scope
-Документ охватывает Telegram‑бот «Карманный агроном» (далее — Система) на этапе MVP.
-Система:
-• Принимает фотографии листьев ≤ 2 МБ.
-• Отправляет JPEG ≤ 2 МБ в GPT‑Vision; получает диагноз {crop,disease,confidence}.
-• Выдаёт протокол обработки (product, dosage_value, dosage_unit, phi) при наличии записи в БД, иначе помечает как «Бета».
-• Ограничивает бесплатный тариф 5 фото/месяц, продаёт Pro‑подписку (₽ 499) через Bot Payments 2.0 / СБП.
-• При превышении лимита API возвращает 402, бот показывает paywall со ссылкой на оплату.
-• Сохраняет историю снимков и предоставляет команду /history.
-Out‑of‑scope: нативные приложения, оф‑лайн CV‑модели, карта полей, white‑label‑SDK.
-2. Glossary
+
+Проект: Telegram‑бот «Карманный агроном» (MVP)
+
+Версия: 1.7 — 5 августа 2025 г.(v1.6 → v1.7: выбрано SBP‑эквайринг от Тинькофф, добавлено авто‑продление Pro, уточнена политика ML‑датасета)
+
+1 · Scope
+
+Система «Карманный агроном»:
+
+Принимает фотографии листьев ≤ 2 МБ (JPEG).
+
+Отправляет JPEG в GPT‑Vision; получает диагноз {crop, disease, confidence}.
+
+Сверяет диагноз с локальной БД протоколов Минсельхоза РФ.
+
+Если найдено — показывает препарат, дозу, PHI + ROI‑калькулятор (экономия ₽/га).
+
+Если не найдено — бейдж «Бета — подтвердить у агронома».
+
+Ограничивает бесплатный тариф до 5 фото в месяц.
+
+Продаёт подписку Pro‑Month (349 ₽/мес) и Pro‑Year (3 390 ₽/год) через Bot Payments → SBP (Тинькофф).
+
+Подписка может быть оформлена как автоплатёж SBP (opt‑in). Бот уведомляет за 3 дня до списания. Отмена через /cancel_autopay.
+
+При превышении лимита API возвращает 402 PAYWALL → бот показывает окно оплаты.
+
+Ведёт историю снимков, доступную по /history.
+
+ML‑датасет: фото старше 90 дней копируются в обезличенный бакет ml-dataset только при согласии пользователя.
+
+Out‑of‑scope (MVP): нативные приложения, on‑device CV, карта полей, white‑label SDK.
+
+2 · Glossary
+
 Term
+
 Definition
+
 GPT‑Vision
-OpenAI сервис анализа изображений, возвращает JSON‑диагноз.
+
+API OpenAI для анализа изображений, возвращает JSON‑диагноз.
+
 Protocol
-Запись обработки: crop, disease, product, dosage_value, dosage_unit, phi.
+
+Запись: crop, disease, product, dosage_value, dosage_unit, phi, registry_date.
+
 Pro
-Платный доступ на 365 дней, снимает лимит фото.
+
+Платный доступ без лимитов (349 ₽/мес или 3 390 ₽/год).
+
 PHI
-Pre‑Harvest Interval — срок ожидания до сбора урожая, дней.
 
-3. Functional Requirements
+Pre‑Harvest Interval — срок ожидания до сбора урожая, дней.
+
+ROI
+
+(expected_loss₽ – cost_treatment₽) / ha.
+
+Autopay SBP
+
+Механизм регулярных списаний по СБП с привязкой счёта пользователя.
+
+3 · Functional Requirements
+
 ID
+
 Description
+
 Priority
+
 FR‑T‑01
-Upload Photo — приём изображения ≤ 2 МБ.
+
+Приём изображения ≤ 2 МБ
+
 High
+
 FR‑T‑02
-Diagnose — POST /v1/ai/diagnose, возвращает диагноз.
+
+POST /v1/ai/diagnose → диагноз
+
 High
+
 FR‑T‑03
-Show Protocol — кнопка после диагноза.
+
+Отправка карточки диагноза + ROI
+
 High
+
 FR‑T‑04
-Purchase Pro — платёж через Bot Payments (СБП).
+
+Кнопка «Протокол» / бейдж «Бета»
+
 High
+
 FR‑T‑05
-Limit Enforcement — контроль 5 фото/мес для free.
+
+Paywall + покупка Pro через Bot Payments (SBP Тинькофф)
+
 High
+
 FR‑T‑06
-History — /history (GET /v1/photos) с пагинацией cursor‑based.
+
+Лимит 5 фото/мес для Free (GET /v1/limits)
+
 High
+
 FR‑T‑07
-Expert Request — /ask_expert отправляет запрос модератору.
+
+История снимков /history (cursor‑pagination)
+
 High
+
 FR‑T‑08
-Partner Order Webhook — /v1/partner/orders принимает заказ.
-High
+
+Запрос эксперту /ask_expert (SLA ≤ 2 ч)
+
+Medium
+
 FR‑T‑09
-Paywall Display — ошибка 402 приводит к показу paywall.
-High
 
-4. API Contracts
+Webhook партнёра /v1/partner/orders
+
+Medium
+
+FR‑T‑10
+
+ROI‑калькулятор: yield_loss%, price₽, cost₽
+
+Medium
+
+FR‑T‑11
+
+Опция автопродления Pro (/autopay/enable, /autopay/disable)
+
+Medium
+
+FR‑T‑12
+
+Экспорт / удаление данных (/v1/users/{id}/export)
+
+Medium
+
+4 · API Contracts
+
 4.1 Endpoints
-/v1/ai/diagnose [POST]
-/v1/photos [GET]
-/v1/payments/sbp/webhook [POST]
-/v1/partner/orders [POST]
+
+POST /v1/ai/diagnose
+
+GET /v1/photos
+
+GET /v1/limits
+
+POST /v1/payments/sbp/webhook — Тинькофф
+
+POST /v1/payments/sbp/autopay/webhook — Тинькофф (регулярные списания)
+
+POST /v1/partner/orders
+
 4.2 Schemas (excerpt)
-• dosage_value: number
-• dosage_unit: enum { ml_10l, g_per_l }
-• ErrorResponse.code: enum { NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, BAD_REQUEST }
-• PhotoItem включает ts, id, crop, disease, confidence
+
+DiagnosisResponse:
+  crop: string
+  disease: string
+  confidence: number # 0‑1
+  roi:
+    economy_per_ha: number
+    currency: "RUB"
+
+PaymentWebhook:
+  id: string  # invoice id
+  amount: int # копейки
+  status: enum {SUCCESS, FAIL, CANCEL}
+  signature: string # HMAC‑SHA256
+
 4.3 Errors
+
 HTTP
+
 Code
+
 Description
+
 400
+
 BAD_REQUEST
-Невалидное изображение / тело запроса
+
+Неверное изображение или тело запроса
+
+402
+
+PAYWALL
+
+Требуется подписка Pro
+
 429
+
 LIMIT_EXCEEDED
-Исчерпана бесплатная квота
+
+Превышена квота
+
 502
-GPT_TIMEOUT
-LLM не ответила  > 10 сек
 
-5. Data Model (PostgreSQL)
-users(id PK, tg_id BIGINT, pro_expires_at TIMESTAMP, created_at TIMESTAMP)
-photos(id PK, user_id FK, file_id TEXT, crop TEXT, disease TEXT, confidence NUMERIC, ts TIMESTAMP)
-protocols(id PK, crop TEXT, disease TEXT, product TEXT, dosage_value NUMERIC, dosage_unit TEXT, phi INT)
-payments(id PK, user_id FK, amount INT, source TEXT, status TEXT, created_at TIMESTAMP)
-photo_usage(user_id PK, month CHAR(7) PK, used INT, updated_at TIMESTAMP)
-idx: photos_user_ts_idx(user_id, ts DESC)
-Counters reset monthly by worker (CRON `5 0 1 * *` Europe/Moscow).
-6. Sequence Diagrams (Text)
-6.1 Happy Path
-User → Bot: send photo
-Bot → TG: getFile
-Bot → GPT: diagnose
-GPT → Bot: JSON
-Bot → DB: insert photo
-Bot → User: message diagnosis + кнопка «Протокол»
-6.2 Purchase Pro
-User → Bot: click Pay
-Bot → TG Payments: invoice
-User → SBP: pay
-SBP → Bot: webhook
-Bot → DB: insert payment, update user.pro
-Bot → User: confirmation
-6.3 Limit Reached
-User → Bot: send photo
-Bot → App: /v1/ai/diagnose
-App → Bot: 402 limit_reached
-Bot → User: показать paywall
-7. Edge Cases
+GPT_TIMEOUT
+
+GPT не ответил за 10 с
+
+5 · Data Model (PostgreSQL)
+
+users(
+  id SERIAL PRIMARY KEY,
+  tg_id BIGINT UNIQUE NOT NULL,
+  pro_expires_at TIMESTAMP,
+  autopay_enabled BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+photos(
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  file_id TEXT,
+  crop TEXT,
+  disease TEXT,
+  confidence NUMERIC(4,3),
+  roi NUMERIC(10,2),
+  ts TIMESTAMP DEFAULT now()
+);
+
+protocols(
+  id SERIAL PRIMARY KEY,
+  crop TEXT,
+  disease TEXT,
+  product TEXT,
+  dosage_value NUMERIC(6,2),
+  dosage_unit TEXT,
+  phi INT,
+  registry_date DATE
+);
+
+payments(
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id),
+  amount INT,
+  source TEXT,              -- "SBP:Tinkoff"
+  autopay BOOLEAN DEFAULT FALSE,
+  status TEXT,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+photo_usage(
+  user_id INTEGER,
+  month CHAR(7),            -- YYYY-MM
+  used INT,
+  updated_at TIMESTAMP,
+  PRIMARY KEY (user_id, month)
+);
+
+Индексы: photos_user_ts_idx(user_id, ts DESC); счётчики сбрасывает CRON 5 0 1 * * (Europe/Moscow).
+
+6 · Sequence Diagrams
+
+6.1 Diagnose — Happy Path
+
+User  → Bot:  фото (JPEG)
+Bot   → TG:   getFile
+Bot   → GPT:  diagnose
+GPT   → Bot:  JSON
+Bot   → DB:   INSERT photos (+ROI)
+Bot   → User: диагноз + ROI + кнопка «Протокол»
+
+6.2 Purchase Pro (one‑time)
+
+User → Bot:  нажал «Купить Pro»
+Bot  → Tinkoff:  CreateInvoice (SBP‑QR)
+Bot  → User:     QR‑код
+Tinkoff → Bot:   POST /payments/sbp/webhook (SUCCESS)
+Bot  → DB:       UPDATE users.pro_expires_at
+Bot  → User:     «Pro активирован до …»
+
+6.3 Autopay Renewal
+
+Cron → Bot:  проверка expiring‑soon
+Bot  → User: нотификация (3 дня)
+T‑0 Bot   → Tinkoff: CreateAutopayCharge
+Tinkoff → Bot: POST /payments/sbp/autopay/webhook (SUCCESS|FAIL)
+Bot → User:  «Продлено / Ошибка платежа»
+
+6.4 Limit Reached
+
+API возвращает 402 PAYWALL → бот показывает окно оплаты.
+
+7 · Edge Cases
+
 Code
+
 Behavior
+
 NO_LEAF
-confidence < 0.2 — сообщение «Не удалось распознать лист…»
+
+confidence < 0.2 → сообщение «Не удалось распознать лист…»
+
 BLUR
-variance < 50 — то же сообщение.
-GPT_TIMEOUT
-GPT > 10 с → фото в pending, сообщение user.
-LIMIT_EXCEEDED
-Free‑пользователь превысил 5 фото в месяц.
 
-8. Non‑Functional Requirements
-Latency: P95 diag_latency_seconds < 8 с (upload → reply).
-Uptime: ≥ 99.5 % / месяц.
-Bot API: ≤ 30 msg/s; HPA масштабирует pods при 75 % load.
-Security: TLS 1.2+, AES‑256 at rest, GPT‑key rotate monthly.
-9. Service‑Level Objectives (SLO)
+variance < 50 → то же сообщение
+
+GPT_TIMEOUT
+
+GPT > 10 с → фото pending, уведомление пользователя
+
+LIMIT_EXCEEDED
+
+Free‑user > 5 фото → 402 PAYWALL
+
+PAYMENT_FAIL
+
+Webhook status=FAIL → grace 3 дня, повтор оплаты
+
+8 · Non‑Functional Requirements
+
 Metric
+
 Target
-Comment
+
 diag_latency_p95
-< 8 с
 
+≤ 8 с
 
-availability
-≥ 99.5 %
-per month
-pending_retry_success
-≥ 95 %
-≤ 30 мин
-expert_response_12h
-≥ 90 %
+Availability
 
+≥ 99.5 % / month
 
+GPT OPEX
 
-10. Observability
-Prometheus metrics: diag_latency_seconds, diag_requests_total, gpt_timeout_total, payment_fail_total, queue_size_pending.
-Grafana dashboards: Diag‑health, Payments, System Load.
-Alerts: GPT timeouts > 5 % /5 мин → Slack #alerts.
-Alerts: error_rate > 2 % /5 мин, p95 /diagnose > 3 с, queue_size_pending > 100 → Slack и Telegram.
-queue_monitor.py логирует предупреждение, если фото в статусе pending старше 60 мин.
-11. Security Details
-Webhook SBP: HMAC‑SHA256 header X‑Sign, secret in Vault, rotate 90 дней.
-GPT Key: Vault KV, rotate monthly.
-Data retention: photos auto‑delete after 90 дн (S3 lifecycle).
-GDPR DSR endpoints: /v1/users/{id}/export, /delete — SLA 30 дн.
-12. DB Migration Policy
-Tool: Alembic (semver tags). Script 2025_07_20_01_init.sql. Down‑migrations CI‑tested; rollback SLA 15 мин.
-13. Scalability Plan
-One bot‑worker = 30 msg/s. HPA spawns new pod at 75 % load. GPT concurrency 10/worker; excess queued in Redis (Phase A) or written to PG if Redis unavailable.
-14. Monitoring & Logging Implementation
-CloudWatch/Grafana‑Loki: structured JSON logs — user_id, diag_id, latency, error_code. Retention 30 дн.
-15. UX Copy – Error Messages
+≤ 0.50 ₽ / фото
+
+Expert SLA
+
+90 % ответов ≤ 2 ч
+
+9 · Observability
+
+Prometheus метрики:
+
+diag_latency_seconds
+
+diag_requests_total
+
+roi_calc_seconds
+
+gpt_timeout_total
+
+payment_fail_total
+
+quota_reject_total
+
+autopay_charge_seconds
+
+Alerts:
+
+gpt_timeout_total{5m} > 5 %
+
+rate(error) > 2 %
+
+queue_pending > 100
+
+autopay_fail_total{1h} > 5
+
+10 · Security
+
+SBP Webhook: HMAC‑SHA256 (X-Sign + body.signature), секреты в Vault, rotation 90 дн.
+
+GPT Key: Vault, rotation 30 дн.
+
+Photos: S3 lifecycle delete 90 дн; при Opt‑In экспорт в ml-dataset (anonymised) на 2 года.
+
+Соответствие ФЗ‑152/GDPR: /v1/users/{id}/export, /v1/users/{id}/delete — SLA 30 дн.
+
+11 · DB Migration Policy
+
+Alembic (semver). Rollback SLA 15 мин.
+
+12 · Scalability
+
+One worker ≈ 30 msg/s; HPA при CPU > 75 %. GPT concurrency 10/worker; Redis queue, fallback PG.
+
+13 · Logs & Monitoring
+
+Grafana‑Loki JSON‑логи: user_id, diag_id, latency, roi, error_code, autopay. Retention 30 дн.
+
+14 · UX – Error Messages
+
 Code
+
 Message
+
 NO_LEAF
-«Не удалось распознать лист. Снимите крупнее и при дневном свете.»
+
+«Не удалось распознать лист. Снимите крупнее и при дневном свете.»
+
 LIMIT_EXCEEDED
-«Лимит 5 бесплатных фото исчерпан. Оформите Pro, чтобы снимать без ограничений.»
+
+«Лимит 5 бесплатных фото исчерпан. Pro — 349 ₽/мес без ограничений.»
+
 GPT_TIMEOUT
-«Сеть нестабильна, фото сохранено — мы пришлём результат позже.»
 
-16. Open Questions
-• SBP‑провайдер — Тинькофф или Сбер?
-• Продление Pro — авто‑renew или ручная оплата?
-• Храним ли анонимные фото > 90 дн для ML‑обучения?
-17. Approval
+«Сеть нестабильна, фото сохранено — пришлём результат позже.»
+
+PAYMENT_FAIL
+
+«Платёж не прошёл. Попробуйте другую карту или отмените автоплатёж.»
+
+15 · Open Questions (закрыто в v1.7)
+
+Вопрос
+
+Ответ
+
+SBP‑провайдер
+
+Тинькофф основной, fallback — ЮKassa (Сбер)
+
+Продление Pro
+
+Автоплатёж SBP (opt‑in), уведомление −3 дня
+
+ML‑датасет
+
+Да, при Opt‑In и двойной анонимизации
+
+16 · Approval
+
 Role
+
 Name
+
 Status
+
 CTO
+
 —
-□
-ML Lead
+
+☐
+
+ML Lead
+
 —
-□
+
+☐
+
 FinOps
+
 —
-□
+
+☐
+
 Legal
+
 —
-□
 
+☐
 
+Документ docs/srs.md (v1.7) заменяет все предыдущие версии ≤ 1.6.

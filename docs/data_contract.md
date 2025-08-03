@@ -1,45 +1,386 @@
-Data Contract – «Карманный агроном» (Bot‑Phase)
-Version 1.7 — 27 July 2025
-(v1.6 → v1.7: added retry_attempts column)
+Data Contract – «Карманный агроном» (Bot‑Phase)
+
+Version 1.8 — 5 August 2025(v1.7 → v1.8: добавлены поля autopay, autopay_enabled, обновлены API‑маппинги, уточнён ML‑датасет, удалена устаревшая photo_quota)
+
 0 · Scope
+
 Документ фиксирует схему БД, правила хранения, линии происхождения данных и JSON‑контракты API для MVP Telegram‑бота.
+
 1 · Storage & Retention
-Фото хранятся в S3 с TTL = 90 дней (через lifecycle rule). Табличные строки (photos) остаются ещё 30 дней с флагом deleted для аудита.
-2 · Logical Schema (ER‑text)
-users 1—n photosusers 1—n paymentsusers 1—n partner_ordersusers 1—1 photo_quotaphotos 1—1 protocols
+
+Фото хранятся в S3 (photos/) с TTL = 90 дней (lifecycle rule).
+
+ML‑датасет (ml-dataset/) — копия снимков status=ok > 90 дн при Opt‑In пользователя, TTL = 2 года.
+
+Табличные строки photos остаются ещё 30 дней после TTL с флагом deleted=true.
+
+Платёжные данные храним 5 лет (ФЗ‑402).
+
+2 · Logical Schema (ER‑text)
+
+users 1—n photos
+users 1—n payments
+users 1—n partner_orders
+users 1—n events
+photos 1—1 protocols
+
 3 · Table Definitions
+
 3.1 users
-id PK, tg_id BIGINT, pro_expires_at TIMESTAMP, created_at TIMESTAMP
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+tg_id
+
+BIGINT UNIQUE NOT NULL
+
+pro_expires_at
+
+TIMESTAMP
+
+autopay_enabled
+
+BOOLEAN DEFAULT FALSE
+
+created_at
+
+TIMESTAMP DEFAULT now()
+
 3.2 photos
-id PK, user_id FK, file_id TEXT, file_unique_id TEXT, width INT, height INT, file_size INT, crop TEXT, disease TEXT, confidence NUMERIC, retry_attempts INT, status TEXT, ts TIMESTAMP, deleted BOOLEAN
-3.3 protocols
-Без изменений
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+user_id
+
+INT FK → users(id)
+
+file_id
+
+TEXT
+
+file_unique_id
+
+TEXT
+
+width
+
+INT
+
+height
+
+INT
+
+file_size
+
+INT
+
+crop
+
+TEXT
+
+disease
+
+TEXT
+
+confidence
+
+NUMERIC(4,3)
+
+retry_attempts
+
+INT DEFAULT 0
+
+status
+
+photo_status
+
+ts
+
+TIMESTAMP DEFAULT now()
+
+deleted
+
+BOOLEAN DEFAULT FALSE
+
+3.3 protocols  — unchanged
+
 3.4 payments
-id PK, user_id FK, amount INT, currency TEXT, status payment_status, created_at TIMESTAMP, updated_at TIMESTAMP, provider TEXT, external_id TEXT, prolong_months INT
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+user_id
+
+INT FK → users(id)
+
+amount
+
+INT
+
+копейки
+
+currency
+
+TEXT
+
+RUB
+
+status
+
+payment_status
+
+provider
+
+TEXT
+
+SBP:Tinkoff
+
+external_id
+
+TEXT
+
+invoice/charge id
+
+autopay
+
+BOOLEAN DEFAULT FALSE
+
+prolong_months
+
+INT
+
+created_at
+
+TIMESTAMP DEFAULT now()
+
+updated_at
+
+TIMESTAMP
+
 3.5 partner_orders
-id PK, user_id FK, order_id TEXT, protocol_id INT, price_kopeks INT, signature TEXT, created_at TIMESTAMP, status order_status
-3.6 photo_quota (NEW)
-user_id PK, used_count INT, month_year CHAR(7)
-3.7 photo_usage (NEW)
-user_id PK, month CHAR(7) PK, used INT, updated_at TIMESTAMP
-3.8 events (NEW)
-id PK, user_id INT, event TEXT, ts TIMESTAMP
-4 · Enum Definitions
-CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying','failed');CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');CREATE TYPE error_code     AS ENUM ('NO_LEAF', 'LIMIT_EXCEEDED', 'GPT_TIMEOUT', 'BAD_REQUEST', 'UNAUTHORIZED');
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+user_id
+
+INT FK
+
+order_id
+
+TEXT
+
+внеш. id AgroStore
+
+protocol_id
+
+INT FK → protocols(id)
+
+price_kopeks
+
+INT
+
+signature
+
+TEXT
+
+HMAC партнёра
+
+status
+
+order_status
+
+created_at
+
+TIMESTAMP DEFAULT now()
+
+3.6 photo_usage
+
+Column
+
+Type
+
+PK
+
+user_id
+
+INT
+
+✓
+
+month
+
+CHAR(7)
+
+YYYY‑MM, ✓
+
+used
+
+INT
+
+updated_at
+
+TIMESTAMP
+
+3.7 events
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+user_id
+
+INT
+
+event
+
+TEXT
+
+e.g. payment_success, autopay_fail
+
+ts
+
+TIMESTAMP DEFAULT now()
+
+4 · Enum Definitions
+
+CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');
+CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying','failed');
+CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');
+CREATE TYPE error_code     AS ENUM ('NO_LEAF','LIMIT_EXCEEDED','GPT_TIMEOUT','BAD_REQUEST','UNAUTHORIZED');
+
 5 · Data Lifecycle
-graph TDPENDING[photos.status=pending] -->|predict| OK[status=ok]PENDING -->|retry| RETRY[status=retrying]RETRY -->|fail| FAILED[status=failed]RETRY -->|predict| OKPhotos auto-delete from S3 after 90d. DB rows soft-deleted 30d later. Quota resets monthly.
-6 · API ↔ DB Mapping (extract)
-/v1/ai/diagnose → insert photos/v1/limits → read photo_quota + count from photos/v1/payments/sbp/webhook → insert payments/v1/partner/orders → insert partner_orders (with signature)
+
+graph TD
+  PENDING[photos.status=pending] -->|predict| OK[status=ok]
+  PENDING -->|retry| RETRY[status=retrying]
+  RETRY -->|fail| FAILED[status=failed]
+  RETRY -->|predict| OK
+
+S3: auto‑delete спустя 90 дней.
+
+DB: deleted=true → 30 дней → hard delete.
+
+ML‑dataset: Opt‑In → TTL 2 года.
+
+Quota (photo_usage) ресет 1‑го числа месяца (cron).
+
+6 · API ↔ DB Mapping
+
+Endpoint
+
+Action
+
+POST /v1/ai/diagnose
+
+INSERT → photos, UPDATE photo_usage.used
+
+GET  /v1/limits
+
+SELECT photo_usage + count photos
+
+POST /v1/payments/sbp/webhook
+
+INSERT → payments (invoice)
+
+POST /v1/payments/sbp/autopay/webhook
+
+INSERT → payments (autopay)
+
+POST /v1/payments/sbp/autopay/cancel
+
+UPDATE users.autopay_enabled=false
+
+POST /v1/partner/orders
+
+INSERT → partner_orders (signature)
 
 6.1 · /v1/ai/diagnose
-Принимает фото в multipart (`image`) или JSON (`image_base64`). Возвращает
-`{crop, disease, confidence}` и создаёт запись в `photos`, увеличивая счётчик
-`photo_quota.used_count`.
+
+Принимает фото (multipart image или JSON image_base64).Возвращает {crop, disease, confidence}; создаёт photos + инкрементирует photo_usage.used.
+
 7 · Ownership & Lineage
-Airflow DAG: export_daily_metrics → S3 → Metabase. См. Data_Lineage.xlsx.
+
+Airflow DAG export_daily_metrics → S3 → Metabase.См. Data_Lineage.xlsx.
+
 8 · Privacy & Compliance
-Фото обезличены (нет EXIF). TTL 90 дней в S3 + 30 дн в БД. DPIA §4 выполнена.Платёжные данные храним 5 лет (ФЗ‑402).DSR endpoint: /v1/dsr/delete_user → удаление по user_id каскадно.
-9 · Change Management
-Схема версионируется через Alembic (semver). Breaking — bump minor.CI проверяет openapi-diff, PR требует ревью Data Owner.
+
+Фото обезличены (EXIF удаляется).
+
+TTL: 90 дн (S3) + 30 дн soft‑delete.
+
+ML‑датасет — только при Opt‑In, TTL 2 года.
+
+Платежи: storage 5 лет (ФЗ‑402).
+
+DSR: POST /v1/dsr/delete_user — каскадное удаление по user_id ≤ 30 дн.
+
+9 · Change Management
+
+Схема версионируется через Alembic (semver).
+
+Breaking → bump minor.
+
+CI: openapi-diff + PR review Data Owner.
+
 10 · Sign-off
-Approved by: Tech Lead, Data Owner, QA.
+
+Role
+
+Name
+
+Date
+
+Tech Lead
+
+—
+
+☐
+
+Data Owner
+
+—
+
+☐
+
+QA
+
+—
+
+☐

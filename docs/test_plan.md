@@ -1,38 +1,151 @@
-QA Test Plan – «Карманный агроном» (Telegram‑бот)
-Версия 1.7 — 27 июля 2025 г.
-(v1.6 → v1.7: history endpoint, новые сценарии навигации)
-1. Цели тестирования
-Проверить соответствие SRS v1.5.Проверить соблюдение SLO (см. §3) для фаз β и GA.Проверить поведение при превышении лимита 5 фото/мес.Проверить валидацию HMAC-подписей от партнёра (X-Sign + signature).Проверить обязательность заголовков X-API-Ver: v1 и X-User-ID.
-2. Область тестирования
-• Диагностика: /diagnose (multipart + base64).• История снимков: /photos.• Платежи: /payments/sbp/webhook.• Партнёрский заказ: /partner/orders (подпись).• Ограничение Free-плана: /limits.• Хранение снимков (TTL = 90 дней).• Интернационализация (RU/EN fallback).
-3. Критерии приёмки
-β-релиз: P0-багов — 0; P1 — ≤3; все P0‑P1 кейсы — PASS.SLO: latency P95 < 8 с; ошибки ≤ 1 %.Тест кейсы: покрытие всех business-rule edge cases.
-4. Тест‑среды
-Staging API + Postman / pytest / k6; TG Sandbox Bot; CI (GitHub Actions).
-5. Контрольный набор изображений
-agro-testset-v1/ (S3): 1 000 JPG + CSV-метки + MD5, SHA‑256 манифест.
-6. Тест‑кейсы
-• P0: отсутствие подписи, превышение лимита, некорректный формат
-• P1: отсутствие заголовков X-API-Ver и X-User-ID, 6‑я заявка, base64 vs multipart
-• P2: тексты сообщений, логирование
-• TC‑030: Фото до mock‑ответа — пользователь отправляет фото боту, получает подтверждение, API выдаёт mock‑диагноз, снимок появляется в S3/Minio
-• TC‑040: Пользователь отправляет фото боту — получает карточку с результатом и протоколом либо пометкой «Бета»
-• TC‑041: Кнопка «Протокол» открывает deep‑link AgroStore
-• TC‑050: При ошибке 402 бот показывает paywall и ссылки на оплату
-• TC‑060: Воркер usage_reset сбрасывает счётчики в начале месяца
-• TC‑070: Путь от paywall до подтверждения PRO — пользователь видит paywall, выбирает оплату, проходит банк и получает сообщение о PRO
-• TC‑080: Просмотр истории через /history выводит список недавних снимков
-• TC‑090: Команда /help показывает справку и доступные команды
-• TC‑100: Пользователь перемещается по меню: старт → история → диагностика
-7. Нагрузочное тестирование
-k6 load_diag.js — ~5 000 RPS, 5 мин; PASS: error < 1 %, latency P95 < 8 c.
-8. API integration tests
-Postman collection v1.7 + CI:• Проверка кодов 200/400/401/402/502• Ajv‑валидация схем OpenAPI• Проверка paywall: /limits → 5/5 → diagnose = 402 → paywall
-9. Security checks
-• SSL Labs grade: A• SQL-injection• Проверка HMAC: signature в теле + заголовке• Rate-limiting (30 req/min per IP, 120 req/min per user, Pro не ограничен) → HTTP 429 и запись события• Бизнес-лимит (5/мес)
-10. Schedule & Roles
-(QA-инженер, DevOps, Security, Product Owner — см. Notion / JIRA)
-11. Risk & Mitigation
-(см. Risk Register v1.1)
-12. Sign‑off
-QA Lead / Security Officer / PO — согласовано
+# QA Test Plan – «Карманный агроном» (Telegram‑бот)
+
+**Версия 1.8 — 5 августа 2025 г.**
+*(v1.7 → v1.8: SRS v1.7, Autopay SBP flow, новые security‑checks)*
+
+---
+
+## 1. Цели тестирования
+
+* Проверить соответствие **SRS v1.7**.
+* Проверить соблюдение **SLO** (см. §3) для фаз β и GA.
+* Проверить поведение при превышении лимита **5 фото/мес**.
+* Проверить валидацию **HMAC‑подписей** (invoice & autopay).
+* Проверить обязательность заголовков **X-API-Ver: v1** и **X-User-ID**.
+* Валидировать новые эндпойнты Autopay (`/sbp/autopay/webhook`, `/sbp/autopay/cancel`).
+
+---
+
+## 2. Область тестирования
+
+* **Диагностика:** `/v1/ai/diagnose` (multipart + base64).
+* **История снимков:** `/v1/photos`.
+* **Платежи:**
+
+  * `/v1/payments/sbp/webhook` – invoice (одноразовый).
+  * `/v1/payments/sbp/autopay/webhook` – регулярные списания.
+  * `/v1/payments/sbp/autopay/cancel` – отмена привязки.
+* **Партнёрский заказ:** `/v1/partner/orders` (HMAC).
+* **Ограничение Free‑плана:** `/v1/limits`.
+* **Автопродление Pro:** cron‑нотификации и grace‑period.
+* **Хранение снимков:** TTL = 90 дней + экспорт в `ml-dataset` (opt-in).
+* **Интернационализация:** RU/EN fallback.
+
+---
+
+## 3. Критерии приёмки
+
+* **β-релиз:** P0‑багов — 0; P1 — ≤ 3; все P0‑P1 кейсы — **PASS**.
+* **SLO:** latency *P95* < 8 с; error‑rate ≤ 1 %.
+* **Coverage:** 100 % business‑rule edge cases (см. §6).
+
+---
+
+## 4. Тест‑среды
+
+| Layer   | Env                                           |
+| ------- | --------------------------------------------- |
+| Backend | Staging API (`api-stg.agronom.internal`)      |
+| Bot     | TG Sandbox Bot (`@agronom_bot_stg`)           |
+| CI      | GitHub Actions + Postman/newman + pytest + k6 |
+
+---
+
+## 5. Контрольный набор изображений
+
+`s3://agro-testset-v1/` – 1 000 JPG, CSV-метки, MD5 & SHA‑256 manifest (ver. 2025‑07‑20).
+
+---
+
+## 6. Тест‑кейсы
+
+### 6.1 Приоритеты
+
+* **P0** – безопасность, платёж, блокирующая ошибка.
+* **P1** – бизнес‑правила, лимиты, крит. UX.
+* **P2** – тексты, логи, i18n.
+
+### 6.2 Matrix
+
+| ID         | Priority | Summary                                                                       |
+| ---------- | -------- | ----------------------------------------------------------------------------- |
+| **TC‑010** | P0       | Отсутствие `X-Signature` → `403`, лог инцидента                               |
+| **TC‑020** | P0       | Подпись неверна (`signature≠hmac`) → `403`, retry‑policy provider сохраняется |
+| **TC‑030** | P1       | Фото до mock‑ответа: diagnose → mock JSON, файл в S3/Minio                    |
+| **TC‑040** | P1       | Диагноз + ROI + «Протокол»/«Бета» карточка                                    |
+| **TC‑041** | P1       | Кнопка «Протокол» открывает deep‑link AgroStore                               |
+| **TC‑050** | P0       | 402 Paywall при > 5 фото/мес                                                  |
+| **TC‑060** | P1       | Воркер `usage_reset` сбрасывает счётчики (01 число, 00:05 MSK)                |
+| **TC‑070** | P0       | Путь Invoice paywall → success webhook → Pro активирован                      |
+| **TC‑075** | P0       | Autopay Charge `success` → продление Pro, grace‑period сброшен                |
+| **TC‑076** | P0       | Autopay Charge `fail` → уведомление, grace‑period 3 дня                       |
+| **TC‑077** | P1       | `/autopay/cancel` → статус `204`, `users.autopay_enabled=false`               |
+| **TC‑078** | P1       | Cron‑нотификация «Через 3 дня будет списание…»                                |
+| **TC‑080** | P1       | `/history` выводит 10 последних снимков (cursor)                              |
+| **TC‑090** | P2       | `/help` – RU/EN, корректный список команд                                     |
+| **TC‑100** | P2       | Навигация меню: старт → история → диагностика                                 |
+
+---
+
+## 7. Нагрузочное тестирование
+
+`k6 load_diag.js` – 5 000 RPS, 5 мин. **PASS**: error‑rate < 1 %, latency *P95* < 8 с.
+
+---
+
+## 8. API Integration Tests (CI)
+
+* Postman Collection **v1.8**
+
+  * Проверка кодов 200/400/401/402/502.
+  * Ajv‑валидация схем OpenAPI.
+  * Invoice → webhook → статус.
+  * Autopay → webhook success/fail.
+  * Paywall flow (`/limits` → 5/5 → diagnose = 402 → paywall).
+* Pytest – unit & contract tests (mock Tinkoff API).
+
+---
+
+## 9. Security Checks
+
+| Check              | Target                                       |
+| ------------------ | -------------------------------------------- |
+| **SSL Labs**       | Grade A                                      |
+| **SQL‑inj**        | N/A                                          |
+| **HMAC Invoice**   | header + body, SHA‑256                       |
+| **HMAC Autopay**   | header + body, SHA‑256                       |
+| **Rate‑limit**     | 30 req/min IP, 120 req/min user (Free) → 429 |
+| **Business‑limit** | > 5 фото → 402                               |
+| **IP Allowlist**   | Webhook‑IP Tinkoff only                      |
+| **Idempotency**    | Повторный webhook не меняет state            |
+
+---
+
+## 10. Schedule & Roles
+
+| Role        | Name        | Tool          |
+| ----------- | ----------- | ------------- |
+| QA Engineer | А. Иванов   | Postman, k6   |
+| DevOps      | С. Петров   | Helm, CI │    |
+| Security    | Л. Смирнова | ZAP, SSL Labs |
+| Product     | М. Кузнецов | Notion / JIRA |
+
+---
+
+## 11. Risk & Mitigation
+
+См. **Risk Register v1.2** (актуализирован 01 авг 2025).
+
+---
+
+## 12. Sign‑off
+
+| Role             | Name | Status |
+| ---------------- | ---- | ------ |
+| QA Lead          | —    | ☐      |
+| Security Officer | —    | ☐      |
+| Product Owner    | —    | ☐      |
+
+---
+
+> Файл `docs/test_plan.md` (v1.8) заменяет все предыдущие версии ≤ 1.7.

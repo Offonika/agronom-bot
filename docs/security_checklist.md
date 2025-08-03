@@ -1,14 +1,114 @@
-(v1.4 → v1.5: monthly usage via photo_usage, payment on limit reach)
-Security & Compliance Checklist – «Карманный агроном» (Bot‑Phase)
-Version 1.5 — 26 July 2025
-(v1.3 → v1.4: API rate-limit, business quota FREE_MONTHLY_LIMIT/mo (default 5), signature in body, UNAUTHORIZED error, API versioning X‑API‑Ver, /v1/limits added)
-All controls map to ISO 27001 Annex A. Personal data limited; 152‑ФЗ not triggered.
-1. API Security Controls
-• API requests require `X-API-Key` и `X-User-ID` (headers)• Partner API requires `X-Sign` (HMAC-SHA256) and duplicate `signature` field in body• Signature is validated using shared secret from Vault (rotated every 90 days)• All API requests must include `X-API-Ver: v1` (required for version control)• Rate limit: 30 req/min per IP, 120 req/min per user (Pro unlimited) via Redis `INCR`+`EXPIRE`; violations trigger HTTP 429 and are logged• Business quota: FREE_MONTHLY_LIMIT diagnosis requests/month for Free users (default 5), tracked per user_id• Violations return `ErrorResponse` with machine-readable code: `UNAUTHORIZED`, `LIMIT_EXCEEDED`, etc.
-2. Data Security
-• TLS 1.2+ enforced on all endpoints• Data at rest is AES-256 encrypted (S3, RDS)• GPT API key stored in Vault, rotated monthly• Diagnosis photos auto-deleted after 90 days (S3 lifecycle policy)• GDPR/DSR endpoints: /v1/users/{id}/export, /delete (SLA: 30 days)• Photos linked to user_id for enforcement of quota and GDPR exports
-3. Logging & Monitoring
-• All diagnosis and payment requests logged with user_id, diag_id, latency, error_code• Logs are structured (JSON) and retained for 30 days (Loki)• Alerts configured for GPT timeout rate > 5% and 401 spikes• Metrics tracked in Prometheus: diag_latency_seconds, diag_requests_total, quota_reject_total
-4. Compliance Verification
-• Secrets stored in Vault with rotation policies (GPT: 30d, HMAC: 90d)• All API schemas validated via OpenAPI + Spectral in CI• API diff changes tracked in ADR (v1.2+)• Manual audit checklist reviewed each release (QA + Security)• Edge case coverage for business rules (e.g., quota violations) in QA plan
-• **Advisory:** check for race conditions during parallel uploads (use transactions and row‑level locks)
+Security & Compliance Checklist – «Карманный агроном» (Bot‑Phase)
+
+Version 1.6 — 5 August 2025(v1.5 → v1.6: Tinkoff Autopay flow, IP allowlist for webhooks, idempotency keys, Opt‑In ML‑датасет)
+
+Все меры маппятся на ISO 27001:2022 Annex A. Персональные данные минимальны; ФЗ‑152 не триггерится (анонимные фото, хэш‑uid).
+
+1 · API Security Controls
+
+Control
+
+Implementation
+
+Authentication
+
+X-API-Key, X-User-ID (headers) — валидируются per‑request; key хранится в Vault
+
+Versioning
+
+X-API-Ver: v1 — обязательный, иначе 426
+
+HMAC Integrity
+
+X-Sign + signature в body (SHA‑256) для:• /payments/sbp/webhook (Invoice)• /payments/sbp/autopay/webhook• /v1/partner/orders
+
+IP Allowlist
+
+Webhook‑ингресс принимает только IP‑пулы Tinkoff (prod & sandbox) + AgroStore
+
+Idempotency
+
+external_id (Invoice) / autopay_charge_id (Autopay) — PK в payments, повтор вебхука безопасен
+
+Rate‑limit
+
+30 req/min IP, 120 req/min user (Pro — unlimited) via Redis INCR+EXPIRE; 429 + log
+
+Business quota
+
+FREE_MONTHLY_LIMIT (5) проверяется таблицей photo_usage; 402 on exceed
+
+Autopay Cancel
+
+POST /autopay/cancel — JWT (telegram hash=) + CSRF double‑submit
+
+2 · Data Security
+
+Area
+
+Measure
+
+Transport
+
+TLS 1.2+ for external, mTLS inside cluster
+
+At rest
+
+AES‑256 (RDS, S3 buckets incl. ml-dataset)
+
+Secrets
+
+Vault CSI, policies:GPT API Key — 30 dHMAC secret — 90 dDB creds — dynamic 24 h
+
+Retention
+
+Photos S3 — 90 d → soft‑delete 30 d → purge.ML‑dataset (Opt‑In) — 2 y.
+
+Payments
+
+Stored 5 y (ФЗ‑402); card PAN не хранится (SBP)
+
+DSR
+
+/v1/dsr/delete_user — каскад, SLA 30 d
+
+3 · Logging & Monitoring
+
+Item
+
+Details
+
+Structured logs
+
+JSON; fields: user_id, diag_id, endpoint, latency, error_code, autopay
+
+Retention
+
+30 d (Loki), S3 export 90 d (cold)
+
+Metrics
+
+diag_latency_seconds, diag_requests_total, quota_reject_total, gpt_timeout_total, payment_fail_total, autopay_charge_seconds
+
+Alerts
+
+GPT timeout > 5 % (5 min), error‑rate > 2 %, autopay_fail_total{1h}>5, spikes 401
+
+4 · Compliance Verification
+
+Secrets rotation enforced via Vault policies.
+
+OpenAPI schemas linted (Spectral) + openapi-diff gate in CI.
+
+Static analysis (ESLint, tsc strict) + npm audit in pipeline.
+
+Manual audit checklist (QA + Security) per release.
+
+Pen‑test scope yearly; last scan 2025‑07‑10 (no critical vulns).
+
+5 · Advisory / Risk
+
+Проверьте race‑condition при параллельной загрузке 2+ фото: используйте row‑level lock (FOR UPDATE) на photo_usage.
+
+Следить за ростом QPS > 300 — включить Redis + rate‑limit offload.
+

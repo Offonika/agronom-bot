@@ -1,168 +1,184 @@
-# AGENTS.md — Contributor Guide для Codex/AI-агентов
+AGENTS.md — Contributor Guide для Codex/AI‑агентов
 
-## Quick English Overview
+Version 1.1 — 5 August 2025(v1.0 → v1.1: добавлены Autopay endpoints, Tinkoff creds, новые docs URLs, Python 3.12 / Node 20, Spectral + openapi‑diff gate)
 
-This repository relies on **Codex** automation. Use **Python 3.12+** for the API
-and **Node.js 18+** for the bot.
+Quick English Overview
 
-- Install Python deps with `pip install -r requirements.txt`.
-- Apply database migrations via `alembic upgrade head`.
-- Start the API with `uvicorn app.main:app --reload`.
-- Install bot deps with `npm ci --prefix bot` and run tests via
-  `npm test --prefix bot`.
-- Run linting with `ruff check app tests` and Python tests via `pytest`.
-- In async FastAPI handlers, avoid blocking DB calls: wrap `SessionLocal`
-  work in `asyncio.to_thread` or use SQLAlchemy async sessions.
+This repo relies on Codex automation. Use Python 3.12+ for the API and Node.js 20+ for the bot.
 
-Pull requests must target **develop** and pass all tests and linters. Update the
-documentation whenever behaviour or APIs change. See the detailed Russian guide
-below for full instructions.
+# Backend
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload
 
-## 📦 Проект: «Карманный агроном» — Telegram Bot (MVP)
+# Frontend / Bot
+npm ci --prefix bot
+npm test --prefix bot
 
-**Внимание:**  
-Этот репозиторий поддерживает автоматизированную разработку с помощью Codex и других AI-агентов. Следуйте этим инструкциям для максимальной эффективности и чистоты истории коммитов.
+# Linting / Tests
+ruff check app tests
+pytest
 
----
+Avoid blocking DB calls inside async FastAPI handlers — use SQLAlchemy async sessions or asyncio.to_thread.
 
-## 🛠️ Базовые команды для среды разработки
+All PRs target develop, must pass tests + linters and update docs when behaviour changes.
 
-Работайте в окружении **Python 3.12+**.
+📦 Проект: «Карманный агроном» — Telegram Bot (MVP)
 
-```bash
+Репозиторий рассчитан на автоматизированные коммиты Codex‑агента. Соблюдайте правила, чтобы CI/CD проходил без вмешательства.
+
+🛠️ Базовые команды
+
 # Установка зависимостей
 pip install -r requirements.txt
 
-# Применить миграции
+# Миграции
 alembic upgrade head
 
-# Запуск сервера (hot-reload)
+# API (hot‑reload)
 uvicorn app.main:app --reload
 
-# Запуск тестов
+# Тесты
 pytest
 
-# Запуск Telegram‑бота
-npm install --prefix bot
+# Telegram‑бот
+npm ci --prefix bot
 node bot/index.js
 
 # Линтинг
-flake8 app/
-# или
 ruff check app/
+
 🔑 Переменные окружения
-Скопируйте `.env.template` в `.env` и укажите настройки.
 
-Не коммитьте реальные токены!
+Скопируйте .env.template → .env и укажите значения.
 
-Для CI/CD и Codex используйте переменные окружения.
+Var
 
-Минимально необходимые переменные:
+Purpose
 
-POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_HOST, POSTGRES_PORT
-DATABASE_URL — строка подключения к БД
-S3_BUCKET, S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY
+POSTGRES_*
 
-BOT_TOKEN_DEV — Telegram Bot Token (тестовый!)
+подключение к БД
 
-OPENAI_API_KEY — ключ GPT‑Vision (тестовый/мок)
+DATABASE_URL
 
-📋 Правила внесения изменений
-Создавайте PR только в ветку develop
+строка соединения Alembic
 
-Каждый PR должен проходить lint (flake8 или ruff) и тесты (pytest)
+S3_*
 
-Если меняете схему БД — добавьте миграцию через Alembic (alembic revision --autogenerate -m "desc")
+доступ к бакету
 
-После изменений в моделях данных обновите data_contract.md
+BOT_TOKEN_DEV
 
-Обновляйте документацию по необходимости:
+Telegram Bot Token (dev)
 
-srs.md
+OPENAI_API_KEY
 
-adr.md
+GPT‑Vision (sandbox)
 
-data_contract.md
-payment_flow.md
+TINKOFF_TERMINAL_KEY / TINKOFF_SECRET_KEY
 
-🚦 CI/CD и проверки
-В проекте используется GitHub Actions для автоматических тестов.
+SBP Invoice + Autopay
 
-Все коммиты в PR должны проходить lint, тесты, миграции и проверки схемы API (OpenAPI diff).
+HMAC_SECRET_PARTNER
 
-Для API-контрактов используйте Spectral (spectral lint openapi/openapi.yaml).
+подпись AgroStore
 
-🧪 Покрытие тестами
-Каждый багфикс или новая фича — пишите/обновляйте тесты в tests/.
+Never commit real tokens! Use GitHub Secrets for CI.
 
-Запускайте pytest до и после ваших изменений.
+📋 Правила PR
 
-Для новых эндпоинтов: добавьте тесты в Postman Collection (если есть).
+Ветвление: feature/… → PR → develop.
 
-🗂️ Организация кода
-Основная логика — в папке app/:
+Каждый PR ➜ ruff, pytest, Alembic migration check, Spectral lint (spectral lint openapi/openapi.yaml), openapi-diff.
 
-controllers/ — FastAPI endpoints
+При изменениях схемы ➜ Alembic migration + обновить:
 
-models/ — SQLAlchemy/Pydantic схемы
+docs/data_contract.md
 
-services/ — бизнес-логика, работа с S3, GPT, подписи
+docs/srs.md
 
-Документация — в папке docs/.
+docs/payment_flow.md
 
-💡 Как агенту Codex действовать при выполнении задач
-Перед изменениями:
+Обновите CHANGELOG.md (semver).
 
-Проверить, что рабочая ветка — develop или фича-ветка
+🚦 CI/CD
 
-Синхронизировать зависимости (pip install -r requirements.txt)
+GitHub Actions workflow: lint → tests → build docker → openapi-diff.
 
-Убедиться, что тестовая база данных доступна
+ArgoCD auto‑deploy on main tag.
 
-Во время изменений:
+🧪 Тесты
 
-Делать коммиты по принципу atomic (минимальный логичный кусок)
+Папка tests/ — PyTest (backend) + Jest (bot).
 
-Следовать python-кодстайлу PEP8, писать docstring'и
+Все багфиксы → unit‑тест.
 
-После изменений:
+Новый эндпойнт → Postman collection + contract‑тест в CI.
 
-Прогонять pytest и линтер
+🗂️ Архитектура каталога
 
-Если добавлены миграции — применить их локально, убедиться что все работает
+app/
+  controllers/   # FastAPI routers
+  models/        # SQLAlchemy + Pydantic
+  services/      # GPT, S3, payments, quotas
+  worker/        # BullMQ jobs (retry_diagnosis.js)
+openapi/
+  openapi.yaml   # synced with FastAPI schema
+bot/
+  src/           # Telegram bot commands
+  tests/
 
-Кратко описать суть изменений в PR: [feature], [fix], [refactor], [test]
+💡 Workflow для Codex‑агента
 
-В комментарии к PR добавить:
+Before coding: checkout develop, pip install, pull latest migrations.
 
-Что изменено/добавлено
+During coding: small atomic commits, follow PEP8 + TS ESLint.
 
-Как проверить изменения (шаги)
+After coding: run pytest, ruff, ensure migrations apply.
 
-Связанные тикеты/issue
+PR description:
 
-🕹️ Специальные указания для Codex
-При возникновении ошибок пишите лог ошибки и предложите пути решения в PR/комментариях.
+Type: [feature] / [fix] / [refactor] / [docs].
 
-Для сложных задач сначала разбейте их на более мелкие шаги (можно прямо в PR).
+What changed + steps to test.
 
-Всегда обновляйте документацию, если меняется бизнес-логика, API, структура БД.
+Linked issues.
 
-Никогда не публикуйте реальные токены и секреты.
+🕹️ Специальные указания
 
-Перед созданием PR — убедитесь, что все инструкции по вышеуказанным пунктам выполнены!
+Ошибка? — Лог + предложить 2+ пути решения.
+
+Большая задача? — Разбей на сабзадачи в PR.
+
+Всегда обновляйте docs, если меняется API/логика.
+
+Никогда не публикуйте реальные секреты.
 
 🔗 Внешние сервисы
-GPT‑Vision — используйте тестовый ключ для разработки.
 
-S3/Minio — если нет доступа к боевому бакету, работайте с локальным Minio.
+GPT‑Vision — sandbox key.
 
-AgroStore — интеграция тестируется через мок-сервис/флаг.
+S3/Minio — local Minio for dev.
+
+Tinkoff SBP — sandbox env.
+
+AgroStore — mock server with make start-partner-mock.
 
 📢 Контакты
-Product Owner: tg: @gromov_agro
 
-Техлид: tg: @your_techlead
+Role
 
-Общие вопросы — через Issues в GitHub
+Handle
 
+Product Owner
+
+@gromov_agro
+
+Tech Lead
+
+@your_techlead
+
+QA Lead
+
+@qa_agro
