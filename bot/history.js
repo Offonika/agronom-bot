@@ -6,7 +6,11 @@ const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 
 async function historyHandler(ctx, offset = 0, pool) {
-  if (ctx.from && pool) {
+  if (!ctx.from) {
+    await ctx.reply(msg('history_error'));
+    return;
+  }
+  if (pool) {
     if (offset === 0) {
       try {
         await logEvent(pool, ctx.from.id, 'history_open');
@@ -21,15 +25,14 @@ async function historyHandler(ctx, offset = 0, pool) {
     }
   }
   try {
+    const headers = {
+      'X-API-Key': API_KEY,
+      'X-API-Ver': API_VER,
+    };
+    if (ctx.from) headers['X-User-ID'] = ctx.from.id;
     const resp = await fetch(
       `${API_BASE}/v1/photos/history?limit=10&offset=${offset}`,
-      {
-        headers: {
-          'X-API-Key': API_KEY,
-          'X-API-Ver': API_VER,
-          'X-User-ID': ctx.from?.id,
-        },
-      },
+      { headers },
     );
     if (!resp.ok) {
       await ctx.reply(msg('history_error'));
