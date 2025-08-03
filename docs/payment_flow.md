@@ -81,7 +81,7 @@ Webhook о попытке регулярного списания.
   "binding_id": "BND-91c8",
   "user_id": 1,
   "amount": 34900,
-  "status": "success",      // success | fail | cancel
+  "status": "success",      // success | fail | cancel | bank_error
   "charged_at": "2025-09-05T00:01:02Z",
   "signature": "<hmac>"
 }

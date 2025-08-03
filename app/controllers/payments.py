@@ -4,6 +4,7 @@ import logging
 import os
 import hmac
 from datetime import datetime, timezone, timedelta
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
@@ -20,6 +21,7 @@ settings = Settings()
 logger = logging.getLogger(__name__)
 HMAC_SECRET = settings.hmac_secret
 MAX_MONTHS = 12
+AUTOPAY_ALLOWED_STATUSES = {"success", "fail", "cancel", "bank_error"}
 
 router = APIRouter(prefix="/payments")
 
@@ -36,7 +38,7 @@ class AutopayWebhook(BaseModel):
     binding_id: str
     user_id: int
     amount: int
-    status: str
+    status: Literal["success", "fail", "cancel", "bank_error"]
     charged_at: datetime
     signature: str
 
@@ -259,6 +261,9 @@ async def autopay_webhook(
         body = AutopayWebhook(**data, signature=provided_sign)
     except ValidationError as err:
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+
+    if body.status not in AUTOPAY_ALLOWED_STATUSES:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:

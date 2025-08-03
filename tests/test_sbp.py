@@ -169,6 +169,29 @@ def test_autopay_webhook_bad_signature(client, monkeypatch):
     assert resp.status_code == 403
 
 
+def test_autopay_webhook_invalid_status(client, monkeypatch):
+    monkeypatch.setenv("SECURE_WEBHOOK", "1")
+    payload = {
+        "autopay_charge_id": "CHG-3",
+        "binding_id": "BND-1",
+        "user_id": 1,
+        "amount": 34900,
+        "status": "unknown",
+        "charged_at": datetime.now(timezone.utc).isoformat(),
+    }
+    sig = compute_signature(HMAC_SECRET, payload)
+    body = {**payload, "signature": sig}
+    raw = json.dumps(body, separators=(",", ":"), sort_keys=True)
+    header_sig = hmac.new(HMAC_SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()
+
+    resp = client.post(
+        "/v1/payments/sbp/autopay/webhook",
+        headers=HEADERS | {"X-Signature": header_sig, "Content-Type": "application/json"},
+        content=raw,
+    )
+    assert resp.status_code == 400
+
+
 def test_autopay_cancel_success(client):
     with SessionLocal() as session:
         _ensure_user(session)

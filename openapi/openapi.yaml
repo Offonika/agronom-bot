@@ -199,7 +199,7 @@ components:
           type: integer
         status:
           type: string
-          enum: [success, fail]
+          enum: [success, fail, cancel, bank_error]
         charged_at:
           type: string
           format: date-time
