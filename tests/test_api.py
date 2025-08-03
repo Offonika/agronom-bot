@@ -18,7 +18,7 @@ def stub_upload(monkeypatch):
         return "1/stub.jpg"
 
     monkeypatch.setattr("app.services.storage.upload_photo", _stub)
-    monkeypatch.setattr("app.controllers.v1.upload_photo", _stub)
+    monkeypatch.setattr("app.controllers.photos.upload_photo", _stub)
     # reset usage to avoid 402 errors between tests
     from app.db import SessionLocal
     from app.models import PhotoUsage
@@ -222,7 +222,7 @@ def test_diagnose_gpt_timeout(monkeypatch, client):
     def _fail(_key: str):
         raise TimeoutError("timeout")
 
-    monkeypatch.setattr("app.controllers.v1.call_gpt_vision_stub", _fail)
+    monkeypatch.setattr("app.controllers.photos.call_gpt_vision_stub", _fail)
 
     resp = client.post(
         "/v1/ai/diagnose",
@@ -856,7 +856,7 @@ def test_diagnose_missing_protocols_table(client):
 
 
 def test_free_monthly_limit_env(monkeypatch, client):
-    monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 1)
+    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 1)
     resp = client.get("/v1/limits", headers=HEADERS)
     assert resp.status_code == 200
     assert resp.json()["limit_monthly_free"] == 1
@@ -880,7 +880,7 @@ def test_free_monthly_limit_env(monkeypatch, client):
 
 def test_usage_count_persists_when_paywall_hit(monkeypatch, client):
     """Usage counter should increment even if paywall returns 402."""
-    monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 1)
+    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 1)
 
     first = client.post(
         "/v1/ai/diagnose",
@@ -922,8 +922,8 @@ def test_sixth_diagnose_call_returns_402(client):
 
 
 def test_paywall_disabled_returns_200(monkeypatch, client):
-    monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 1)
-    monkeypatch.setattr("app.controllers.v1.PAYWALL_ENABLED", False)
+    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 1)
+    monkeypatch.setattr("app.controllers.photos.PAYWALL_ENABLED", False)
 
     first = client.post(
         "/v1/ai/diagnose",
@@ -954,7 +954,7 @@ def test_diagnose_old_sqlite_fallback(monkeypatch, client):
 
 
 def test_pro_expired_event_logged(monkeypatch, client):
-    monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 0)
+    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 0)
     from app.db import SessionLocal
     from app.models import Event
     past = datetime(2024, 1, 1, tzinfo=timezone.utc)
