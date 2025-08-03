@@ -78,13 +78,17 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
         if count == 0 and path.exists():
             rows = load_csv(path)
             for r in rows:
+                try:
+                    phi = int(r.get("phi") or 0)
+                except ValueError:
+                    phi = 0
                 proto = Protocol(
                     crop=r["crop"],
                     disease=r["disease"],
                     product=r["product"],
                     dosage_value=r["dosage_value"],
                     dosage_unit=r["dosage_unit"],
-                    phi=int(r["phi"]),
+                    phi=phi,
                 )
                 session.add(proto)
             session.commit()
