@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.8 — 5 August 2025(v1.7 → v1.8: добавлены поля autopay, autopay_enabled, обновлены API‑маппинги, уточнён ML‑датасет)
+Version 1.9 — 5 August 2025(v1.8 → v1.9: добавлен эндпойнт ask_expert)
 
 0 · Scope
 
@@ -332,6 +332,10 @@ INSERT → payments (autopay)
 POST /v1/payments/sbp/autopay/cancel
 
 UPDATE users.autopay_enabled=false
+
+POST /v1/ask_expert
+
+INSERT → events (ask_expert)
 
 POST /v1/partner/orders
 

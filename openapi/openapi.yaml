@@ -2,10 +2,10 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: "1.8"
+  version: "1.9"
   description: |
-    Telegram-бот «Карманный агроном» — API v1.8.
-    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header.
+    Telegram-бот «Карманный агроном» — API v1.9.
+    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header, +ask_expert endpoint.
   contact:
     name: Ivan Gromov
     url: https://github.com/agronom-bot
@@ -718,6 +718,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /v1/ask_expert:
+    post:
+      summary: Queue question for expert
+      operationId: askExpert
+      description: Send a question to a human agronomist for review.
+      tags: [expert]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+      responses:
+        '202':
+          description: Queued
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 tags:
   - name: diagnose
     description: Disease recognition
@@ -729,6 +766,8 @@ tags:
     description: User usage limits
   - name: partner
     description: External partner callbacks
+  - name: expert
+    description: Human expert questions
 
 
 

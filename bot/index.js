@@ -9,6 +9,7 @@ const {
   helpHandler,
   cancelAutopayHandler,
   autopayEnableHandler,
+  askExpertHandler,
 } = require('./commands');
 
 const token = process.env.BOT_TOKEN_DEV;
@@ -34,6 +35,7 @@ async function init() {
       { command: 'subscribe', description: 'Купить PRO' },
       { command: 'autopay_enable', description: 'Включить автоплатёж' },
       { command: 'cancel_autopay', description: 'Отключить автоплатёж' },
+      { command: 'ask_expert', description: 'Задать вопрос эксперту' },
     ]);
 
     bot.start(async (ctx) => {
@@ -56,6 +58,10 @@ async function init() {
     });
 
     bot.command('history', async (ctx) => historyHandler(ctx, 0, pool));
+
+    bot.command('ask_expert', async (ctx) => {
+      await askExpertHandler(ctx, pool);
+    });
 
     bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
