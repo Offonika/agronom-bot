@@ -1,15 +1,20 @@
 import asyncio
+import logging
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
 from app import db as db_module
+from app.config import Settings
 from app.dependencies import (
     ErrorResponse,
     rate_limit,
     verify_partner_hmac,
 )
 from app.models import PartnerOrder
+
+settings = Settings()
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/partner")
 
@@ -32,6 +37,11 @@ async def partner_orders(
     _: None = Depends(rate_limit),
     x_sign: str = Header(..., alias="X-Sign"),
 ):
+    client_ip = request.client.host if request.client else ""
+    if client_ip not in settings.partner_ips:
+        logger.warning("audit: forbidden ip %s", client_ip)
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
+
     data, sign, provided_sign = await verify_partner_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)

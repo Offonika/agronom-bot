@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     hmac_secret_partner: str = Field(
         "test-hmac-partner", alias="HMAC_SECRET_PARTNER"
     )
+    tinkoff_ips: list[str] = Field(
+        default_factory=lambda: ["127.0.0.1", "testclient"]
+    )
+    partner_ips: list[str] = Field(
+        default_factory=lambda: ["127.0.0.1", "testclient"]
+    )
     tinkoff_terminal_key: str = "tinkoff-terminal-key"
     tinkoff_secret_key: str = "tinkoff-secret-key"
     free_monthly_limit: int = 5

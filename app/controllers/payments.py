@@ -156,6 +156,11 @@ async def payments_webhook(
     _: None = Depends(rate_limit),
     x_signature: str | None = Header(None, alias="X-Signature"),
 ):
+    client_ip = request.client.host if request.client else ""
+    if client_ip not in settings.tinkoff_ips:
+        logger.warning("audit: forbidden ip %s", client_ip)
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
+
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
     if secure and not verify_hmac(x_signature or "", raw_body, HMAC_SECRET):
@@ -228,6 +233,11 @@ async def autopay_webhook(
     _: None = Depends(rate_limit),
     x_signature: str | None = Header(None, alias="X-Signature"),
 ):
+    client_ip = request.client.host if request.client else ""
+    if client_ip not in settings.tinkoff_ips:
+        logger.warning("audit: forbidden ip %s", client_ip)
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
+
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
     if secure and not verify_hmac(x_signature or "", raw_body, HMAC_SECRET):
