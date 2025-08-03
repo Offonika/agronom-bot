@@ -239,7 +239,7 @@ test('photoHandler hides expert button when disabled', { concurrency: false }, a
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].opts.reply_markup, undefined);
+  assert.equal(replies[0].opts, undefined);
 });
 
 test('photoHandler paywall on 402', { concurrency: false }, async () => {
@@ -457,6 +457,7 @@ test('retryHandler returns result', { concurrency: false }, async () => {
     await retryHandler(ctx, 42);
   });
   assert.ok(replies[0].msg.includes('Культура: apple'));
+  assert.equal(replies[0].opts, undefined);
 });
 
 test('historyHandler paginates', { concurrency: false }, async () => {

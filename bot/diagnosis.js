@@ -133,7 +133,8 @@ async function photoHandler(pool, ctx) {
     }
 
     const { text, keyboard } = formatDiagnosis(ctx, data);
-    await ctx.reply(text, { reply_markup: keyboard });
+    const opts = keyboard ? { reply_markup: keyboard } : undefined;
+    await ctx.reply(text, opts);
   } catch (err) {
     console.error('diagnose error', err);
     if (typeof ctx.reply === 'function') {
@@ -173,7 +174,8 @@ async function retryHandler(ctx, photoId) {
     }
 
     const { text, keyboard } = formatDiagnosis(ctx, data);
-    await ctx.reply(text, { reply_markup: keyboard });
+    const opts = keyboard ? { reply_markup: keyboard } : undefined;
+    await ctx.reply(text, opts);
   } catch (err) {
     console.error('retry error', err);
     await ctx.reply(msg('status_error'));
