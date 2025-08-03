@@ -37,7 +37,7 @@ def test_start_to_diagnose():
 
 @pytest.mark.smoke
 def test_paywall_with_mock_payment(monkeypatch):
-    monkeypatch.setattr("app.controllers.v1.FREE_MONTHLY_LIMIT", 0)
+    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 0)
 
     headers = HEADERS | {"X-User-ID": "2"}
     with SessionLocal() as session:
