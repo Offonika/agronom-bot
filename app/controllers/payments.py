@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import text
 
 from app import db as db_module
@@ -19,6 +19,7 @@ from app.services.hmac import verify_hmac
 settings = Settings()
 logger = logging.getLogger(__name__)
 HMAC_SECRET = settings.hmac_secret
+MAX_MONTHS = 12
 
 router = APIRouter(prefix="/payments")
 
@@ -33,7 +34,7 @@ class PaymentWebhook(BaseModel):
 class PaymentCreateRequest(BaseModel):
     user_id: int
     plan: str
-    months: int = 1
+    months: int = Field(default=1, ge=1, le=MAX_MONTHS)
 
 
 class PaymentCreateResponse(BaseModel):
@@ -51,12 +52,20 @@ class PaymentStatusResponse(BaseModel):
     response_model=PaymentCreateResponse,
     responses={401: {"model": ErrorResponse}},
 )
-async def create_payment(body: PaymentCreateRequest, user_id: int = Depends(require_api_headers)):
+async def create_payment(request: Request, user_id: int = Depends(require_api_headers)):
+    try:
+        body = PaymentCreateRequest.model_validate(await request.json())
+    except ValidationError as err:
+        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+
     if body.user_id != user_id:
         err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     if body.plan.lower() != "pro":
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+
+    if body.months < 1 or body.months > MAX_MONTHS:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
     amount = 19900 * body.months
