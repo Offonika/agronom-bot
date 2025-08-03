@@ -80,6 +80,42 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
   delete process.env.BETA_EXPERT_CHAT;
 });
 
+test('photoHandler handles non-ok API status', { concurrency: false }, async () => {
+  const pool = { query: async () => {} };
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 1 },
+    reply: async (msg) => replies.push(msg),
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  await withMockFetch({
+    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    default: { ok: false, status: 500 },
+  }, async () => {
+    await photoHandler(pool, ctx);
+  });
+  assert.equal(replies[0], msg('diagnose_error'));
+});
+
+test('photoHandler handles invalid JSON response', { concurrency: false }, async () => {
+  const pool = { query: async () => {} };
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 1 },
+    reply: async (msg) => replies.push(msg),
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  await withMockFetch({
+    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    default: { json: async () => { throw new Error('bad json'); } },
+  }, async () => {
+    await photoHandler(pool, ctx);
+  });
+  assert.equal(replies[0], msg('diagnose_error'));
+});
+
 test('messageHandler ignores non-photo', { concurrency: false }, () => {
   let logged = '';
   const orig = console.log;
