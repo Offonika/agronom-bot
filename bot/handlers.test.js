@@ -315,7 +315,6 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
     async () => {
       await buyProHandler(ctx, pool, 0);
       if (ctx.pollPromise) await ctx.pollPromise;
-      await new Promise((r) => setTimeout(r, 20));
     },
     calls,
   );

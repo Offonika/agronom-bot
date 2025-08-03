@@ -59,7 +59,7 @@ async function buyProHandler(ctx, pool, intervalMs = 3000, timeoutMs = 60000) {
     });
     const data = await resp.json();
     ctx.paymentId = data.payment_id;
-    const reply = ctx.reply(msg('payment_prompt'), {
+    const reply = await ctx.reply(msg('payment_prompt'), {
       reply_markup: {
         inline_keyboard: [[{ text: msg('payment_button'), url: data.url }]],
       },
@@ -72,7 +72,7 @@ async function buyProHandler(ctx, pool, intervalMs = 3000, timeoutMs = 60000) {
     return reply;
   } catch (err) {
     console.error('payment error', err);
-    return ctx.reply(msg('payment_error'));
+    return await ctx.reply(msg('payment_error'));
   }
 }
 
