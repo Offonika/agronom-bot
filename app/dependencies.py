@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import hmac
+import hashlib
 import json
 from fastapi import Header, HTTPException, Request
 from pydantic import BaseModel
@@ -60,8 +60,7 @@ async def verify_hmac(request: Request, x_sign: str):
         raise HTTPException(status_code=400, detail=err.model_dump())
 
     payload.pop("signature", None)
-    body_for_sign = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-    calculated = hmac.new(HMAC_SECRET.encode(), body_for_sign, hashlib.sha256).hexdigest()
+    calculated = compute_signature(HMAC_SECRET, payload)
 
     if not hmac.compare_digest(calculated, x_sign) or not hmac.compare_digest(
         calculated, provided_sign
