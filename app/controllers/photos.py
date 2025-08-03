@@ -183,8 +183,8 @@ async def diagnose(
             disease = result.get("disease", "")
             conf = result.get("confidence", 0.0)
             status = "ok"
-        except (TimeoutError, ValueError, json.JSONDecodeError) as exc:
-            logger.exception("GPT error", exc_info=exc)
+        except (TimeoutError, ValueError, json.JSONDecodeError):
+            logger.exception("GPT error")
             crop = ""
             disease = ""
             conf = 0.0
@@ -233,8 +233,8 @@ async def diagnose(
             disease = result.get("disease", "")
             conf = result.get("confidence", 0.0)
             status = "ok"
-        except (TimeoutError, ValueError, json.JSONDecodeError) as exc:
-            logger.exception("GPT error", exc_info=exc)
+        except (TimeoutError, ValueError, json.JSONDecodeError):
+            logger.exception("GPT error")
             crop = ""
             disease = ""
             conf = 0.0
