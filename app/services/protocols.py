@@ -47,7 +47,7 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
 
             update_protocols_csv(output=path)
         except Exception as exc:  # noqa: BLE001
-            logging.warning("CSV download failed: %s — using cached file", exc)
+            logger.warning("CSV download failed: %s — using cached file", exc)
 
     # -------- 2. connect to DB -------------------------------------------------
     with db.SessionLocal() as session:
@@ -68,7 +68,7 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
         try:
             count = session.query(Protocol).count()
         except OperationalError:
-            logging.warning(
+            logger.warning(
                 "Table 'protocols' not found. "
                 "Run 'alembic upgrade head' or set DB_CREATE_ALL=1"
             )
@@ -92,7 +92,7 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
                 )
                 session.add(proto)
             session.commit()
-            logging.info("Imported %s protocols from CSV", len(rows))
+            logger.info("Imported %s protocols from CSV", len(rows))
 
 
 # --------------------------------------------------------------------------- #
