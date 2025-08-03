@@ -4,7 +4,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
 from app import db as db_module
-from app.dependencies import ErrorResponse, require_api_headers, verify_hmac as verify_partner_hmac
+from app.dependencies import (
+    ErrorResponse,
+    require_api_headers,
+    verify_partner_hmac,
+)
 from app.models import PartnerOrder
 
 router = APIRouter(prefix="/partner")

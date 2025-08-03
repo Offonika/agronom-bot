@@ -1,18 +1,19 @@
 from app.services.hmac import verify_hmac
 import hmac
 import hashlib
+import pytest
 
 
-def test_verify_hmac_success():
+@pytest.mark.parametrize("secret", ["test-hmac-secret", "test-hmac-partner"])
+def test_verify_hmac_success(secret):
     body = b'{"ok":true}'
-    secret = 'test-hmac-secret'
     sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     assert verify_hmac(sig, body, secret)
 
 
-def test_verify_hmac_fail():
+@pytest.mark.parametrize("secret", ["test-hmac-secret", "test-hmac-partner"])
+def test_verify_hmac_fail(secret):
     body = b'{"ok":true}'
-    secret = 'test-hmac-secret'
     sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     assert not verify_hmac('bad' + sig[3:], body, secret)
 
