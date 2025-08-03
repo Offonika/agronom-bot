@@ -9,7 +9,7 @@ import threading
 
 from cachetools import TTLCache
 from sqlalchemy import inspect, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from app import db
 from app.models import Protocol
@@ -47,8 +47,11 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
             from scripts.update_protocols import update_protocols_csv
 
             update_protocols_csv(output=path)
-        except Exception as exc:  # noqa: BLE001
+        except (ImportError, OSError) as exc:
             logger.warning("CSV download failed: %s — using cached file", exc)
+        except Exception:
+            logger.exception("Unexpected error while downloading protocols CSV")
+            raise
 
     # -------- 2. connect to DB -------------------------------------------------
     with db.SessionLocal() as session:
@@ -58,7 +61,10 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
             insp = inspect(engine)
             try:
                 search_path = session.execute(text("SHOW search_path")).scalar()
-            except Exception:  # noqa: BLE001
+            except SQLAlchemyError:
+                search_path = "n/a"
+            except Exception:
+                logger.exception("Unexpected error retrieving search path")
                 search_path = "n/a"
             logger.debug("DB url       → %s", engine.url)
             logger.debug("search_path  → %s", search_path)
