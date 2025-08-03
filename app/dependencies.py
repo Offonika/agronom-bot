@@ -42,7 +42,7 @@ def compute_signature(secret: str, payload: dict) -> str:
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-async def verify_hmac(request: Request, x_sign: str):
+async def verify_partner_hmac(request: Request, x_sign: str):
     raw_body = await request.body()
     try:
         payload = json.loads(raw_body)
@@ -69,3 +69,7 @@ async def verify_hmac(request: Request, x_sign: str):
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     return payload, calculated, provided_sign
+
+
+# Backward compatibility for existing imports
+verify_hmac = verify_partner_hmac
