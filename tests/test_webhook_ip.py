@@ -64,7 +64,7 @@ def test_payments_webhook_allowed_ip(apply_migrations):
 
 def test_partner_orders_forbidden_ip(caplog):
     bad_ip = "10.0.0.1"
-    headers = _auth_headers() | {"X-Sign": "bad"}
+    headers = {"X-Sign": "bad"}
     with TestClient(app, client=(bad_ip, 5000)) as client, caplog.at_level(
         logging.WARNING
     ):
@@ -83,8 +83,27 @@ def test_partner_orders_allowed_ip():
     }
     sign = compute_signature(settings.hmac_secret_partner, payload.copy())
     payload["signature"] = sign
-    headers = _auth_headers() | {"X-Sign": sign}
+    headers = {"X-Sign": sign}
     with TestClient(app, client=(allowed_ip, 5000)) as client:
         resp = client.post("/v1/partner/orders", headers=headers, json=payload)
     assert resp.status_code == 202
+
+
+def test_partner_orders_rate_limit():
+    allowed_ip = settings.partner_ips[0]
+    payload = {
+        "order_id": "ord1",
+        "user_tg_id": 1,
+        "protocol_id": 1,
+        "price_kopeks": 1000,
+    }
+    sign = compute_signature(settings.hmac_secret_partner, payload.copy())
+    payload["signature"] = sign
+    headers = {"X-Sign": sign}
+    with TestClient(app, client=(allowed_ip, 5000)) as client:
+        for _ in range(30):
+            resp = client.post("/v1/partner/orders", headers=headers, json=payload)
+            assert resp.status_code == 202
+        resp = client.post("/v1/partner/orders", headers=headers, json=payload)
+        assert resp.status_code == 429
 
