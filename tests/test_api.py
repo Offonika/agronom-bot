@@ -658,19 +658,20 @@ async def test_verify_hmac_bad_json(client):
     assert exc.value.status_code == 400
 
 
-def test_payment_webhook_missing_signature(client):
+def test_payment_webhook_bad_body_signature_returns_403(client):
     payload = {
         "external_id": "1",
         "status": "success",
         "paid_at": "2024-01-01T00:00:00Z",
-        "signature": "abc",
     }
+    _ = compute_signature("test-hmac-secret", payload)
+    payload["signature"] = "wrong"
     resp = client.post(
         "/v1/payments/sbp/webhook",
         headers=HEADERS,
         json=payload,
     )
-    assert resp.status_code in {400, 401, 404, 422}
+    assert resp.status_code == 403
 
 
 def test_payment_webhook_bad_payload(client):

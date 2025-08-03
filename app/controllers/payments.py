@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import hmac
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
@@ -11,7 +12,7 @@ from sqlalchemy import text
 
 from app import db as db_module
 from app.config import Settings
-from app.dependencies import ErrorResponse, require_api_headers
+from app.dependencies import ErrorResponse, require_api_headers, compute_signature
 from app.models import Event, Payment
 from app.services import create_sbp_link
 from app.services.hmac import verify_hmac
@@ -116,7 +117,11 @@ async def payment_status(payment_id: str, user_id: int = Depends(require_api_hea
 @router.post(
     "/sbp/webhook",
     status_code=200,
-    responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
+    responses={
+        401: {"model": ErrorResponse},
+        400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
+    },
 )
 async def payments_webhook(
     request: Request,
@@ -135,6 +140,10 @@ async def payments_webhook(
         logger.exception("failed to parse webhook body as JSON")
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
     provided_sign = data.pop("signature", "")
+    expected_sign = compute_signature(HMAC_SECRET, data)
+    if not hmac.compare_digest(provided_sign, expected_sign):
+        logger.warning("audit: invalid payload signature")
+        raise HTTPException(status_code=403, detail="FORBIDDEN")
 
     try:
         body = PaymentWebhook(**data, signature=provided_sign)

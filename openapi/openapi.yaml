@@ -564,6 +564,12 @@ paths:
       responses:
         '200':
           description: Accepted
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /v1/partner/orders:
     post:
