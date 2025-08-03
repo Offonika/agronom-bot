@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.8 — 5 August 2025(v1.7 → v1.8: добавлены поля autopay, autopay_enabled, обновлены API‑маппинги, уточнён ML‑датасет, удалена устаревшая photo_quota)
+Version 1.8 — 5 August 2025(v1.7 → v1.8: добавлены поля autopay, autopay_enabled, обновлены API‑маппинги, уточнён ML‑датасет)
 
 0 · Scope
 

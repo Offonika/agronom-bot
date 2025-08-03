@@ -111,15 +111,7 @@ def upgrade() -> None:
         sa.Column('status', order_status, nullable=False, server_default='new'),
     )
 
-    op.create_table(
-        'photo_quota',
-        sa.Column('user_id', sa.Integer, primary_key=True),
-        sa.Column('used_count', sa.Integer),
-        sa.Column('month_year', sa.String(length=7)),
-    )
-
 def downgrade() -> None:
-    op.drop_table('photo_quota')
     op.drop_table('partner_orders')
     op.drop_table('payments')
     op.drop_table('protocols')

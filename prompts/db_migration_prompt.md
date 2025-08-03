@@ -4,7 +4,6 @@
 
 Структура таблиц берётся из `docs/data_contract.md`:
 - Таблица `photos` включает поля: id, user_id, crop, disease, confidence, ts
-- Таблица `photo_quota` содержит: user_id, used_count, month_year
 
 Каждая миграция должна:
 - иметь semver в имени (например, `2025_07_20_01_init.py`)
