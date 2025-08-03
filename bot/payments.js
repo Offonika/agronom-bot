@@ -41,7 +41,7 @@ async function sendPaywall(ctx, pool) {
   });
 }
 
-async function buyProHandler(ctx, pool, intervalMs = 3000) {
+async function buyProHandler(ctx, pool, intervalMs = 3000, timeoutMs = 60000) {
   await ctx.answerCbQuery();
   if (ctx.from) {
     await logEvent(pool, ctx.from.id, 'paywall_click_buy');
@@ -65,7 +65,7 @@ async function buyProHandler(ctx, pool, intervalMs = 3000) {
       },
     });
     if (intervalMs > 0) {
-      ctx.pollPromise = pollPaymentStatus(ctx, data.payment_id, intervalMs).catch((e) =>
+      ctx.pollPromise = pollPaymentStatus(ctx, data.payment_id, intervalMs, timeoutMs).catch((e) =>
         console.error('poll error', e),
       );
     }
@@ -76,8 +76,9 @@ async function buyProHandler(ctx, pool, intervalMs = 3000) {
   }
 }
 
-async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
-  for (let i = 0; i < 20; i += 1) {
+async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000, timeoutMs = 60000) {
+  const maxAttempts = Math.max(1, Math.floor(timeoutMs / intervalMs));
+  for (let i = 0; i < maxAttempts; i += 1) {
     await new Promise((r) => setTimeout(r, intervalMs));
     try {
       const resp = await fetch(`${API_BASE}/v1/payments/${paymentId}`, {
@@ -97,12 +98,13 @@ async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000) {
         } else {
           await ctx.reply(msg('payment_fail'));
         }
-        break;
+        return;
       }
     } catch (e) {
       console.error('status check error', e);
     }
   }
+  await ctx.reply(msg('payment_pending'));
 }
 
 async function subscribeHandler(ctx, pool) {

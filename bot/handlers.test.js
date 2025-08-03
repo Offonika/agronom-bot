@@ -546,3 +546,17 @@ test('msg replaces multiple occurrences of a variable', () => {
   assert.equal(result, 'hi and hi');
   delete strings.repeat;
 });
+
+test('pollPaymentStatus notifies on timeout', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 1 }, reply: async (m) => replies.push(m) };
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/payments/42': { json: async () => ({ status: 'processing' }) },
+    },
+    async () => {
+      await pollPaymentStatus(ctx, 42, 1, 5);
+    },
+  );
+  assert.equal(replies[0], msg('payment_pending'));
+});
