@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from app import db as db_module
 from app.config import Settings
-from app.dependencies import ErrorResponse, require_api_headers
+from app.dependencies import ErrorResponse, rate_limit
 from app.models import Event, Photo
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol
@@ -98,7 +98,7 @@ class PhotoHistoryItem(BaseModel):
 )
 async def diagnose(
     request: Request,
-    user_id: int = Depends(require_api_headers),
+    user_id: int = Depends(rate_limit),
     image: UploadFile | None = OPTIONAL_FILE,
     prompt_id: str | None = Form(None),
 ):
@@ -291,7 +291,7 @@ async def diagnose(
 async def list_photos(
     limit: int = 10,
     cursor: str | None = None,
-    user_id: int = Depends(require_api_headers),
+    user_id: int = Depends(rate_limit),
 ):
     if limit <= 0:
         return ListPhotosResponse(items=[], next_cursor=None)
@@ -337,7 +337,7 @@ async def list_photos(
 async def list_photos_history(
     limit: int = 10,
     offset: int = 0,
-    user_id: int = Depends(require_api_headers),
+    user_id: int = Depends(rate_limit),
 ):
     limit = max(0, min(limit, 50))
     offset = max(0, offset)
@@ -373,7 +373,7 @@ async def list_photos_history(
     response_model=LimitsResponse,
     responses={401: {"model": ErrorResponse}},
 )
-async def get_limits(user_id: int = Depends(require_api_headers)):
+async def get_limits(user_id: int = Depends(rate_limit)):
     def _db_call() -> int:
         with db_module.SessionLocal() as db:
             moscow_tz = ZoneInfo("Europe/Moscow")
@@ -395,7 +395,7 @@ async def get_limits(user_id: int = Depends(require_api_headers)):
     response_model=PhotoStatusResponse,
     responses={401: {"model": ErrorResponse}, 404: {"description": "Not found"}},
 )
-async def photo_status(photo_id: int, user_id: int = Depends(require_api_headers)):
+async def photo_status(photo_id: int, user_id: int = Depends(rate_limit)):
     def _db_call() -> dict:
         with db_module.SessionLocal() as db:
             photo = db.query(Photo).filter_by(id=photo_id, user_id=user_id, deleted=False).first()

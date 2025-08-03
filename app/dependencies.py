@@ -3,13 +3,16 @@ from __future__ import annotations
 import hmac
 import hashlib
 import json
-from fastapi import Header, HTTPException, Request
+
+import redis.asyncio as redis
+from fastapi import Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from app.config import Settings
 
 settings = Settings()
 HMAC_SECRET_PARTNER = settings.hmac_secret_partner
+redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
 
 
 class ErrorResponse(BaseModel):
@@ -35,6 +38,25 @@ async def require_api_headers(
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     return x_user_id
+
+
+async def rate_limit(request: Request, user_id: int = Depends(require_api_headers)) -> int:
+    """Throttle requests by IP and user via Redis."""
+    ip = request.headers.get("X-Forwarded-For") or (request.client.host if request.client else "")
+    ip_key = f"rate:ip:{ip}"
+    user_key = f"rate:user:{user_id}"
+
+    pipe = redis_client.pipeline()
+    pipe.incr(ip_key)
+    pipe.expire(ip_key, 60)
+    pipe.incr(user_key)
+    pipe.expire(user_key, 60)
+    ip_count, _, user_count, _ = await pipe.execute()
+    if ip_count > 30 or user_count > 120:
+        err = ErrorResponse(code="TOO_MANY_REQUESTS", message="Rate limit exceeded")
+        raise HTTPException(status_code=429, detail=err.model_dump())
+
+    return user_id
 
 
 def compute_signature(secret: str, payload: dict) -> str:

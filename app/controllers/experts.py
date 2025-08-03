@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app import db as db_module
-from app.dependencies import ErrorResponse, require_api_headers
+from app.dependencies import ErrorResponse, rate_limit
 from app.models import Event
 
 router = APIRouter()
@@ -20,7 +20,7 @@ class AskExpertRequest(BaseModel):
     responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
 )
 async def ask_expert(
-    body: AskExpertRequest, user_id: int = Depends(require_api_headers)
+    body: AskExpertRequest, user_id: int = Depends(rate_limit)
 ):
     """Queue a question for a human expert."""
 

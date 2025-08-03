@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app import db as db_module
 from app.config import Settings
-from app.dependencies import ErrorResponse, require_api_headers, compute_signature
+from app.dependencies import ErrorResponse, compute_signature, rate_limit
 from app.models import Event, Payment, User
 from app.services import create_sbp_link
 from app.services.hmac import verify_hmac
@@ -68,7 +68,7 @@ class PaymentStatusResponse(BaseModel):
     response_model=PaymentCreateResponse,
     responses={401: {"model": ErrorResponse}},
 )
-async def create_payment(request: Request, user_id: int = Depends(require_api_headers)):
+async def create_payment(request: Request, user_id: int = Depends(rate_limit)):
     try:
         payload = await request.json()
     except json.JSONDecodeError as err:
@@ -124,7 +124,7 @@ async def create_payment(request: Request, user_id: int = Depends(require_api_he
     response_model=PaymentStatusResponse,
     responses={401: {"model": ErrorResponse}, 404: {"description": "Not found"}},
 )
-async def payment_status(payment_id: str, user_id: int = Depends(require_api_headers)):
+async def payment_status(payment_id: str, user_id: int = Depends(rate_limit)):
     def _db_call() -> tuple[str, datetime | None]:
         with db_module.SessionLocal() as db:
             payment = (
@@ -153,7 +153,7 @@ async def payment_status(payment_id: str, user_id: int = Depends(require_api_hea
 )
 async def payments_webhook(
     request: Request,
-    _: None = Depends(require_api_headers),
+    _: None = Depends(rate_limit),
     x_signature: str | None = Header(None, alias="X-Signature"),
 ):
     raw_body = await request.body()
@@ -225,7 +225,7 @@ async def payments_webhook(
 )
 async def autopay_webhook(
     request: Request,
-    _: None = Depends(require_api_headers),
+    _: None = Depends(rate_limit),
     x_signature: str | None = Header(None, alias="X-Signature"),
 ):
     raw_body = await request.body()
@@ -313,7 +313,7 @@ async def autopay_webhook(
 )
 async def cancel_autopay(
     request: Request,
-    user_id: int = Depends(require_api_headers),
+    user_id: int = Depends(rate_limit),
 ):
     try:
         payload = await request.json()
