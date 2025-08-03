@@ -41,7 +41,13 @@ async function sendPaywall(ctx, pool) {
   });
 }
 
-async function buyProHandler(ctx, pool, intervalMs = 3000, timeoutMs = 60000) {
+async function buyProHandler(
+  ctx,
+  pool,
+  intervalMs = 3000,
+  timeoutMs = 60000,
+  autopay = false,
+) {
   await ctx.answerCbQuery();
   if (ctx.from) {
     await logEvent(pool, ctx.from.id, 'paywall_click_buy');
@@ -55,7 +61,7 @@ async function buyProHandler(ctx, pool, intervalMs = 3000, timeoutMs = 60000) {
         'X-User-ID': ctx.from?.id,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ user_id: ctx.from.id, plan: 'pro', months: 1 }),
+      body: JSON.stringify({ user_id: ctx.from.id, plan: 'pro', months: 1, autopay }),
     });
     const data = await resp.json();
     ctx.paymentId = data.payment_id;
@@ -65,14 +71,39 @@ async function buyProHandler(ctx, pool, intervalMs = 3000, timeoutMs = 60000) {
       },
     });
     if (intervalMs > 0) {
-      ctx.pollPromise = pollPaymentStatus(ctx, data.payment_id, intervalMs, timeoutMs).catch((e) =>
-        console.error('poll error', e),
-      );
+      ctx.pollPromise = pollPaymentStatus(
+        ctx,
+        data.payment_id,
+        intervalMs,
+        timeoutMs,
+      ).catch((e) => console.error('poll error', e));
     }
     return reply;
   } catch (err) {
     console.error('payment error', err);
     return await ctx.reply(msg('payment_error'));
+  }
+}
+
+async function cancelAutopay(ctx) {
+  try {
+    const resp = await fetch(`${API_BASE}/v1/payments/sbp/autopay/cancel`, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': API_KEY,
+        'X-API-Ver': API_VER,
+        'X-User-ID': ctx.from?.id,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ user_id: ctx.from.id }),
+    });
+    if (resp.ok) {
+      return ctx.reply(msg('autopay_cancel_success'));
+    }
+    return ctx.reply(msg('autopay_cancel_error'));
+  } catch (err) {
+    console.error('autopay cancel error', err);
+    return ctx.reply(msg('autopay_cancel_error'));
   }
 }
 
@@ -119,4 +150,5 @@ module.exports = {
   logEvent,
   paywallEnabled,
   getLimit,
+  cancelAutopay,
 };

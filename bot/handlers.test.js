@@ -12,6 +12,7 @@ const {
   subscribeHandler,
   buyProHandler,
   pollPaymentStatus,
+  cancelAutopay,
 } = require('./payments');
 const { startHandler, helpHandler, feedbackHandler } = require('./commands');
 const { historyHandler } = require('./history');
@@ -326,10 +327,15 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   assert.equal(req.opts.method, 'POST');
   assert.equal(req.opts.headers['Content-Type'], 'application/json');
   assert.equal(req.opts.headers['X-API-Key'], 'test-api-key');
-  assert.equal(req.opts.headers['X-API-Ver'], 'v1');
-  assert.equal(req.opts.headers['X-User-ID'], 1);
-  assert.deepEqual(JSON.parse(req.opts.body), { user_id: 1, plan: 'pro', months: 1 });
-});
+    assert.equal(req.opts.headers['X-API-Ver'], 'v1');
+    assert.equal(req.opts.headers['X-User-ID'], 1);
+    assert.deepEqual(JSON.parse(req.opts.body), {
+      user_id: 1,
+      plan: 'pro',
+      months: 1,
+      autopay: false,
+    });
+  });
 
 test('buyProHandler polls success', { concurrency: false }, async () => {
   const replies = [];
@@ -359,6 +365,50 @@ test('buyProHandler polls fail', { concurrency: false }, async () => {
     if (ctx.pollPromise) await ctx.pollPromise;
   });
   assert.equal(replies[1].msg, tr('payment_fail'));
+});
+
+test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = {
+    from: { id: 4 },
+    answerCbQuery: () => {},
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+  };
+  const pool = { query: async () => {} };
+  const calls = [];
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/payments/create': {
+        json: async () => ({ url: 'http://pay', payment_id: 'p4' }),
+      },
+      default: {
+        json: async () => ({ status: 'success', pro_expires_at: '2025-01-01T00:00:00Z' }),
+      },
+    },
+    async () => {
+      await buyProHandler(ctx, pool, 0, 60000, true);
+    },
+    calls,
+  );
+  const req = calls.find((c) => c.url === 'http://localhost:8000/v1/payments/create');
+  assert.equal(JSON.parse(req.opts.body).autopay, true);
+});
+
+test('cancelAutopay calls API', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 5 }, reply: async (m) => replies.push(m) };
+  const calls = [];
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/payments/sbp/autopay/cancel': { status: 204 },
+    },
+    async () => {
+      await cancelAutopay(ctx);
+    },
+    calls,
+  );
+  assert.equal(JSON.parse(calls[0].opts.body).user_id, 5);
+  assert.equal(replies[0], tr('autopay_cancel_success'));
 });
 
 test('paywall disabled does not reply', { concurrency: false }, async () => {

@@ -15,5 +15,7 @@
   "diagnose_error": "Ошибка диагностики",
   "status_error": "Ошибка запроса статуса",
   "history_error": "Ошибка получения истории",
-  "history_empty": "История пуста"
+  "history_empty": "История пуста",
+  "autopay_cancel_success": "Автоплатёж отключён",
+  "autopay_cancel_error": "Не удалось отключить автоплатёж"
 }
