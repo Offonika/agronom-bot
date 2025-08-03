@@ -20,85 +20,90 @@ const pool = new Pool({
 });
 const bot = new Telegraf(token);
 
-bot.telegram.setMyCommands([
-  { command: 'start', description: 'Начать работу' },
-  { command: 'help', description: 'Помощь' },
-  { command: 'history', description: 'История запросов' },
-  { command: 'subscribe', description: 'Купить PRO' },
-]);
+async function init() {
+  try {
+    await bot.telegram.setMyCommands([
+      { command: 'start', description: 'Начать работу' },
+      { command: 'help', description: 'Помощь' },
+      { command: 'history', description: 'История запросов' },
+      { command: 'subscribe', description: 'Купить PRO' },
+    ]);
 
-bot.start(async (ctx) => {
-  await startHandler(ctx, pool);
-  await bot.telegram.setChatMenuButton(ctx.chat.id, { type: 'commands' });
-});
+    bot.start(async (ctx) => {
+      await startHandler(ctx, pool);
+      await bot.telegram.setChatMenuButton(ctx.chat.id, { type: 'commands' });
+    });
 
-bot.command('subscribe', async (ctx) => {
-  await subscribeHandler(ctx, pool);
-});
+    bot.command('subscribe', async (ctx) => {
+      await subscribeHandler(ctx, pool);
+    });
 
-bot.command('help', (ctx) => helpHandler(ctx));
+    bot.command('help', (ctx) => helpHandler(ctx));
 
-bot.command('history', async (ctx) => historyHandler(ctx, 0, pool));
+    bot.command('history', async (ctx) => historyHandler(ctx, 0, pool));
 
-bot.on('photo', (ctx) => photoHandler(pool, ctx));
+    bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
-bot.on('message', messageHandler);
+    bot.on('message', messageHandler);
 
-bot.action(/^proto\|/, async (ctx) => {
-  const parts = ctx.callbackQuery.data.split('|');
-  if (parts.length < 5) {
-    await ctx.answerCbQuery();
-    return ctx.reply('Некорректный формат данных.');
-  }
-  const [, product, val, unit, phi] = parts;
-  const msg =
-    `Препарат: ${product}\n` +
-    `Доза: ${val} ${unit}\n` +
-    `Срок ожидания (PHI): ${phi} дней`;
-  await ctx.answerCbQuery();
-  return ctx.reply(msg);
-});
+    bot.action(/^proto\|/, async (ctx) => {
+      const parts = ctx.callbackQuery.data.split('|');
+      if (parts.length < 5) {
+        await ctx.answerCbQuery();
+        return ctx.reply('Некорректный формат данных.');
+      }
+      const [, product, val, unit, phi] = parts;
+      const msg =
+        `Препарат: ${product}\n` +
+        `Доза: ${val} ${unit}\n` +
+        `Срок ожидания (PHI): ${phi} дней`;
+      await ctx.answerCbQuery();
+      return ctx.reply(msg);
+    });
 
-bot.action('ask_expert', async (ctx) => {
-  await ctx.answerCbQuery();
-  return ctx.reply('Свяжитесь с экспертом для уточнения протокола.');
-});
+    bot.action('ask_expert', async (ctx) => {
+      await ctx.answerCbQuery();
+      return ctx.reply('Свяжитесь с экспертом для уточнения протокола.');
+    });
 
-bot.command('retry', (ctx) => {
-  const [, id] = ctx.message.text.split(' ');
-  if (id) return retryHandler(ctx, id);
-  return ctx.reply('Укажите ID фото после команды /retry');
-});
+    bot.command('retry', (ctx) => {
+      const [, id] = ctx.message.text.split(' ');
+      if (id) return retryHandler(ctx, id);
+      return ctx.reply('Укажите ID фото после команды /retry');
+    });
 
-bot.action(/^retry\|/, async (ctx) => {
-  const [, id] = ctx.callbackQuery.data.split('|');
-  await ctx.answerCbQuery();
-  return retryHandler(ctx, id);
-});
+    bot.action(/^retry\|/, async (ctx) => {
+      const [, id] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      return retryHandler(ctx, id);
+    });
 
-bot.action(/^history\|/, async (ctx) => {
-  const [, off] = ctx.callbackQuery.data.split('|');
-  const offset = Math.max(parseInt(off, 10) || 0, 0);
-  await ctx.answerCbQuery();
-  return historyHandler(ctx, offset, pool);
-});
+    bot.action(/^history\|/, async (ctx) => {
+      const [, off] = ctx.callbackQuery.data.split('|');
+      const offset = Math.max(parseInt(off, 10) || 0, 0);
+      await ctx.answerCbQuery();
+      return historyHandler(ctx, offset, pool);
+    });
 
-bot.action(/^info\|/, async (ctx) => {
-  const [, id] = ctx.callbackQuery.data.split('|');
-  await ctx.answerCbQuery();
-  return retryHandler(ctx, id);
-});
+    bot.action(/^info\|/, async (ctx) => {
+      const [, id] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      return retryHandler(ctx, id);
+    });
 
-bot.action('buy_pro', async (ctx) => {
-  await buyProHandler(ctx, pool);
-});
+    bot.action('buy_pro', async (ctx) => {
+      await buyProHandler(ctx, pool);
+    });
 
-bot.launch()
-  .then(() => console.log('Bot started'))
-  .catch((err) => {
-    console.error('Bot launch failed', err);
+    await bot.launch();
+    console.log('Bot started');
+  } catch (err) {
+    console.error('Bot initialization failed', err);
     process.exit(1);
-  });
+  }
+}
+
+init();
 
 // Gracefully close DB connections on termination
 async function shutdown() {
