@@ -19,6 +19,15 @@ HEADERS = {
 }
 
 
+@pytest.fixture(autouse=True)
+def stub_upload(monkeypatch):
+    async def _stub(user_id: int, data: bytes) -> str:
+        return "1/stub.jpg"
+
+    monkeypatch.setattr("app.services.storage.upload_photo", _stub)
+    monkeypatch.setattr("app.controllers.photos.upload_photo", _stub)
+
+
 @pytest.mark.smoke
 def test_start_to_diagnose():
     """Run bot start→diagnose scenario via Node tests."""
@@ -107,3 +116,15 @@ def test_help_command():
         text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.smoke
+def test_camelot_import():
+    import camelot  # noqa: F401
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
