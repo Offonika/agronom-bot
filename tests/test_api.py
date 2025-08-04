@@ -1008,6 +1008,23 @@ def test_paywall_disabled_returns_200(monkeypatch, client):
     assert second.status_code == 200
 
 
+@pytest.mark.asyncio
+async def test_paywall_helper_enforces_limit(monkeypatch):
+    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 1)
+    monkeypatch.setattr("app.controllers.photos.PAYWALL_ENABLED", True)
+
+    from app.controllers.photos import _enforce_paywall
+
+    first = await _enforce_paywall(1)
+    assert first is None
+
+    second = await _enforce_paywall(1)
+    assert second is not None
+    assert second.status_code == 402
+    body = json.loads(second.body.decode())
+    assert body == {"error": "limit_reached", "limit": 1}
+
+
 def test_diagnose_old_sqlite_fallback(monkeypatch, client):
     """Fallback path for SQLite versions without RETURNING."""
     monkeypatch.setattr("sqlite3.sqlite_version_info", (3, 34, 0))

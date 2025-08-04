@@ -29,6 +29,57 @@ PAYWALL_ENABLED = settings.paywall_enabled
 router = APIRouter()
 
 
+async def _enforce_paywall(user_id: int) -> JSONResponse | None:
+    """Increment usage counter and enforce paywall limits."""
+
+    def _db() -> tuple[int, datetime | None]:
+        with db_module.SessionLocal() as db:
+            moscow_tz = ZoneInfo("Europe/Moscow")
+            month_key = datetime.now(moscow_tz).strftime("%Y-%m")
+            params = {"uid": user_id, "month": month_key}
+            stmt = text(
+                "INSERT INTO photo_usage (user_id, month, used, updated_at) "
+                "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
+                "ON CONFLICT(user_id, month) DO UPDATE "
+                "SET used = photo_usage.used + 1, "
+                "updated_at = CURRENT_TIMESTAMP"
+            )
+            db.execute(stmt, params)
+            db.commit()
+            used = db.execute(
+                text(
+                    "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
+                ),
+                params,
+            ).scalar_one()
+
+            pro = db.execute(
+                text("SELECT pro_expires_at FROM users WHERE id=:uid"),
+                {"uid": user_id},
+            ).scalar()
+            if isinstance(pro, str):
+                pro = datetime.fromisoformat(pro)
+            if pro and getattr(pro, "tzinfo", None) is None:
+                pro = pro.replace(tzinfo=timezone.utc)
+            return used, pro
+
+    used, pro = await asyncio.to_thread(_db)
+    now_utc = datetime.now(timezone.utc)
+    if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
+        if pro and pro < now_utc:
+            def _log() -> None:
+                with db_module.SessionLocal() as db:
+                    db.add(Event(user_id=user_id, event="pro_expired"))
+                    db.commit()
+
+            await asyncio.to_thread(_log)
+        return JSONResponse(
+            status_code=402,
+            content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
+        )
+    return None
+
+
 class DiagnoseRequestBase64(BaseModel):
     image_base64: str
     prompt_id: str
@@ -104,42 +155,6 @@ async def diagnose(
     image: UploadFile | None = OPTIONAL_FILE,
     prompt_id: str | None = Form(None),
 ):
-    async def _increment_usage() -> tuple[int, datetime | None]:
-        def _db() -> tuple[int, datetime | None]:
-            with db_module.SessionLocal() as db:
-                moscow_tz = ZoneInfo("Europe/Moscow")
-                month_key = datetime.now(moscow_tz).strftime("%Y-%m")
-                params = {"uid": user_id, "month": month_key}
-                stmt = text(
-                    "INSERT INTO photo_usage (user_id, month, used, updated_at) "
-                    "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
-                    "ON CONFLICT(user_id, month) DO UPDATE "
-                    "SET used = photo_usage.used + 1, "
-                    "updated_at = CURRENT_TIMESTAMP"
-                )
-                db.execute(stmt, params)
-                # Persist increment before reading the value to ensure the
-                # returned counter reflects committed state.
-                db.commit()
-                used = db.execute(
-                    text(
-                        "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
-                    ),
-                    params,
-                ).scalar_one()
-
-                pro = db.execute(
-                    text("SELECT pro_expires_at FROM users WHERE id=:uid"),
-                    {"uid": user_id},
-                ).scalar()
-                if isinstance(pro, str):
-                    pro = datetime.fromisoformat(pro)
-                if pro and getattr(pro, "tzinfo", None) is None:
-                    pro = pro.replace(tzinfo=timezone.utc)
-                return used, pro
-
-        return await asyncio.to_thread(_db)
-
     status = "ok"
     file_id = ""
     crop = ""
@@ -155,21 +170,8 @@ async def diagnose(
             err = ErrorResponse(code="BAD_REQUEST", message="image too large")
             return JSONResponse(status_code=400, content=err.model_dump())
 
-        used, pro = await _increment_usage()
-        # `used` reflects the counter after this call
-        now_utc = datetime.now(timezone.utc)
-        if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
-            if pro and pro < now_utc:
-                def _log() -> None:
-                    with db_module.SessionLocal() as db:
-                        db.add(Event(user_id=user_id, event="pro_expired"))
-                        db.commit()
-
-                await asyncio.to_thread(_log)
-            return JSONResponse(
-                status_code=402,
-                content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
-            )
+        if resp := await _enforce_paywall(user_id):
+            return resp
 
         key = await upload_photo(user_id, contents)
         file_id = key
@@ -206,21 +208,8 @@ async def diagnose(
             err = ErrorResponse(code="BAD_REQUEST", message="image too large")
             return JSONResponse(status_code=400, content=err.model_dump())
 
-        used, pro = await _increment_usage()
-        # `used` reflects the counter after this call
-        now_utc = datetime.now(timezone.utc)
-        if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
-            if pro and pro < now_utc:
-                def _log() -> None:
-                    with db_module.SessionLocal() as db:
-                        db.add(Event(user_id=user_id, event="pro_expired"))
-                        db.commit()
-
-                await asyncio.to_thread(_log)
-            return JSONResponse(
-                status_code=402,
-                content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
-            )
+        if resp := await _enforce_paywall(user_id):
+            return resp
 
         key = await upload_photo(user_id, contents)
         file_id = key
