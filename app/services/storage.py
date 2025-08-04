@@ -1,4 +1,3 @@
-import logging
 import os
 from asyncio import Lock
 from datetime import datetime, timezone
@@ -6,6 +5,7 @@ from typing import AsyncContextManager as AbstractAsyncContextManager
 from uuid import uuid4
 
 import aioboto3
+import logging  # noqa: I001
 from aiobotocore.client import AioBaseClient
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException
