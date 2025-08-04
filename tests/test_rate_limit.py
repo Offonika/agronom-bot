@@ -39,3 +39,15 @@ def test_rate_limit_redis_unavailable(client, monkeypatch):
     monkeypatch.setattr(dependencies, "redis_client", _RedisFail())
     resp = client.get("/v1/photos", headers=HEADERS)
     assert resp.status_code == 503
+
+
+def test_rate_limit_untrusted_proxy(client, monkeypatch):
+    headers = HEADERS.copy()
+    monkeypatch.setattr(dependencies.settings, "trusted_proxies", ["127.0.0.1"])
+    for i in range(30):
+        headers["X-Forwarded-For"] = f"1.1.1.{i}"
+        resp = client.get("/v1/photos", headers=headers)
+        assert resp.status_code == 200
+    headers["X-Forwarded-For"] = "1.1.1.30"
+    resp = client.get("/v1/photos", headers=headers)
+    assert resp.status_code == 429

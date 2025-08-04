@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     partner_ips: list[str] = Field(
         default_factory=lambda: ["127.0.0.1", "testclient"]
     )
+    trusted_proxies: list[str] = Field(
+        default_factory=lambda: ["127.0.0.1", "testclient"]
+    )
     tinkoff_terminal_key: str = "tinkoff-terminal-key"
     tinkoff_secret_key: str = "tinkoff-secret-key"
     free_monthly_limit: int = 5
