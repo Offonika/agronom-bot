@@ -21,8 +21,8 @@ services:
 
   bot:
     build:
-      context: .
-      dockerfile: bot/Dockerfile
+      context: ./bot
+      dockerfile: Dockerfile
     volumes:
       - .:/usr/src/app
     env_file: .env
