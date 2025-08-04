@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.10 — 5 August 2025(v1.9 → v1.10: ProtocolResponse дополнился category/status/waiting_days)
+Version 1.11 — 5 August 2025(v1.10 → v1.11: добавлены таблицы catalogs/catalog_items и ER‑диаграмма)
 
 0 · Scope
 
@@ -23,6 +23,25 @@ users 1—n payments
 users 1—n partner_orders
 users 1—n events
 photos 1—1 protocols
+catalogs 1—n catalog_items
+
+```mermaid
+erDiagram
+    catalogs ||--o{ catalog_items : contains
+    catalogs {
+        int id
+        text crop
+        text disease
+    }
+    catalog_items {
+        int id
+        int catalog_id
+        text product
+        numeric dosage_value
+        text dosage_unit
+        int phi
+    }
+```
 
 3 · Table Definitions
 
@@ -283,6 +302,58 @@ e.g. payment_success, autopay_fail
 ts
 
 TIMESTAMP DEFAULT now()
+
+3.8 catalogs
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+crop
+
+TEXT
+
+disease
+
+TEXT
+
+3.9 catalog_items
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+catalog_id
+
+INT FK → catalogs(id)
+
+product
+
+TEXT
+
+dosage_value
+
+NUMERIC
+
+dosage_unit
+
+TEXT
+
+phi
+
+INT
 
 4 · Enum Definitions
 
