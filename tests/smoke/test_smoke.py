@@ -128,3 +128,13 @@ def test_camelot_import():
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert resp.status_code == 200
+
+
+@pytest.mark.smoke
+def test_bs4_import():
+    import bs4  # noqa: F401
+
+
+@pytest.mark.smoke
+def test_pendulum_import():
+    import pendulum  # noqa: F401
