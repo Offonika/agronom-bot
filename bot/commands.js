@@ -35,9 +35,9 @@ async function feedbackHandler(ctx, pool) {
   if (ctx.from) {
     await logEvent(pool, ctx.from.id, 'feedback_open');
   }
-  await ctx.reply('Будем рады вашему отзыву!', {
+  await ctx.reply(msg('feedback_text'), {
     reply_markup: {
-      inline_keyboard: [[{ text: 'Оставить отзыв', url: url.toString() }]],
+      inline_keyboard: [[{ text: msg('feedback_button'), url: url.toString() }]],
     },
   });
 }

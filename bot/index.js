@@ -8,6 +8,7 @@ const { reminderHandler } = require('./reminder');
 const {
   startHandler,
   helpHandler,
+  feedbackHandler,
   cancelAutopayHandler,
   autopayEnableHandler,
   askExpertHandler,
@@ -38,6 +39,7 @@ async function init() {
       { command: 'cancel_autopay', description: 'Отключить автоплатёж' },
       { command: 'ask_expert', description: 'Задать вопрос эксперту' },
       { command: 'reminder', description: 'Управление напоминаниями' },
+      { command: 'feedback', description: 'Оставить отзыв' },
     ]);
 
     bot.start(async (ctx) => {
@@ -66,6 +68,8 @@ async function init() {
     });
 
     bot.command('reminder', reminderHandler);
+
+    bot.command('feedback', (ctx) => feedbackHandler(ctx, pool));
 
     bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
