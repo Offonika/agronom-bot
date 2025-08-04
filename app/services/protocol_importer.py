@@ -7,7 +7,12 @@ import zipfile
 from pathlib import Path
 from typing import Iterable
 
+import re
+from datetime import datetime
+from urllib.parse import urljoin
+
 import requests
+from bs4 import BeautifulSoup
 from sqlalchemy import text
 
 from app import db
@@ -15,6 +20,35 @@ from app import db
 ROOT = Path(__file__).resolve().parents[2]
 CSV_PATH = ROOT / "protocols.csv"
 FIELDNAMES = ["crop", "disease", "product", "dosage_value", "dosage_unit", "phi"]
+
+
+def find_latest_zip(html: str, base_url: str) -> str:
+    """Return absolute URL of latest ZIP link found in ``html``.
+
+    The function scans anchor tags for links ending with ``.zip`` and selects
+    the one with the most recent date in ``DD.MM.YYYY`` format appearing in the
+    link text. ``base_url`` is used to resolve relative URLs. A ``ValueError``
+    is raised when no ZIP links are present.
+    """
+
+    soup = BeautifulSoup(html, "html.parser")
+    latest_href: str | None = None
+    latest_date: datetime | None = None
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if not href.lower().endswith(".zip"):
+            continue
+        text = a.get_text(" ", strip=True)
+        match = re.search(r"(\d{2}\.\d{2}\.\d{4})", text)
+        date: datetime | None = None
+        if match:
+            date = datetime.strptime(match.group(1), "%d.%m.%Y")
+        if latest_date is None or (date and date > latest_date):
+            latest_href = href
+            latest_date = date
+    if not latest_href:
+        raise ValueError("No ZIP links found")
+    return urljoin(base_url, latest_href)
 
 
 def download_zip(url: str, dest: Path) -> Path:
