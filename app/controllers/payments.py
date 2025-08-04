@@ -49,7 +49,7 @@ class AutopayCancelRequest(BaseModel):
 
 class PaymentCreateRequest(BaseModel):
     user_id: int
-    plan: str
+    plan: Literal["pro"]
     months: int = Field(default=1, ge=1, le=MAX_MONTHS)
     autopay: bool | None = None
 
@@ -84,9 +84,6 @@ async def create_payment(request: Request, user_id: int = Depends(rate_limit)):
     if body.user_id != user_id:
         err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
         raise HTTPException(status_code=401, detail=err.model_dump())
-
-    if body.plan.lower() != "pro":
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
     if body.months < 1 or body.months > MAX_MONTHS:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
