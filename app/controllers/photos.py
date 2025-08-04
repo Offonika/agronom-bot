@@ -118,14 +118,15 @@ async def diagnose(
                     "updated_at = CURRENT_TIMESTAMP"
                 )
                 db.execute(stmt, params)
+                # Persist increment before reading the value to ensure the
+                # returned counter reflects committed state.
+                db.commit()
                 used = db.execute(
                     text(
                         "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
                     ),
                     params,
                 ).scalar_one()
-
-                db.commit()
 
                 pro = db.execute(
                     text("SELECT pro_expires_at FROM users WHERE id=:uid"),
@@ -155,6 +156,7 @@ async def diagnose(
             return JSONResponse(status_code=400, content=err.model_dump())
 
         used, pro = await _increment_usage()
+        # `used` reflects the counter after this call
         now_utc = datetime.now(timezone.utc)
         if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
             if pro and pro < now_utc:
@@ -205,6 +207,7 @@ async def diagnose(
             return JSONResponse(status_code=400, content=err.model_dump())
 
         used, pro = await _increment_usage()
+        # `used` reflects the counter after this call
         now_utc = datetime.now(timezone.utc)
         if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
             if pro and pro < now_utc:
