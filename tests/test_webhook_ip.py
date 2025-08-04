@@ -62,6 +62,38 @@ def test_payments_webhook_allowed_ip(apply_migrations):
     assert resp.status_code == 200
 
 
+def test_payments_webhook_x_forwarded_for(apply_migrations):
+    allowed_ip = settings.tinkoff_ips[0]
+    bad_ip = "10.0.0.1"
+    external_id = "ext123fwd"
+    with db_module.SessionLocal() as db:
+        payment = Payment(
+            user_id=1,
+            amount=100,
+            currency="RUB",
+            provider="sbp",
+            external_id=external_id,
+            prolong_months=1,
+            status="pending",
+        )
+        db.add(payment)
+        db.commit()
+
+    payload = {
+        "external_id": external_id,
+        "status": "success",
+        "paid_at": datetime.now(timezone.utc).isoformat(),
+    }
+    payload["signature"] = compute_signature(settings.hmac_secret, payload.copy())
+    headers = _auth_headers()
+    headers["X-Forwarded-For"] = f"{allowed_ip}, {bad_ip}"
+    with TestClient(app, client=(bad_ip, 5000)) as client:
+        resp = client.post(
+            "/v1/payments/sbp/webhook", headers=headers, json=payload
+        )
+    assert resp.status_code == 200
+
+
 def test_partner_orders_forbidden_ip(caplog):
     bad_ip = "10.0.0.1"
     headers = {"X-Sign": "bad"}
@@ -85,6 +117,23 @@ def test_partner_orders_allowed_ip():
     payload["signature"] = sign
     headers = {"X-Sign": sign}
     with TestClient(app, client=(allowed_ip, 5000)) as client:
+        resp = client.post("/v1/partner/orders", headers=headers, json=payload)
+    assert resp.status_code == 202
+
+
+def test_partner_orders_x_forwarded_for():
+    allowed_ip = settings.partner_ips[0]
+    bad_ip = "10.0.0.1"
+    payload = {
+        "order_id": "ord2",
+        "user_tg_id": 1,
+        "protocol_id": 1,
+        "price_kopeks": 1000,
+    }
+    sign = compute_signature(settings.hmac_secret_partner, payload.copy())
+    payload["signature"] = sign
+    headers = {"X-Sign": sign, "X-Forwarded-For": f"{allowed_ip}, {bad_ip}"}
+    with TestClient(app, client=(bad_ip, 5000)) as client:
         resp = client.post("/v1/partner/orders", headers=headers, json=payload)
     assert resp.status_code == 202
 

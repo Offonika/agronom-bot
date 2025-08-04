@@ -47,7 +47,10 @@ async def require_api_headers(
 
 async def rate_limit(request: Request, user_id: int = Depends(require_api_headers)) -> int:
     """Throttle requests by IP and user via Redis."""
-    ip = request.headers.get("X-Forwarded-For") or (request.client.host if request.client else "")
+    raw_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else ""
+    )
+    ip = raw_ip.split(",")[0].strip()
     ip_key = f"rate:ip:{ip}"
     user_key = f"rate:user:{user_id}"
 

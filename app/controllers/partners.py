@@ -34,7 +34,10 @@ async def partner_orders(
     request: Request,
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    client_ip = request.client.host if request.client else ""
+    raw_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else ""
+    )
+    client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.partner_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
         raise HTTPException(status_code=403, detail="FORBIDDEN")
