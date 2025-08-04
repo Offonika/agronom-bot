@@ -1,0 +1,6 @@
+# Files and directories excluded from the bot build context
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+*.test.js

@@ -1,6 +1,6 @@
 FROM node:18
 WORKDIR /usr/src/app
-COPY bot/package*.json ./bot/
-RUN npm ci --prefix bot
+COPY package*.json ./
+RUN npm ci
 COPY . .
-ENTRYPOINT ["node", "bot/index.js"]
+ENTRYPOINT ["node", "index.js"]
