@@ -260,7 +260,7 @@ async def diagnose(
     if status != "ok":
         return JSONResponse(status_code=202, content={"id": photo_id, "status": "pending"})
 
-    proto = await asyncio.to_thread(find_protocol, crop, disease)
+    proto = await asyncio.to_thread(find_protocol, "main", crop, disease)
     if proto:
         proto_resp = ProtocolResponse(
             id=proto.id,
@@ -416,7 +416,9 @@ async def photo_status(photo_id: int, user_id: int = Depends(rate_limit)):
         and photo_data["crop"]
         and photo_data["disease"]
     ):
-        p = await asyncio.to_thread(find_protocol, photo_data["crop"], photo_data["disease"])
+        p = await asyncio.to_thread(
+            find_protocol, "main", photo_data["crop"], photo_data["disease"]
+        )
         if p:
             proto = ProtocolResponse(
                 id=p.id,
