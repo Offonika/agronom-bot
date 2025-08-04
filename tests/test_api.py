@@ -1072,3 +1072,8 @@ def test_pro_expired_event_logged(monkeypatch, client):
     with SessionLocal() as session:
         events = session.query(Event).filter_by(user_id=1).all()
         assert any(e.event == "pro_expired" for e in events)
+
+    # cleanup to not affect other tests
+    with SessionLocal() as session:
+        session.execute(text("UPDATE users SET pro_expires_at=NULL WHERE id=1"))
+        session.commit()
