@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Only initialize storage and DB connections; catalog data is pre-loaded
     await init_storage(settings)
     await asyncio.to_thread(init_db, settings)
     yield
