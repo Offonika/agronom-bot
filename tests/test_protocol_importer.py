@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from app.config import Settings
 from app.db import SessionLocal, init_db
-from app.services.protocol_importer import find_latest_zip, bulk_insert
+from app.services.protocol_importer import find_latest_zip, bulk_insert_items
 
 
 @contextmanager
@@ -77,7 +77,7 @@ def test_bulk_insert_populates_tables(tmp_path):
     ]
     with tmp_db(tmp_path):
         create_protocols_view()
-        bulk_insert(rows, force=True)
+        bulk_insert_items(rows, force=True)
         with SessionLocal() as session:
             product = session.execute(text("SELECT product FROM catalog_items"))
             assert product.scalar_one() == "Хорус 75 ВДГ"
