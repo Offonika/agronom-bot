@@ -158,7 +158,10 @@ async def payments_webhook(
     _: None = Depends(rate_limit),
     x_signature: str | None = Header(None, alias="X-Signature"),
 ):
-    client_ip = request.client.host if request.client else ""
+    raw_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else ""
+    )
+    client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.tinkoff_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
         raise HTTPException(status_code=403, detail="FORBIDDEN")
@@ -235,7 +238,10 @@ async def autopay_webhook(
     _: None = Depends(rate_limit),
     x_signature: str | None = Header(None, alias="X-Signature"),
 ):
-    client_ip = request.client.host if request.client else ""
+    raw_ip = request.headers.get(
+        "X-Forwarded-For", request.client.host if request.client else ""
+    )
+    client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.tinkoff_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
         raise HTTPException(status_code=403, detail="FORBIDDEN")
