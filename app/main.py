@@ -9,7 +9,6 @@ from fastapi import FastAPI
 
 from app.config import Settings
 from app.db import init_db
-from app.services.protocols import import_csv_to_db
 from app.services.storage import init_storage, close_client
 from app.logger import setup_logging
 from app.controllers import v1
@@ -26,7 +25,6 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     await init_storage(settings)
     await asyncio.to_thread(init_db, settings)
-    await asyncio.to_thread(import_csv_to_db)
     yield
     await close_client()
 

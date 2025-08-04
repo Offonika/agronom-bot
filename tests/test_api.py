@@ -8,8 +8,51 @@ from fastapi import HTTPException
 from starlette.requests import Request
 from sqlalchemy import text
 from app.dependencies import compute_signature, verify_hmac
-from app.services.protocols import import_csv_to_db
 from app.config import Settings
+from app.db import SessionLocal
+from app.models import Catalog, CatalogItem
+
+
+def seed_protocol():
+    with SessionLocal() as session:
+        session.execute(text("DELETE FROM catalog_items"))
+        session.execute(text("DELETE FROM catalogs"))
+
+        session.execute(
+            text(
+                """
+                CREATE VIEW IF NOT EXISTS protocols_current AS
+                SELECT ci.id AS id,
+                       c.crop AS crop,
+                       c.disease AS disease,
+                       ci.product AS product,
+                       ci.dosage_value AS dosage_value,
+                       ci.dosage_unit AS dosage_unit,
+                       ci.phi AS phi
+                FROM catalog_items ci
+                JOIN catalogs c ON c.id = ci.catalog_id
+                WHERE ci.is_current = 1
+                """
+            )
+        )
+
+        def _add(crop: str, disease: str, product: str, dosage_value: float, dosage_unit: str, phi: int):
+            catalog = Catalog(crop=crop, disease=disease)
+            session.add(catalog)
+            session.flush()
+            item = CatalogItem(
+                catalog_id=catalog.id,
+                product=product,
+                dosage_value=dosage_value,
+                dosage_unit=dosage_unit,
+                phi=phi,
+                is_current=True,
+            )
+            session.add(item)
+
+        _add("apple", "powdery_mildew", "Скор 250 ЭК", 2, "ml_10l", 30)
+        _add("apple", "scab", "Хорус 75 ВДГ", 3, "g_per_l", 28)
+        session.commit()
 
 
 @pytest.fixture(autouse=True)
@@ -122,25 +165,24 @@ def test_diagnose_large_base64(client):
 
 
 def test_diagnose_json_returns_stub(client):
+    seed_protocol()
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert resp.status_code == 200
-    assert resp.json() == {
-        "crop": "apple",
-        "disease": "powdery_mildew",
-        "confidence": 0.92,
-        "protocol_status": None,
-        "protocol": {
-            "id": 1,
-            "product": "Скор 250 ЭК",
-            "dosage_value": 2.0,
-            "dosage_unit": "ml_10l",
-            "phi": 30,
-        },
-    }
+    body = resp.json()
+    assert body["crop"] == "apple"
+    assert body["disease"] == "powdery_mildew"
+    assert body["confidence"] == 0.92
+    assert body["protocol_status"] is None
+    proto = body["protocol"]
+    assert proto is not None
+    assert proto["product"] == "Скор 250 ЭК"
+    assert proto["dosage_value"] == 2.0
+    assert proto["dosage_unit"] == "ml_10l"
+    assert proto["phi"] == 30
 
 
 def test_diagnose_without_protocol(client):
@@ -360,9 +402,7 @@ def test_photo_retry_attempts_default(client):
 def test_photo_status_completed(client):
     from app.db import SessionLocal
     from app.models import Photo
-    from app.services.protocols import import_csv_to_db
-
-    import_csv_to_db()
+    seed_protocol()
 
     with SessionLocal() as session:
         photo = Photo(
@@ -821,7 +861,7 @@ def test_photos_table_has_meta(client):
 
 
 def test_diagnose_json_with_protocol(client):
-    import_csv_to_db()
+    seed_protocol()
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -875,7 +915,7 @@ def test_diagnose_missing_protocols_table(client):
         assert data["protocol_status"] == "Бета"
     finally:
         subprocess.run(["alembic", "upgrade", "head"], check=True)
-        import_csv_to_db()
+        seed_protocol()
 
 
 def test_free_monthly_limit_env(monkeypatch, client):
