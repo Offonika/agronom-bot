@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -29,6 +30,8 @@ async def lifespan(app: FastAPI):
     yield
     await close_client()
 
+if sys.version_info[:2] < (3, 11):
+    raise RuntimeError("Python 3.11+ is required")
 
 app = FastAPI(
     title="Agronom Bot Internal API",
