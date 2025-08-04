@@ -3,8 +3,10 @@ from __future__ import annotations
 import hmac
 import hashlib
 import json
+import logging
 
 import redis.asyncio as redis
+from redis.exceptions import RedisError
 from fastapi import Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 
@@ -13,6 +15,9 @@ from app.config import Settings
 settings = Settings()
 HMAC_SECRET_PARTNER = settings.hmac_secret_partner
 redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorResponse(BaseModel):
@@ -46,12 +51,19 @@ async def rate_limit(request: Request, user_id: int = Depends(require_api_header
     ip_key = f"rate:ip:{ip}"
     user_key = f"rate:user:{user_id}"
 
-    pipe = redis_client.pipeline()
-    pipe.incr(ip_key)
-    pipe.expire(ip_key, 60)
-    pipe.incr(user_key)
-    pipe.expire(user_key, 60)
-    ip_count, _, user_count, _ = await pipe.execute()
+    try:
+        pipe = redis_client.pipeline()
+        pipe.incr(ip_key)
+        pipe.expire(ip_key, 60)
+        pipe.incr(user_key)
+        pipe.expire(user_key, 60)
+        ip_count, _, user_count, _ = await pipe.execute()
+    except RedisError as exc:
+        logger.exception("Redis unavailable for rate limiting: %s", exc)
+        err = ErrorResponse(
+            code="SERVICE_UNAVAILABLE", message="Rate limiter unavailable"
+        )
+        raise HTTPException(status_code=503, detail=err.model_dump()) from exc
     if ip_count > 30 or user_count > 120:
         err = ErrorResponse(code="TOO_MANY_REQUESTS", message="Rate limit exceeded")
         raise HTTPException(status_code=429, detail=err.model_dump())
