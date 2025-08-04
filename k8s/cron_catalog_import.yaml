@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: import-catalog-pesticide
+spec:
+  schedule: "0 9 1 * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: import
+              image: python:3.11
+              command: ["python", "-m", "app.services.protocol_importer", "--category", "pesticide"]
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: import-catalog-agrochem
+spec:
+  schedule: "0 9 1 * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: import
+              image: python:3.11
+              command: ["python", "-m", "app.services.protocol_importer", "--category", "agrochem"]
+          restartPolicy: OnFailure
