@@ -80,6 +80,35 @@ async def _enforce_paywall(user_id: int) -> JSONResponse | None:
     return None
 
 
+class _ProcessImageError(Exception):
+    def __init__(self, response: JSONResponse):
+        self.response = response
+
+
+async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, float, str]:
+    if len(contents) > 2 * 1024 * 1024:
+        err = ErrorResponse(code="BAD_REQUEST", message="image too large")
+        raise _ProcessImageError(
+            JSONResponse(status_code=400, content=err.model_dump())
+        )
+
+    if resp := await _enforce_paywall(user_id):
+        raise _ProcessImageError(resp)
+
+    key = await upload_photo(user_id, contents)
+    try:
+        result = call_gpt_vision_stub(key)
+        crop = result.get("crop", "")
+        disease = result.get("disease", "")
+        conf = result.get("confidence", 0.0)
+    except (TimeoutError, ValueError, json.JSONDecodeError):
+        logger.exception("GPT error")
+        crop = ""
+        disease = ""
+        conf = 0.0
+    return key, crop, disease, conf
+
+
 class DiagnoseRequestBase64(BaseModel):
     image_base64: str
     prompt_id: str
@@ -155,38 +184,11 @@ async def diagnose(
     image: UploadFile | None = OPTIONAL_FILE,
     prompt_id: str | None = Form(None),
 ):
-    status = "ok"
-    file_id = ""
-    crop = ""
-    disease = ""
-    conf = 0.0
-
     if image:
         if prompt_id not in (None, "v1"):
             err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
             return JSONResponse(status_code=400, content=err.model_dump())
         contents = await image.read()
-        if len(contents) > 2 * 1024 * 1024:
-            err = ErrorResponse(code="BAD_REQUEST", message="image too large")
-            return JSONResponse(status_code=400, content=err.model_dump())
-
-        if resp := await _enforce_paywall(user_id):
-            return resp
-
-        key = await upload_photo(user_id, contents)
-        file_id = key
-        try:
-            result = call_gpt_vision_stub(key)
-            crop = result.get("crop", "")
-            disease = result.get("disease", "")
-            conf = result.get("confidence", 0.0)
-            status = "ok"
-        except (TimeoutError, ValueError, json.JSONDecodeError):
-            logger.exception("GPT error")
-            crop = ""
-            disease = ""
-            conf = 0.0
-            status = "pending"
     else:
         try:
             json_data = await request.json()
@@ -204,27 +206,11 @@ async def diagnose(
         except binascii.Error:
             err = ErrorResponse(code="BAD_REQUEST", message="invalid base64")
             return JSONResponse(status_code=400, content=err.model_dump())
-        if len(contents) > 2 * 1024 * 1024:
-            err = ErrorResponse(code="BAD_REQUEST", message="image too large")
-            return JSONResponse(status_code=400, content=err.model_dump())
-
-        if resp := await _enforce_paywall(user_id):
-            return resp
-
-        key = await upload_photo(user_id, contents)
-        file_id = key
-        try:
-            result = call_gpt_vision_stub(key)
-            crop = result.get("crop", "")
-            disease = result.get("disease", "")
-            conf = result.get("confidence", 0.0)
-            status = "ok"
-        except (TimeoutError, ValueError, json.JSONDecodeError):
-            logger.exception("GPT error")
-            crop = ""
-            disease = ""
-            conf = 0.0
-            status = "pending"
+    try:
+        file_id, crop, disease, conf = await _process_image(contents, user_id)
+    except _ProcessImageError as err:
+        return err.response
+    status = "ok" if crop and disease else "pending"
 
     def _save() -> int:
         with db_module.SessionLocal() as db:

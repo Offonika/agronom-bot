@@ -124,6 +124,45 @@ def test_diagnose_multipart_success(client):
     assert resp.status_code == 200
 
 
+def test_diagnose_multipart_uses_process(monkeypatch, client):
+    async def fake_process(contents: bytes, user_id: int) -> tuple[str, str, str, float]:
+        assert contents == b"abc"
+        return "k", "wheat", "rust", 0.5
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+    monkeypatch.setattr("app.controllers.photos.find_protocol", lambda *_, **__: None)
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files={"image": ("leaf.jpg", b"abc", "image/jpeg")},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["crop"] == "wheat"
+    assert data["disease"] == "rust"
+    assert data["confidence"] == 0.5
+
+
+def test_diagnose_base64_uses_process(monkeypatch, client):
+    async def fake_process(contents: bytes, user_id: int) -> tuple[str, str, str, float]:
+        assert contents == b"xyz"
+        return "k", "corn", "blight", 0.7
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+    monkeypatch.setattr("app.controllers.photos.find_protocol", lambda *_, **__: None)
+    encoded = base64.b64encode(b"xyz").decode()
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": encoded, "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["crop"] == "corn"
+    assert data["disease"] == "blight"
+    assert data["confidence"] == 0.7
+
+
 def test_diagnose_missing_header(client):
     resp = client.post(
         "/v1/ai/diagnose",
