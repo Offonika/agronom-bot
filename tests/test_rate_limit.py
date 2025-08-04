@@ -1,5 +1,8 @@
 import os
 
+from redis.exceptions import RedisError
+from app import dependencies
+
 HEADERS = {
     "X-API-Key": os.getenv("API_KEY", "test-api-key"),
     "X-API-Ver": "v1",
@@ -26,3 +29,13 @@ def test_rate_limit_user(client):
     headers["X-Forwarded-For"] = "10.0.0.4"
     resp = client.get("/v1/photos", headers=headers)
     assert resp.status_code == 429
+
+
+def test_rate_limit_redis_unavailable(client, monkeypatch):
+    class _RedisFail:
+        def pipeline(self):
+            raise RedisError
+
+    monkeypatch.setattr(dependencies, "redis_client", _RedisFail())
+    resp = client.get("/v1/photos", headers=HEADERS)
+    assert resp.status_code == 503
