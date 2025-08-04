@@ -116,13 +116,13 @@ def bulk_insert_items(rows: Iterable[dict], force: bool = False) -> None:
         for row in rows:
             key = (row["crop"], row["disease"])
             if key not in catalogs_cache:
-                catalog_id = session.execute(
+                result = session.execute(
                     text(
-                        "INSERT INTO catalogs (crop, disease) VALUES (:crop, :disease) RETURNING id"
+                        "INSERT INTO catalogs (crop, disease) VALUES (:crop, :disease)"
                     ),
                     {"crop": row["crop"], "disease": row["disease"]},
-                ).scalar_one()
-                catalogs_cache[key] = catalog_id
+                )
+                catalogs_cache[key] = result.lastrowid
             session.execute(
                 text(
                     "INSERT INTO catalog_items (catalog_id, product, dosage_value, dosage_unit, phi) "

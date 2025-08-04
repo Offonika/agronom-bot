@@ -3,7 +3,6 @@ import base64
 import binascii
 import json
 import logging
-import sqlite3
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -111,30 +110,20 @@ async def diagnose(
                 moscow_tz = ZoneInfo("Europe/Moscow")
                 month_key = datetime.now(moscow_tz).strftime("%Y-%m")
                 params = {"uid": user_id, "month": month_key}
-                if sqlite3.sqlite_version_info >= (3, 35):
-                    stmt = text(
-                        "INSERT INTO photo_usage (user_id, month, used, updated_at) "
-                        "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
-                        "ON CONFLICT(user_id, month) DO UPDATE "
-                        "SET used = photo_usage.used + 1, "
-                        "updated_at = CURRENT_TIMESTAMP RETURNING used"
-                    )
-                    used = db.execute(stmt, params).scalar_one()
-                else:
-                    stmt = text(
-                        "INSERT INTO photo_usage (user_id, month, used, updated_at) "
-                        "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
-                        "ON CONFLICT(user_id, month) DO UPDATE "
-                        "SET used = photo_usage.used + 1, "
-                        "updated_at = CURRENT_TIMESTAMP"
-                    )
-                    db.execute(stmt, params)
-                    used = db.execute(
-                        text(
-                            "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
-                        ),
-                        params,
-                    ).scalar_one()
+                stmt = text(
+                    "INSERT INTO photo_usage (user_id, month, used, updated_at) "
+                    "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
+                    "ON CONFLICT(user_id, month) DO UPDATE "
+                    "SET used = photo_usage.used + 1, "
+                    "updated_at = CURRENT_TIMESTAMP"
+                )
+                db.execute(stmt, params)
+                used = db.execute(
+                    text(
+                        "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
+                    ),
+                    params,
+                ).scalar_one()
 
                 db.commit()
 
