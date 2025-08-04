@@ -1,6 +1,6 @@
 # Карманный агроном – Telegram Bot (MVP)
 
-[![Python 3.12](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/release/python-3120/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/release/python-3110/)
 > Требуется Node.js 18+ для работы Telegram-бота и тестов.
 
 > Минималистичный AI-бот для диагностики болезней растений и рекомендаций по протоколу обработки.  
@@ -149,10 +149,10 @@ agronom-bot/
 `migrate_safe.sh` автоматически преобразует такие DSN к виду
 `postgresql://` перед передачей в `psql`.
 
-2. Создайте виртуальное окружение под **Python 3.12** (в нём уже есть SQLite 3.35+):
+2. Создайте виртуальное окружение под **Python 3.11+ (3.12 experimental)** (в нём уже есть SQLite 3.35+):
 
    ```bash
-   python3.12 -m venv .venv
+   python3.11 -m venv .venv
    source .venv/bin/activate
    ```
 
@@ -284,7 +284,7 @@ python scripts/update_protocols.py --url <csv_url>
 
 По умолчанию скачивается тестовый датасет и файл сохраняется в `protocols.csv`.
 
-### ⚙️ Миграция на Python 3.12
+### ⚙️ Миграция на Python 3.11+ (3.12 experimental)
 
 1. Удалите старое окружение `.venv` (если было):
 
@@ -295,7 +295,7 @@ python scripts/update_protocols.py --url <csv_url>
 2. Пересоздайте виртуальное окружение и переустановите зависимости:
 
    ```bash
-   python3.12 -m venv .venv
+   python3.11 -m venv .venv
    source .venv/bin/activate
    ./.codex/setup.sh
    ```
