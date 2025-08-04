@@ -120,7 +120,7 @@ def test_help_command():
 
 @pytest.mark.smoke
 def test_camelot_import():
-    pytest.importorskip("camelot")
+    pytest.importorskip("camelot", exc_type=ImportError, reason="Camelot not installed")
 
     resp = client.post(
         "/v1/ai/diagnose",
