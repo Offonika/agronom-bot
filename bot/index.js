@@ -34,6 +34,7 @@ async function init() {
       { command: 'start', description: 'Начать работу' },
       { command: 'help', description: 'Помощь' },
       { command: 'history', description: 'История запросов' },
+      { command: 'retry', description: 'Повторить диагностику' },
       { command: 'subscribe', description: 'Купить PRO' },
       { command: 'autopay_enable', description: 'Включить автоплатёж' },
       { command: 'cancel_autopay', description: 'Отключить автоплатёж' },
