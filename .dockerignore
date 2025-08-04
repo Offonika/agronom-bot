@@ -7,8 +7,9 @@ node_modules/
 tests/
 docs/
 locales/
-bot/
+# bot/
 monitoring/
 k8s/
 runbooks/
 scripts/
+
