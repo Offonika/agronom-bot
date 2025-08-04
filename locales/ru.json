@@ -19,5 +19,8 @@
   "autopay_cancel_success": "Автоплатёж отключён",
   "autopay_cancel_error": "Не удалось отключить автоплатёж",
   "feedback_text": "Будем рады вашему отзыву!",
-  "feedback_button": "Оставить отзыв"
+  "feedback_button": "Оставить отзыв",
+  "faq": "Зачем нужна подписка? PRO снимает лимит фотографий и поддерживает развитие сервиса.",
+  "faq_buy_button": "Купить PRO",
+  "faq_back_button": "Назад"
 }

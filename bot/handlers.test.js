@@ -325,6 +325,17 @@ test('startHandler replies with onboarding text', { concurrency: false }, async 
   assert.equal(msg, tr('start'));
 });
 
+test('startHandler replies with FAQ', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { startPayload: 'faq', from: { id: 2 }, reply: async (m, opts) => replies.push({ msg: m, opts }) };
+  await startHandler(ctx, { query: async () => {} });
+  assert.equal(replies[0].msg, tr('faq'));
+  const btns = replies[0].opts.reply_markup.inline_keyboard[0];
+  assert.equal(btns[0].callback_data, 'buy_pro');
+  assert.equal(btns[0].text, tr('faq_buy_button'));
+  assert.equal(btns[1].text, tr('faq_back_button'));
+});
+
 test('buyProHandler returns payment link', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
