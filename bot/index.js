@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { Pool } = require('pg');
-const { photoHandler, messageHandler, retryHandler } = require('./diagnosis');
+const { photoHandler, messageHandler, retryHandler, getProductName } = require('./diagnosis');
 const { subscribeHandler, buyProHandler } = require('./payments');
 const { historyHandler } = require('./history');
 const {
@@ -73,7 +73,9 @@ async function init() {
         await ctx.answerCbQuery();
         return ctx.reply('Некорректный формат данных.');
       }
-      const [, product, val, unit, phi] = parts;
+      const [, productHashEnc, val, unit, phi] = parts;
+      const productHash = decodeURIComponent(productHashEnc);
+      const product = getProductName(productHash) || productHash;
       const msg =
         `Препарат: ${product}\n` +
         `Доза: ${val} ${unit}\n` +
