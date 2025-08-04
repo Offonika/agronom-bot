@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.9 — 5 August 2025(v1.8 → v1.9: добавлен эндпойнт ask_expert)
+Version 1.10 — 5 August 2025(v1.9 → v1.10: ProtocolResponse дополнился category/status/waiting_days)
 
 0 · Scope
 
@@ -343,7 +343,7 @@ INSERT → partner_orders (signature)
 
 6.1 · /v1/ai/diagnose
 
-Принимает фото (multipart image или JSON image_base64).Возвращает {crop, disease, confidence}; создаёт photos + инкрементирует photo_usage.used.
+Принимает фото (multipart image или JSON image_base64).Возвращает {crop, disease, confidence, protocol_status, protocol{id, product, dosage_value, dosage_unit, phi, category, status, waiting_days}}; создаёт photos + инкрементирует photo_usage.used.
 
 7 · Ownership & Lineage
 
