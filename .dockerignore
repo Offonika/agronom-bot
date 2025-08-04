@@ -1,0 +1,14 @@
+# Files and directories excluded from the API build context
+.git
+.github
+.gitignore
+docker-compose.yml
+node_modules/
+tests/
+docs/
+locales/
+bot/
+monitoring/
+k8s/
+runbooks/
+scripts/
