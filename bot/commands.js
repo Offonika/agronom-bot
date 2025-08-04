@@ -6,6 +6,16 @@ async function startHandler(ctx, pool) {
     await logEvent(pool, ctx.from.id, 'paywall_click_buy');
   } else if (ctx.startPayload === 'faq') {
     await logEvent(pool, ctx.from.id, 'paywall_click_faq');
+    return ctx.reply(msg('faq'), {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: msg('faq_buy_button'), callback_data: 'buy_pro' },
+            { text: msg('faq_back_button'), url: 'https://t.me/YourBot' },
+          ],
+        ],
+      },
+    });
   }
   await ctx.reply(msg('start'));
 }
