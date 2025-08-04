@@ -466,7 +466,7 @@ def test_create_payment_invalid_json(client):
     resp = client.post(
         "/v1/payments/create",
         headers=HEADERS | {"Content-Type": "application/json"},
-        data="{not-valid",
+        content="{not-valid",
     )
     assert resp.status_code == 400
     assert resp.json() == {"detail": "BAD_REQUEST"}
