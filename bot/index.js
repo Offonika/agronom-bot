@@ -69,6 +69,8 @@ async function init() {
 
     bot.command('reminder', reminderHandler);
 
+    bot.action(/^remind/, reminderHandler);
+
     bot.command('feedback', (ctx) => feedbackHandler(ctx, pool));
 
     bot.on('photo', (ctx) => photoHandler(pool, ctx));
