@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
+from redis.exceptions import RedisError
 
 from app import db as db_module
 from app import dependencies
@@ -39,10 +40,17 @@ async def partner_orders(
         raise HTTPException(status_code=403, detail="FORBIDDEN")
 
     ip_key = f"rate:partner-ip:{client_ip}"
-    pipe = dependencies.redis_client.pipeline()
-    pipe.incr(ip_key)
-    pipe.expire(ip_key, 60)
-    count, _ = await pipe.execute()
+    try:
+        pipe = dependencies.redis_client.pipeline()
+        pipe.incr(ip_key)
+        pipe.expire(ip_key, 60)
+        count, _ = await pipe.execute()
+    except RedisError as exc:
+        logger.exception("Redis unavailable for rate limiting: %s", exc)
+        err = ErrorResponse(
+            code="SERVICE_UNAVAILABLE", message="Rate limiter unavailable"
+        )
+        raise HTTPException(status_code=503, detail=err.model_dump()) from exc
     if count > 30:
         err = ErrorResponse(code="TOO_MANY_REQUESTS", message="Rate limit exceeded")
         raise HTTPException(status_code=429, detail=err.model_dump())
