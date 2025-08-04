@@ -17,6 +17,7 @@ const {
 } = require('./payments');
 const { startHandler, helpHandler, feedbackHandler } = require('./commands');
 const { historyHandler } = require('./history');
+const { reminderHandler, reminders } = require('./reminder');
 const strings = require('../locales/ru.json');
 const { msg } = require('./utils');
 function tr(key, vars = {}) {
@@ -659,4 +660,35 @@ test('pollPaymentStatus notifies on timeout', { concurrency: false }, async () =
     },
   );
   assert.equal(replies[0], msg('payment_pending'));
+});
+
+test('reminderHandler creates reminder', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = {
+    from: { id: 7 },
+    callbackQuery: { data: 'remind_add' },
+    answerCbQuery: async () => {},
+    reply: async (m, o) => replies.push({ m, o }),
+  };
+  await reminderHandler(ctx);
+  assert.equal(replies[0].m, msg('reminder_created'));
+  assert.equal(reminders.get(7).length, 1);
+  reminders.clear();
+});
+
+test('reminderHandler cancels reminder', { concurrency: false }, async () => {
+  const t = setTimeout(() => {}, 0);
+  t.unref();
+  reminders.set(8, [{ id: 1, timeout: t }]);
+  const replies = [];
+  const ctx = {
+    from: { id: 8 },
+    callbackQuery: { data: 'remind_cancel|1' },
+    answerCbQuery: async () => {},
+    reply: async (m) => replies.push(m),
+  };
+  await reminderHandler(ctx);
+  assert.equal(replies[0], msg('reminder_cancelled'));
+  assert.equal(reminders.get(8).length, 0);
+  reminders.clear();
 });

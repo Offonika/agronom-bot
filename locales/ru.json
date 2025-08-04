@@ -22,5 +22,15 @@
   "feedback_button": "Оставить отзыв",
   "faq": "Зачем нужна подписка? PRO снимает лимит фотографий и поддерживает развитие сервиса.",
   "faq_buy_button": "Купить PRO",
-  "faq_back_button": "Назад"
+  "faq_back_button": "Назад",
+  "reminder_prompt": "Управление напоминаниями",
+  "reminder_add_button": "Создать",
+  "reminder_list_button": "Мои напоминания",
+  "reminder_created": "Напоминание создано",
+  "reminder_none": "Напоминаний нет",
+  "reminder_list_title": "Ваши напоминания",
+  "reminder_cancel_button": "Отменить",
+  "reminder_cancelled": "Напоминание отменено",
+  "reminder_due": "Сработало напоминание",
+  "reminder_error": "Ошибка напоминаний"
 }
