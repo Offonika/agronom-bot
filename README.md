@@ -272,13 +272,14 @@ apple,powdery_mildew,Скор 250 ЭК,2,ml_10l,30
 Если таблица уже заполнена, внесите запись вручную или очистите её
 перед перезапуском API.
 
-Для загрузки CSV из открытого источника используйте скрипт:
+Для импорта протоколов из ZIP‑архива с PDF используйте CLI:
 
 ```bash
-python scripts/update_protocols.py --url <csv_url>
+python app/services/protocol_importer.py <zip_url> --category main
 ```
 
-По умолчанию скачивается тестовый датасет и файл сохраняется в `protocols.csv`.
+Добавьте флаг `--force`, чтобы перезаписать существующие данные. CSV копия
+сохраняется в `protocols.csv`.
 
 ### ⚙️ Миграция на Python 3.11+ (3.12 experimental)
 
