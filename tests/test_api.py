@@ -517,6 +517,13 @@ def test_create_payment_user_id_mismatch(client):
     assert resp.status_code == 401
 
 
+@pytest.mark.parametrize("plan", ["basic", "PRO", ""])
+def test_create_payment_invalid_plan(client, plan):
+    payload = {"user_id": 1, "plan": plan, "months": 1}
+    resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
+    assert resp.status_code == 400
+
+
 @pytest.mark.parametrize("months", [0, 13])
 def test_create_payment_invalid_months(client, months):
     payload = {"user_id": 1, "plan": "pro", "months": months}

@@ -231,6 +231,7 @@ components:
           type: integer
         plan:
           type: string
+          enum: [pro]
           example: pro
         months:
           type: integer
