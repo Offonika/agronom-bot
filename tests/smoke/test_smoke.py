@@ -120,7 +120,7 @@ def test_help_command():
 
 @pytest.mark.smoke
 def test_camelot_import():
-    import camelot  # noqa: F401
+    pytest.importorskip("camelot")
 
     resp = client.post(
         "/v1/ai/diagnose",

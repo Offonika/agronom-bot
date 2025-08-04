@@ -6,18 +6,30 @@ import csv
 import logging
 from pathlib import Path
 import threading
+from dataclasses import dataclass
 
 from cachetools import TTLCache
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from app import db
-from app.models import Protocol
+from app.models import Catalog, CatalogItem
 
 # CSV is stored in the repository root
 CSV_PATH = Path(__file__).resolve().parent.parent.parent / "protocols.csv"
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProtocolRow:
+    id: int
+    crop: str
+    disease: str
+    product: str
+    dosage_value: float
+    dosage_unit: str
+    phi: int
 
 
 # --------------------------------------------------------------------------- #
@@ -73,11 +85,11 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
 
         # -------- 3. if table missing → warn & exit ----------------------------
         try:
-            count = session.query(Protocol).count()
+            count = session.query(CatalogItem).count()
         except OperationalError:
             logger.warning(
-                "Table 'protocols' not found. "
-                "Run 'alembic upgrade head' or set DB_CREATE_ALL=1"
+                "Table 'catalog_items' not found. "
+                "Run 'alembic upgrade head' or set DB_CREATE_ALL=1",
             )
             return
 
@@ -89,15 +101,24 @@ def import_csv_to_db(path: Path = CSV_PATH, update: bool = False) -> None:
                     phi = int(r.get("phi") or 0)
                 except ValueError:
                     phi = 0
-                proto = Protocol(
-                    crop=r["crop"],
-                    disease=r["disease"],
+                catalog = (
+                    session.query(Catalog)
+                    .filter(Catalog.crop == r["crop"], Catalog.disease == r["disease"])
+                    .first()
+                )
+                if catalog is None:
+                    catalog = Catalog(crop=r["crop"], disease=r["disease"])
+                    session.add(catalog)
+                    session.flush()
+                item = CatalogItem(
+                    catalog_id=catalog.id,
                     product=r["product"],
                     dosage_value=r["dosage_value"],
                     dosage_unit=r["dosage_unit"],
                     phi=phi,
+                    is_current=True,
                 )
-                session.add(proto)
+                session.add(item)
             session.commit()
             logger.info("Imported %s protocols from CSV", len(rows))
 
@@ -108,20 +129,23 @@ _cache = TTLCache(maxsize=1024, ttl=600)
 _cache_lock = threading.RLock()
 
 
-def _cache_protocol(crop: str, disease: str) -> Protocol | None:
+def _cache_protocol(crop: str, disease: str) -> ProtocolRow | None:
     key = (crop, disease)
     with _cache_lock:
         if key in _cache:
             return _cache[key]
     session = db.SessionLocal()
     try:
-        proto = (
-            session.query(Protocol)
-            .filter(Protocol.crop == crop, Protocol.disease == disease)
-            .first()
-        )
+        row = session.execute(
+            text(
+                "SELECT id, crop, disease, product, dosage_value, dosage_unit, phi "
+                "FROM protocols_current WHERE crop = :crop AND disease = :disease LIMIT 1"
+            ),
+            {"crop": crop, "disease": disease},
+        ).first()
+        proto = ProtocolRow(**row._mapping) if row else None
     except OperationalError as exc:
-        logger.warning("Protocols table query failed: %s", exc)
+        logger.warning("protocols_current view query failed: %s", exc)
         return None
     finally:
         session.close()
@@ -138,6 +162,6 @@ def _clear_cache() -> None:
 _cache_protocol.cache_clear = _clear_cache
 
 
-def find_protocol(crop: str, disease: str) -> Protocol | None:
+def find_protocol(crop: str, disease: str) -> ProtocolRow | None:
     """Return protocol by crop and disease."""
     return _cache_protocol(crop, disease)

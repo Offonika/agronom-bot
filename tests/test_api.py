@@ -145,10 +145,10 @@ def test_diagnose_json_returns_stub(client):
 
 def test_diagnose_without_protocol(client):
     from app.db import SessionLocal
-    from app.models import Protocol
+    from app.models import CatalogItem
 
     session = SessionLocal()
-    session.query(Protocol).delete()
+    session.query(CatalogItem).delete()
     session.commit()
     session.close()
 
@@ -835,10 +835,10 @@ def test_diagnose_json_with_protocol(client):
 
 def test_diagnose_json_no_protocol_beta(client):
     from app.db import SessionLocal
-    from app.models import Protocol
+    from app.models import CatalogItem
 
     session = SessionLocal()
-    session.query(Protocol).delete()
+    session.query(CatalogItem).delete()
     session.commit()
     session.close()
 
@@ -857,10 +857,10 @@ def test_diagnose_missing_protocols_table(client):
     """Diagnose should gracefully handle a missing protocols table."""
     from app.db import SessionLocal
     from sqlalchemy import text
-    from app.models import Protocol
+    import subprocess
 
     with SessionLocal() as session:
-        session.execute(text("DROP TABLE IF EXISTS protocols"))
+        session.execute(text("DROP VIEW IF EXISTS protocols_current"))
         session.commit()
 
     try:
@@ -874,9 +874,7 @@ def test_diagnose_missing_protocols_table(client):
         assert data["protocol"] is None
         assert data["protocol_status"] == "Бета"
     finally:
-        with SessionLocal() as session:
-            Protocol.__table__.create(bind=session.bind, checkfirst=True)
-            session.commit()
+        subprocess.run(["alembic", "upgrade", "head"], check=True)
         import_csv_to_db()
 
 
