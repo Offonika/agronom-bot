@@ -219,3 +219,17 @@ def test_autopay_cancel_user_mismatch(client):
     with SessionLocal() as session:
         user = session.get(User, 1)
         assert user and user.autopay_enabled in (1, True)
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    ["/v1/payments/sbp/webhook", "/v1/payments/sbp/autopay/webhook"],
+)
+@pytest.mark.parametrize("payload", ["[]", "123"])
+def test_webhook_rejects_non_object_json(client, endpoint, payload):
+    resp = client.post(
+        endpoint,
+        headers=HEADERS | {"Content-Type": "application/json"},
+        content=payload,
+    )
+    assert resp.status_code == 400
