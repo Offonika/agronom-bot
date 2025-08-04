@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const { photoHandler, messageHandler, retryHandler, getProductName } = require('./diagnosis');
 const { subscribeHandler, buyProHandler } = require('./payments');
 const { historyHandler } = require('./history');
+const { reminderHandler } = require('./reminder');
 const {
   startHandler,
   helpHandler,
@@ -36,6 +37,7 @@ async function init() {
       { command: 'autopay_enable', description: 'Включить автоплатёж' },
       { command: 'cancel_autopay', description: 'Отключить автоплатёж' },
       { command: 'ask_expert', description: 'Задать вопрос эксперту' },
+      { command: 'reminder', description: 'Управление напоминаниями' },
     ]);
 
     bot.start(async (ctx) => {
@@ -62,6 +64,8 @@ async function init() {
     bot.command('ask_expert', async (ctx) => {
       await askExpertHandler(ctx, pool);
     });
+
+    bot.command('reminder', reminderHandler);
 
     bot.on('photo', (ctx) => photoHandler(pool, ctx));
 
