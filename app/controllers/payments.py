@@ -177,6 +177,9 @@ async def payments_webhook(
     except (json.JSONDecodeError, TypeError) as err:
         logger.exception("failed to parse webhook body as JSON")
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+    if not isinstance(data, dict):
+        logger.warning("audit: non-object webhook payload")
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
     provided_sign = data.pop("signature", "")
     expected_sign = compute_signature(HMAC_SECRET, data)
     if not hmac.compare_digest(provided_sign, expected_sign):
@@ -257,6 +260,9 @@ async def autopay_webhook(
     except (json.JSONDecodeError, TypeError) as err:
         logger.exception("failed to parse webhook body as JSON")
         raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+    if not isinstance(data, dict):
+        logger.warning("audit: non-object webhook payload")
+        raise HTTPException(status_code=400, detail="BAD_REQUEST")
     provided_sign = data.pop("signature", "")
     expected_sign = compute_signature(HMAC_SECRET, data)
     if not hmac.compare_digest(provided_sign, expected_sign):
