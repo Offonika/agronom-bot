@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 import boto3
 import pytest
 import pytest_asyncio
@@ -104,6 +105,25 @@ async def test_close_client_closes():
     storage._client_ctx = dummy
     await storage.close_client()
     assert dummy.closed
+    assert storage._client is None
+
+
+class FailingClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        raise RuntimeError("boom")
+
+
+@pytest.mark.asyncio
+async def test_close_client_ignores_errors(caplog):
+    failing = FailingClient()
+    storage._client = await failing.__aenter__()
+    storage._client_ctx = failing
+    with caplog.at_level(logging.ERROR):
+        await storage.close_client()
+    assert "Failed to close S3 client" in caplog.text
     assert storage._client is None
 
 

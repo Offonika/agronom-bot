@@ -72,7 +72,10 @@ async def close_client() -> None:
     """Close the cached S3 client if it exists."""
     global _client, _client_ctx
     if _client_ctx is not None:
-        await _client_ctx.__aexit__(None, None, None)
+        try:
+            await _client_ctx.__aexit__(None, None, None)
+        except Exception:  # pragma: no cover - best effort cleanup
+            logger.exception("Failed to close S3 client")
     _client = None
     _client_ctx = None
 
