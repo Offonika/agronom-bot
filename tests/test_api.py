@@ -964,13 +964,16 @@ def test_usage_count_persists_when_paywall_hit(monkeypatch, client):
     assert limits.json()["used_this_month"] == 2
 
 
-def test_sixth_diagnose_call_returns_402(client):
+def test_sixth_diagnose_call_returns_402(monkeypatch, client):
     """Ensure the 6th diagnose request fails with 402 by default."""
-    limit = Settings().free_monthly_limit
+    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 5)
+    limit = 5
     for i in range(limit):
+        headers = HEADERS.copy()
+        headers["X-Forwarded-For"] = f"10.0.0.{i}"
         resp = client.post(
             "/v1/ai/diagnose",
-            headers=HEADERS,
+            headers=headers,
             json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
         )
         assert resp.status_code == 200, f"call {i}"
@@ -979,9 +982,11 @@ def test_sixth_diagnose_call_returns_402(client):
     assert limits.status_code == 200
     assert limits.json()["used_this_month"] == limit
 
+    sixth_headers = HEADERS.copy()
+    sixth_headers["X-Forwarded-For"] = f"10.0.0.{limit}"
     sixth = client.post(
         "/v1/ai/diagnose",
-        headers=HEADERS,
+        headers=sixth_headers,
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert sixth.status_code == 402
