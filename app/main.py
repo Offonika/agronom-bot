@@ -34,7 +34,7 @@ if sys.version_info[:2] < (3, 11):
 
 app = FastAPI(
     title="Agronom Bot Internal API",
-    version="1.9",
+    version="1.10.0",
     lifespan=lifespan,
 )
 

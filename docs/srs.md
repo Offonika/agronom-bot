@@ -2,7 +2,7 @@ System Requirements Specification (SRS)
 
 Проект: Telegram‑бот «Карманный агроном» (MVP)
 
-Версия: 1.8 — 5 августа 2025 г.(v1.7 → v1.8: добавлен запрос к эксперту)
+Версия: 1.9 — 5 августа 2025 г.(v1.8 → v1.9: ProtocolResponse расширен категориями)
 
 1 · Scope
 
@@ -231,6 +231,9 @@ protocols(
   id SERIAL PRIMARY KEY,
   crop TEXT,
   disease TEXT,
+  category TEXT,
+  status TEXT,
+  waiting_days INT,
   product TEXT,
   dosage_value NUMERIC(6,2),
   dosage_unit TEXT,

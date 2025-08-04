@@ -48,6 +48,9 @@ class ProtocolResponse(BaseModel):
     dosage_value: float
     dosage_unit: str
     phi: int
+    category: str | None = None
+    status: str | None = None
+    waiting_days: int | None = None
 
 
 class DiagnoseResponse(BaseModel):
@@ -268,6 +271,9 @@ async def diagnose(
             dosage_value=float(proto.dosage_value or 0),
             dosage_unit=proto.dosage_unit,
             phi=proto.phi,
+            category=proto.category,
+            status=proto.status,
+            waiting_days=proto.waiting_days,
         )
         proto_status = None
     else:
@@ -426,6 +432,9 @@ async def photo_status(photo_id: int, user_id: int = Depends(rate_limit)):
                 dosage_value=float(p.dosage_value or 0),
                 dosage_unit=p.dosage_unit,
                 phi=p.phi,
+                category=p.category,
+                status=p.status,
+                waiting_days=p.waiting_days,
             )
 
     return PhotoStatusResponse(

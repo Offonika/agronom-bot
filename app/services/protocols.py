@@ -24,6 +24,9 @@ class ProtocolRow:
     dosage_value: float
     dosage_unit: str
     phi: int
+    category: str | None = None
+    status: str | None = None
+    waiting_days: int | None = None
 
 
 # --------------------------------------------------------------------------- #

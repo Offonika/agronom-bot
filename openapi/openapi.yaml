@@ -2,10 +2,10 @@ openapi: 3.0.3
 
 info:
   title: Agronom Bot Internal API
-  version: "1.9"
+  version: "1.10.0"
   description: |
-    Telegram-бот «Карманный агроном» — API v1.9.
-    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header, +ask_expert endpoint.
+    Telegram-бот «Карманный агроном» — API v1.10.0.
+    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header, +ask_expert endpoint, +protocol fields category/status/waiting_days.
   contact:
     name: Ivan Gromov
     url: https://github.com/agronom-bot
@@ -107,6 +107,15 @@ components:
           enum: [ml_10l, g_per_l]
           example: ml_10l
         phi:
+          type: integer
+          example: 30
+        category:
+          type: string
+          example: main
+        status:
+          type: string
+          example: active
+        waiting_days:
           type: integer
           example: 30
 
