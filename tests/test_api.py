@@ -966,13 +966,18 @@ def test_usage_count_persists_when_paywall_hit(monkeypatch, client):
 
 def test_sixth_diagnose_call_returns_402(client):
     """Ensure the 6th diagnose request fails with 402 by default."""
-    for i in range(5):
+    limit = Settings().free_monthly_limit
+    for i in range(limit):
         resp = client.post(
             "/v1/ai/diagnose",
             headers=HEADERS,
             json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
         )
         assert resp.status_code == 200, f"call {i}"
+
+    limits = client.get("/v1/limits", headers=HEADERS)
+    assert limits.status_code == 200
+    assert limits.json()["used_this_month"] == limit
 
     sixth = client.post(
         "/v1/ai/diagnose",
