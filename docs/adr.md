@@ -23,6 +23,7 @@
 | --------------- | ----------------------------------------------------------- |
 | Языки / Runtime | **Node.js 20** (TypeScript strict)                          |
 | ML              | **GPT‑Vision API (OpenAI)**                                 |
+| Data Sources    | Government pesticide catalogs                               |
 | Storage         | **PostgreSQL 15**, S3‑совместимое хранилище (VK S3 / Minio) |
 | Cache / Queue   | Redis 7 (Phase B, опционально)                              |
 | Secrets         | **Hashicorp Vault CSI**                                     |
