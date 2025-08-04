@@ -7,6 +7,7 @@ const {
   photoHandler,
   messageHandler,
   retryHandler,
+  getProductName,
 } = require('./diagnosis');
 const {
   subscribeHandler,
@@ -200,6 +201,27 @@ test('formatDiagnosis trims long product names and limits callback_data', () => 
   const cb = keyboard.inline_keyboard[0][0].callback_data;
   assert.ok(cb.length <= 64);
   assert.ok(!cb.includes('AAAAAA'));
+});
+
+test('formatDiagnosis keeps original product name for callback', () => {
+  const ctx = { from: { id: 1 } };
+  const longName = 'B'.repeat(40);
+  const data = {
+    crop: 'c',
+    disease: 'd',
+    confidence: 0.9,
+    protocol: {
+      product: longName,
+      dosage_value: 1,
+      dosage_unit: 'ml',
+      phi: 10,
+    },
+  };
+  const { keyboard } = formatDiagnosis(ctx, data);
+  const cb = keyboard.inline_keyboard[0][0].callback_data;
+  const [, prod] = cb.split('|');
+  const decoded = decodeURIComponent(prod);
+  assert.equal(getProductName(decoded), longName);
 });
 
 test('photoHandler shows expert button when enabled', { concurrency: false }, async () => {

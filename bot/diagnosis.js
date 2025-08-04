@@ -2,6 +2,8 @@ const crypto = require('node:crypto');
 const { msg } = require('./utils');
 const { sendPaywall } = require('./payments');
 
+const productNames = new Map();
+
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
@@ -27,9 +29,10 @@ function formatDiagnosis(ctx, data) {
       }
       return s;
     };
-    let product = data.protocol.product || '';
-    if (product.length > 32) {
-      product = crypto.createHash('sha256').update(product).digest('hex');
+    const product = data.protocol.product || '';
+    let productHash = product;
+    if (productHash.length > 32) {
+      productHash = crypto.createHash('sha256').update(productHash).digest('hex');
     }
     const other = [
       encode(data.protocol.dosage_value),
@@ -38,7 +41,8 @@ function formatDiagnosis(ctx, data) {
     ];
     const base = ['proto', '', ...other].join('|');
     const avail = 64 - base.length;
-    const prodEncoded = safeSlice(encode(product), Math.max(avail, 0));
+    const prodEncoded = safeSlice(encode(productHash), Math.max(avail, 0));
+    productNames.set(decodeURIComponent(prodEncoded), product);
     const cb = ['proto', prodEncoded, ...other].join('|').slice(0, 64);
     const row = [{ text: 'Показать протокол', callback_data: cb }];
     if (data.protocol.id) {
@@ -182,9 +186,14 @@ async function retryHandler(ctx, photoId) {
   }
 }
 
+function getProductName(hash) {
+  return productNames.get(hash);
+}
+
 module.exports = {
   formatDiagnosis,
   photoHandler,
   messageHandler,
   retryHandler,
+  getProductName,
 };
