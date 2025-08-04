@@ -4,7 +4,7 @@ Version 1.1 — 5 August 2025(v1.0 → v1.1: добавлены Autopay endp
 
 Quick English Overview
 
-This repo relies on Codex automation. Use Python 3.12+ for the API and Node.js 20+ for the bot.
+This repo relies on Codex automation. Use Python 3.11+ (3.12 experimental) for the API and Node.js 20+ for the bot.
 
 # Backend
 pip install -r requirements.txt
