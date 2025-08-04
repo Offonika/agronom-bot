@@ -258,28 +258,25 @@ await asyncio.to_thread(_db_task)
 8. Быстро поднять всю инфраструктуру можно командой `docker-compose up -d`. После запуска сервис Grafana будет доступен на [http://localhost:3000](http://localhost:3000). По умолчанию логин и пароль `admin`/`admin`. При необходимости укажите переменные `GF_SECURITY_ADMIN_USER` и `GF_SECURITY_ADMIN_PASSWORD` в `.env`.
 
 
-### Добавление протокола обработки
+### Импорт протоколов обработки
 
-Файл `protocols.csv` лежит в корне репозитория. Формат строк:
-
-```
-crop,disease,product,dosage_value,dosage_unit,phi
-apple,powdery_mildew,Скор 250 ЭК,2,ml_10l,30
-```
-
-Добавьте новую строку с культурой, болезнью и параметрами препарата.
-При первом запуске приложение импортирует CSV в таблицу `protocols`.
-Если таблица уже заполнена, внесите запись вручную или очистите её
-перед перезапуском API.
-
-Для импорта протоколов из ZIP‑архива с PDF используйте CLI:
+Для обновления справочника обработок используйте утилиту:
 
 ```bash
-python app/services/protocol_importer.py <zip_url> --category main
+python -m app.services.protocol_importer <zip_url> --category main
 ```
 
-Добавьте флаг `--force`, чтобы перезаписать существующие данные. CSV копия
-сохраняется в `protocols.csv`.
+Добавьте флаг `--force`, чтобы перезаписать существующие данные. Скрипт
+сохраняет CSV и заполняет таблицы `catalogs` и `catalog_items`.
+В продакшене утилита запускается ежемесячным CRON‑джобом для актуализации
+протоколов.
+
+### Ежемесячные задачи CRON
+
+- `python -m app.services.protocol_importer` — обновляет таблицы `catalogs` и
+  `catalog_items`.
+- `usage_reset.js` — сбрасывает счётчики в таблице `photo_usage` по расписанию
+  `5 0 1 * *` (МСК).
 
 ### ⚙️ Миграция на Python 3.11+ (3.12 experimental)
 
