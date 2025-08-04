@@ -9,11 +9,16 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+      fail-fast: false
+    continue-on-error: ${{ matrix.python-version == '3.12' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
