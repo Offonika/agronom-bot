@@ -163,13 +163,24 @@ def test_diagnose_base64_uses_process(monkeypatch, client):
     assert data["confidence"] == 0.7
 
 
-def test_diagnose_missing_header(client):
+def test_diagnose_missing_api_version(client):
     resp = client.post(
         "/v1/ai/diagnose",
-        headers={"X-API-Key": "test-api-key"},
+        headers={"X-API-Key": "test-api-key", "X-User-ID": "1"},
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
-    assert resp.status_code in {400, 422}
+    assert resp.status_code == 426
+    assert resp.json()["detail"]["code"] == "UPGRADE_REQUIRED"
+
+
+def test_diagnose_invalid_api_version(client):
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers={"X-API-Key": "test-api-key", "X-API-Ver": "v2", "X-User-ID": "1"},
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 426
+    assert resp.json()["detail"]["code"] == "UPGRADE_REQUIRED"
 
 
 def test_diagnose_invalid_key(client):
