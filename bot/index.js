@@ -62,7 +62,7 @@ async function init() {
       await cancelAutopayHandler(ctx);
     });
 
-    bot.command('history', async (ctx) => historyHandler(ctx, 0, pool));
+    bot.command('history', async (ctx) => historyHandler(ctx, '', pool));
 
     bot.command('ask_expert', async (ctx) => {
       await askExpertHandler(ctx, pool);
@@ -113,10 +113,9 @@ async function init() {
     });
 
     bot.action(/^history\|/, async (ctx) => {
-      const [, off] = ctx.callbackQuery.data.split('|');
-      const offset = Math.max(parseInt(off, 10) || 0, 0);
+      const [, cur] = ctx.callbackQuery.data.split('|');
       await ctx.answerCbQuery();
-      return historyHandler(ctx, offset, pool);
+      return historyHandler(ctx, cur || '', pool);
     });
 
     bot.action(/^info\|/, async (ctx) => {

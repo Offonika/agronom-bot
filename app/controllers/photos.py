@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError, field_validator
-from sqlalchemy import text
+from sqlalchemy import and_, or_, text
 
 from app import db as db_module
 from app.config import Settings
@@ -304,17 +304,25 @@ async def list_photos(
             q = (
                 db.query(Photo)
                 .filter(Photo.user_id == user_id, Photo.deleted.is_(False))
-                .order_by(Photo.id.desc())
+                .order_by(Photo.ts.desc(), Photo.id.desc())
             )
             if cursor:
                 try:
-                    last_id = int(cursor)
-                    q = q.filter(Photo.id < last_id)
-                except ValueError as err:
+                    last_id_str, last_ts_str = cursor.split(":", 1)
+                    last_id = int(last_id_str)
+                    last_ts = datetime.fromtimestamp(int(last_ts_str), tz=timezone.utc)
+                except (ValueError, TypeError) as err:
                     raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+                q = q.filter(
+                    or_(
+                        Photo.ts < last_ts,
+                        and_(Photo.ts == last_ts, Photo.id < last_id),
+                    )
+                )
 
             limit_local = min(limit, 50)
-            rows = q.limit(limit_local).all()
+            rows = q.limit(limit_local + 1).all()
+            items_rows = rows[:limit_local]
             items_local = [
                 PhotoItem(
                     id=r.id,
@@ -324,9 +332,13 @@ async def list_photos(
                     confidence=float(r.confidence or 0),
                     roi=float(r.roi or 0),
                 )
-                for r in rows
+                for r in items_rows
             ]
-            next_cur = str(rows[-1].id) if len(rows) == limit_local else None
+            next_cur = (
+                f"{items_rows[-1].id}:{int(items_rows[-1].ts.replace(tzinfo=timezone.utc).timestamp())}"
+                if len(rows) > limit_local
+                else None
+            )
             return items_local, next_cur
 
     items, next_cursor = await asyncio.to_thread(_db_call)

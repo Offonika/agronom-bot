@@ -178,7 +178,7 @@ components:
         next_cursor:
           type: string
           nullable: true
-          description: Передайте значение в ?cursor=… для следующей страницы
+          description: "Передайте значение в ?cursor=… для следующей страницы (формат `<id>:<unix_ts>`)"
 
     PaymentWebhook:
       type: object
@@ -393,7 +393,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Отдаётся в ответе как `next_cursor`
+            description: "Отдаётся в ответе как `next_cursor` (формат: `<id>:<unix_ts>`)"
       responses:
         '200':
           description: Paginated list
