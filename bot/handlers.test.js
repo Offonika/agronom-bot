@@ -684,6 +684,51 @@ test('pollPaymentStatus notifies on timeout', { concurrency: false }, async () =
   assert.equal(replies[0], msg('payment_pending'));
 });
 
+test('pollPaymentStatus stops when aborted', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 1 }, reply: async (m) => replies.push(m) };
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 2);
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/payments/42': { json: async () => ({ status: 'processing' }) },
+    },
+    async () => {
+      await pollPaymentStatus(ctx, 42, 10, 100, controller.signal);
+    },
+  );
+  assert.equal(replies.length, 0);
+});
+
+test('buyProHandler aborts existing poll', { concurrency: false }, async () => {
+  const ctx = {
+    from: { id: 1 },
+    answerCbQuery: async () => {},
+    reply: async () => {},
+  };
+  const pool = { query: async () => {} };
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/payments/create': {
+        json: async () => ({ payment_id: 1, url: 'http://pay' }),
+      },
+      'http://localhost:8000/v1/payments/1': {
+        json: async () => ({ status: 'success', pro_expires_at: new Date().toISOString() }),
+      },
+    },
+    async () => {
+      await buyProHandler(ctx, pool, 50, 200);
+      const oldPromise = ctx.pollPromise;
+      const oldController = ctx.pollController;
+      await buyProHandler(ctx, pool, 50, 200);
+      assert.ok(oldController.signal.aborted);
+      await oldPromise;
+      await ctx.pollPromise;
+      assert.equal(ctx.pollPromise, null);
+    },
+  );
+});
+
 test('reminderHandler creates reminder', { concurrency: false }, async () => {
   const replies = [];
   const ctx = {

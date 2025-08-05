@@ -71,12 +71,29 @@ async function buyProHandler(
       },
     });
     if (intervalMs > 0) {
+      if (ctx.pollController) {
+        ctx.pollController.abort();
+      }
+      const controller = new AbortController();
+      ctx.pollController = controller;
       ctx.pollPromise = pollPaymentStatus(
         ctx,
         data.payment_id,
         intervalMs,
         timeoutMs,
-      ).catch((e) => console.error('poll error', e));
+        controller.signal,
+      )
+        .catch((e) => {
+          if (!controller.signal.aborted) {
+            console.error('poll error', e);
+          }
+        })
+        .finally(() => {
+          if (ctx.pollController === controller) {
+            ctx.pollPromise = null;
+            ctx.pollController = null;
+          }
+        });
     }
     return reply;
   } catch (err) {
@@ -121,10 +138,35 @@ async function cancelAutopay(ctx) {
   }
 }
 
-async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000, timeoutMs = 60000) {
+async function pollPaymentStatus(
+  ctx,
+  paymentId,
+  intervalMs = 3000,
+  timeoutMs = 60000,
+  signal,
+) {
   const maxAttempts = Math.max(1, Math.floor(timeoutMs / intervalMs));
+  const delay = (ms) =>
+    new Promise((resolve, reject) => {
+      const t = setTimeout(resolve, ms);
+      if (signal) {
+        signal.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(t);
+            reject(new Error('aborted'));
+          },
+          { once: true },
+        );
+      }
+    });
   for (let i = 0; i < maxAttempts; i += 1) {
-    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      await delay(intervalMs);
+    } catch {
+      return;
+    }
+    if (signal?.aborted) return;
     try {
       const resp = await fetch(`${API_BASE}/v1/payments/${paymentId}`, {
         headers: {
@@ -132,6 +174,7 @@ async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000, timeoutMs = 
           'X-API-Ver': API_VER,
           'X-User-ID': ctx.from?.id,
         },
+        signal,
       });
       if (!resp.ok) continue;
       const data = await resp.json();
@@ -146,10 +189,14 @@ async function pollPaymentStatus(ctx, paymentId, intervalMs = 3000, timeoutMs = 
         return;
       }
     } catch (e) {
-      console.error('status check error', e);
+      if (!signal?.aborted) {
+        console.error('status check error', e);
+      }
     }
   }
-  await ctx.reply(msg('payment_pending'));
+  if (!signal?.aborted) {
+    await ctx.reply(msg('payment_pending'));
+  }
 }
 
 async function subscribeHandler(ctx, pool) {
