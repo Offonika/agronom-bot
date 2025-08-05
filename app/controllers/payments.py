@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import hmac
+import jwt
 from datetime import datetime, timezone, timedelta
 from typing import Literal
 from uuid import uuid4
@@ -16,6 +17,7 @@ from app.dependencies import ErrorResponse, compute_signature, rate_limit
 from app.models import Event, Payment, User
 from app.services import create_sbp_link
 from app.services.hmac import verify_hmac
+from app.middleware.csrf import validate_csrf
 
 settings = Settings()
 logger = logging.getLogger(__name__)
@@ -338,7 +340,24 @@ async def autopay_webhook(
 async def cancel_autopay(
     request: Request,
     user_id: int = Depends(rate_limit),
+    authorization: str | None = Header(None, alias="Authorization"),
+    x_csrf_token: str | None = Header(None, alias="X-CSRF-Token"),
 ):
+    if not authorization or not authorization.lower().startswith("bearer "):
+        err = ErrorResponse(code="UNAUTHORIZED", message="Missing JWT")
+        raise HTTPException(status_code=401, detail=err.model_dump())
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload_jwt = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+    except Exception as exc:  # noqa: BLE001
+        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid JWT")
+        raise HTTPException(status_code=401, detail=err.model_dump()) from exc
+    if payload_jwt.get("user_id") != user_id:
+        err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
+        raise HTTPException(status_code=401, detail=err.model_dump())
+
+    await validate_csrf(request, x_csrf_token)
+
     try:
         payload = await request.json()
     except json.JSONDecodeError as err:
