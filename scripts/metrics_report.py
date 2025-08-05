@@ -87,8 +87,11 @@ def send_slack(text: str) -> None:
     if not SLACK_WEBHOOK_URL:
         logging.warning("SLACK_WEBHOOK_URL not configured")
         return
-    resp = requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=10)
-    resp.raise_for_status()
+    try:
+        resp = requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException:
+        logging.exception("failed to send Slack notification")
 
 
 def main() -> None:
