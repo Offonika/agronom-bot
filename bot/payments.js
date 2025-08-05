@@ -63,6 +63,10 @@ async function buyProHandler(
       },
       body: JSON.stringify({ user_id: ctx.from.id, plan: 'pro', months: 1, autopay }),
     });
+    if (!resp.ok) {
+      console.error('payment create error', resp.status);
+      return await ctx.reply(msg('payment_error'));
+    }
     const data = await resp.json();
     ctx.paymentId = data.payment_id;
     const reply = await ctx.reply(msg('payment_prompt'), {

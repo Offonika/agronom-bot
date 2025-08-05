@@ -429,6 +429,21 @@ test('buyProHandler polls fail', { concurrency: false }, async () => {
   assert.equal(replies[1].msg, tr('payment_fail'));
 });
 
+test('buyProHandler handles non-ok API status', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 6 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
+  const pool = { query: async () => {} };
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/payments/create': { ok: false, status: 500 },
+    },
+    async () => {
+      await buyProHandler(ctx, pool, 0);
+    },
+  );
+  assert.equal(replies[0].msg, msg('payment_error'));
+});
+
 test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
   const replies = [];
   const ctx = {
