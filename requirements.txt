@@ -39,6 +39,7 @@ MarkupSafe==2.1.5
 moto==5.0.12
 multidict==6.6.3
 numpy==2.3.2
+openai==1.63.0
 opencv-python==4.7.0.72
 openpyxl==3.1.5
 packaging==25.0

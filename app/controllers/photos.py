@@ -24,7 +24,7 @@ from app.metrics import (
     roi_calc_seconds,
 )
 from app.models import Event, Photo, ErrorCode
-from app.services.gpt import call_gpt_vision_stub
+from app.services.gpt import call_gpt_vision
 from app.services.protocols import find_protocol
 from app.services.storage import get_public_url, upload_photo
 from app.services.roi import calculate_roi
@@ -110,7 +110,7 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, 
 
     key = await upload_photo(user_id, contents)
     try:
-        result = await asyncio.to_thread(call_gpt_vision_stub, key)
+        result = await asyncio.to_thread(call_gpt_vision, key)
         crop = result.get("crop", "")
         disease = result.get("disease", "")
         conf = result.get("confidence", 0.0)

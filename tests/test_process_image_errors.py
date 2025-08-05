@@ -13,12 +13,12 @@ async def test_process_image_handles_generic_exception(monkeypatch, caplog):
     async def fake_enforce_paywall(user_id: int):
         return None
 
-    def fake_call_gpt_vision_stub(key: str) -> dict:
+    def fake_call_gpt_vision(key: str) -> dict:
         raise RuntimeError("boom")
 
     monkeypatch.setattr(photos, "upload_photo", fake_upload_photo)
     monkeypatch.setattr(photos, "_enforce_paywall", fake_enforce_paywall)
-    monkeypatch.setattr(photos, "call_gpt_vision_stub", fake_call_gpt_vision_stub)
+    monkeypatch.setattr(photos, "call_gpt_vision", fake_call_gpt_vision)
 
     with caplog.at_level(logging.ERROR):
         key, crop, disease, conf, roi = await photos._process_image(b"data", 123)
