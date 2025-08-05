@@ -43,6 +43,7 @@ POST
   "autopay": true
 }
 
+Стоимость Pro — 34 900 ₽/мес. Сумма в копейках рассчитывается как `34900 * months`.
 Если autopay=true, backend создаёт Invoice + Autopay Binding (см. Tinkoff API v2 init + bind_card).
 
 200 OK
