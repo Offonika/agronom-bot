@@ -71,7 +71,7 @@ components:
 
     DiagnoseResponse:
       type: object
-      required: [crop, disease, confidence]
+      required: [crop, disease, confidence, roi]
       properties:
         crop:
           type: string
@@ -83,6 +83,10 @@ components:
           type: number
           format: float
           example: 0.87
+        roi:
+          type: number
+          format: float
+          example: 1.9
         protocol_status:
           type: string
           example: "Бета"

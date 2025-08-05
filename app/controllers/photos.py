@@ -21,11 +21,13 @@ from app.metrics import (
     gpt_timeout_total,
     quota_reject_total,
     queue_size_pending,
+    roi_calc_seconds,
 )
 from app.models import Event, Photo
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol
 from app.services.storage import get_public_url, upload_photo
+from app.services.roi import calculate_roi
 
 settings = Settings()
 logger = logging.getLogger(__name__)
@@ -94,7 +96,7 @@ class _ProcessImageError(Exception):
         self.response = response
 
 
-async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, float, str]:
+async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, float, float]:
     if len(contents) > 2 * 1024 * 1024:
         err = ErrorResponse(code="BAD_REQUEST", message="image too large")
         raise _ProcessImageError(
@@ -121,7 +123,12 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, float
         crop = ""
         disease = ""
         conf = 0.0
-    return key, crop, disease, conf
+
+    roi_start = time.perf_counter()
+    roi = calculate_roi(crop, disease) if crop and disease else 0.0
+    roi_calc_seconds.observe(time.perf_counter() - roi_start)
+
+    return key, crop, disease, conf, roi
 
 
 class DiagnoseRequestBase64(BaseModel):
@@ -151,6 +158,7 @@ class DiagnoseResponse(BaseModel):
     crop: str
     disease: str
     confidence: float
+    roi: float
     protocol: ProtocolResponse | None = None
     protocol_status: str | None = None
 
@@ -224,7 +232,7 @@ async def diagnose(
     diag_requests_total.inc()
     start_time = time.perf_counter()
     try:
-        file_id, crop, disease, conf = await _process_image(contents, user_id)
+        file_id, crop, disease, conf, roi = await _process_image(contents, user_id)
     except _ProcessImageError as err:
         diag_latency_seconds.observe(time.perf_counter() - start_time)
         return err.response
@@ -239,6 +247,7 @@ async def diagnose(
                 crop=crop,
                 disease=disease,
                 confidence=conf,
+                roi=roi,
                 status=status,
             )
             db.add(photo)
@@ -273,6 +282,7 @@ async def diagnose(
         confidence=conf,
         protocol=proto_resp,
         protocol_status=proto_status,
+        roi=roi,
     )
 
 
@@ -312,6 +322,7 @@ async def list_photos(
                     crop=r.crop or "",
                     disease=r.disease or "",
                     confidence=float(r.confidence or 0),
+                    roi=float(r.roi or 0),
                 )
                 for r in rows
             ]
