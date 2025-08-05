@@ -1,0 +1,13 @@
+# Exclude directories not needed for building the API image
+.git
+node_modules
+tests
+docs
+locales
+bot
+openapi
+scripts
+runbooks
+k8s
+monitoring
+load
