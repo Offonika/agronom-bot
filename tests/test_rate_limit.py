@@ -1,5 +1,6 @@
 import os
 
+import pytest
 from redis.exceptions import RedisError
 from app import dependencies
 
@@ -49,5 +50,16 @@ def test_rate_limit_untrusted_proxy(client, monkeypatch):
         resp = client.get("/v1/photos", headers=headers)
         assert resp.status_code == 200
     headers["X-Forwarded-For"] = "1.1.1.30"
+    resp = client.get("/v1/photos", headers=headers)
+    assert resp.status_code == 429
+
+
+@pytest.mark.parametrize("xff", ["", "   "])
+def test_rate_limit_empty_x_forwarded_for(client, xff):
+    headers = HEADERS.copy()
+    headers["X-Forwarded-For"] = xff
+    for _ in range(30):
+        resp = client.get("/v1/photos", headers=headers)
+        assert resp.status_code == 200
     resp = client.get("/v1/photos", headers=headers)
     assert resp.status_code == 429
