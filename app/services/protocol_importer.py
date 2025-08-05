@@ -26,6 +26,8 @@ from bs4 import BeautifulSoup
 from sqlalchemy import text
 
 from app import db
+from app.models.catalog import Catalog
+from app.models.catalog_item import CatalogItem
 
 logger = logging.getLogger(__name__)
 
@@ -129,29 +131,37 @@ def bulk_insert_items(rows: Iterable[dict], force: bool = False) -> None:
             session.commit()
 
         catalogs_cache: dict[tuple[str, str], int] = {}
+        catalogs_to_insert: list[dict] = []
         for row in rows:
             key = (row["crop"], row["disease"])
             if key not in catalogs_cache:
-                result = session.execute(
-                    text(
-                        "INSERT INTO catalogs (crop, disease) VALUES (:crop, :disease)"
-                    ),
-                    {"crop": row["crop"], "disease": row["disease"]},
-                )
-                catalogs_cache[key] = result.lastrowid
-            session.execute(
-                text(
-                    "INSERT INTO catalog_items (catalog_id, product, dosage_value, dosage_unit, phi) "
-                    "VALUES (:catalog_id, :product, :dosage_value, :dosage_unit, :phi)"
-                ),
+                catalog_data = {"crop": row["crop"], "disease": row["disease"]}
+                catalogs_cache[key] = 0
+                catalogs_to_insert.append(catalog_data)
+
+        if catalogs_to_insert:
+            session.bulk_insert_mappings(
+                Catalog, catalogs_to_insert, return_defaults=True
+            )
+            for catalog in catalogs_to_insert:
+                key = (catalog["crop"], catalog["disease"])
+                catalogs_cache[key] = catalog["id"]
+
+        items_to_insert: list[dict] = []
+        for row in rows:
+            items_to_insert.append(
                 {
-                    "catalog_id": catalogs_cache[key],
+                    "catalog_id": catalogs_cache[(row["crop"], row["disease"])],
                     "product": row["product"],
                     "dosage_value": row["dosage_value"],
                     "dosage_unit": row["dosage_unit"],
                     "phi": row.get("phi", 0),
-                },
+                }
             )
+
+        if items_to_insert:
+            session.bulk_insert_mappings(CatalogItem, items_to_insert)
+
         session.commit()
     finally:
         session.close()
