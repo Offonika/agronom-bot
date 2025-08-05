@@ -1,5 +1,4 @@
 import os
-
 from app.db import SessionLocal
 from app.models import Event
 
@@ -34,3 +33,21 @@ def test_ask_expert_missing_header(client):
         json={"question": "q"},
     )
     assert resp.status_code == 401
+
+
+def test_ask_expert_empty_question(client):
+    resp = client.post(
+        "/v1/ask_expert",
+        headers=HEADERS,
+        json={"question": ""},
+    )
+    assert resp.status_code == 400
+
+
+def test_ask_expert_too_long_question(client):
+    resp = client.post(
+        "/v1/ask_expert",
+        headers=HEADERS,
+        json={"question": "a" * 501},
+    )
+    assert resp.status_code == 400

@@ -1,17 +1,18 @@
 import asyncio
-from fastapi import APIRouter, Depends
+import json
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 
 from app import db as db_module
 from app.dependencies import ErrorResponse, rate_limit
-from app.models import Event
+from app.models import Event, ErrorCode
 
 router = APIRouter()
 
 
 class AskExpertRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=500)
 
 
 @router.post(
@@ -20,9 +21,19 @@ class AskExpertRequest(BaseModel):
     responses={401: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
 )
 async def ask_expert(
-    body: AskExpertRequest, user_id: int = Depends(rate_limit)
+    request: Request, user_id: int = Depends(rate_limit)
 ):
     """Queue a question for a human expert."""
+
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError as err:
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+
+    try:
+        AskExpertRequest.model_validate(payload)
+    except ValidationError as err:
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
