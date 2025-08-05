@@ -10,7 +10,7 @@ from sqlalchemy import text
 from app.dependencies import compute_signature, verify_hmac
 from app.config import Settings
 from app.db import SessionLocal
-from app.models import Catalog, CatalogItem
+from app.models import Catalog, CatalogItem, ErrorCode
 
 
 def seed_protocol():
@@ -198,7 +198,7 @@ def test_diagnose_invalid_key(client):
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert resp.status_code == 401
-    assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
+    assert resp.json()["detail"]["code"] == ErrorCode.UNAUTHORIZED
 
 
 def test_diagnose_large_image(client):
@@ -296,7 +296,7 @@ def test_diagnose_json_bad_prompt(client):
     )
     assert resp.status_code == 400
     data = resp.json()
-    assert data["code"] == "BAD_REQUEST"
+    assert data["code"] == ErrorCode.BAD_REQUEST
     assert "prompt_id" in data["message"]
 
     after = client.get("/v1/limits", headers=HEADERS)
@@ -312,7 +312,7 @@ def test_diagnose_json_missing_prompt(client):
     )
     assert resp.status_code == 400
     data = resp.json()
-    assert data["code"] == "BAD_REQUEST"
+    assert data["code"] == ErrorCode.BAD_REQUEST
     assert "Field required" in data["message"]
 
 
@@ -383,7 +383,7 @@ def test_limits_unauthorized(client):
     resp = client.get("/v1/limits", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}
     if resp.status_code == 401:
-        assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
+        assert resp.json()["detail"]["code"] == ErrorCode.UNAUTHORIZED
 
 
 def test_limits_missing_user_id(client):
@@ -391,7 +391,7 @@ def test_limits_missing_user_id(client):
     headers.pop("X-User-ID")
     resp = client.get("/v1/limits", headers=headers)
     assert resp.status_code == 401
-    assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
+    assert resp.json()["detail"]["code"] == ErrorCode.UNAUTHORIZED
 
 
 def test_photos_success(client):
@@ -450,7 +450,7 @@ def test_photos_unauthorized(client):
     resp = client.get("/v1/photos", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}
     if resp.status_code == 401:
-        assert resp.json()["detail"]["code"] == "UNAUTHORIZED"
+        assert resp.json()["detail"]["code"] == ErrorCode.UNAUTHORIZED
 
 
 def test_photos_history_limit_offset(client):
@@ -588,7 +588,7 @@ def test_create_payment_invalid_json(client):
         content="{not-valid",
     )
     assert resp.status_code == 400
-    assert resp.json() == {"detail": "BAD_REQUEST"}
+    assert resp.json() == {"detail": ErrorCode.BAD_REQUEST}
 
 
 def test_create_payment_user_id_mismatch(client):

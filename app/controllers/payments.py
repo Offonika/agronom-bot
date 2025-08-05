@@ -16,7 +16,7 @@ from app import db as db_module
 from app.config import Settings
 from app.dependencies import ErrorResponse, compute_signature, rate_limit
 from app.metrics import autopay_charge_seconds, payment_fail_total
-from app.models import Event, Payment, User
+from app.models import Event, Payment, User, ErrorCode
 from app.services import create_sbp_link
 from app.services.hmac import verify_hmac
 from app.middleware.csrf import validate_csrf
@@ -78,19 +78,21 @@ async def create_payment(request: Request, user_id: int = Depends(rate_limit)):
     try:
         payload = await request.json()
     except json.JSONDecodeError as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     try:
         body = PaymentCreateRequest.model_validate(payload)
     except ValidationError as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     if body.user_id != user_id:
-        err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="User ID mismatch"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     if body.months < 1 or body.months > MAX_MONTHS:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
 
     amount = 34900 * body.months
     currency = "RUB"
@@ -165,32 +167,32 @@ async def payments_webhook(
     client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.tinkoff_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
+        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
 
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
     if secure and not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
         logger.warning("audit: invalid webhook signature")
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
+        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
 
     try:
         data = json.loads(raw_body)
     except (json.JSONDecodeError, TypeError) as err:
         logger.exception("failed to parse webhook body as JSON")
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
     if not isinstance(data, dict):
         logger.warning("audit: non-object webhook payload")
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
     provided_sign = data.pop("signature", "")
     expected_sign = compute_signature(HMAC_SECRET, data)
     if not hmac.compare_digest(provided_sign, expected_sign):
         logger.warning("audit: invalid payload signature")
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
+        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
 
     try:
         body = PaymentWebhook(**data, signature=provided_sign)
     except ValidationError as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
@@ -250,35 +252,35 @@ async def autopay_webhook(
     client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.tinkoff_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
+        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
 
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
     if secure and not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
         logger.warning("audit: invalid webhook signature")
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
+        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
 
     try:
         data = json.loads(raw_body)
     except (json.JSONDecodeError, TypeError) as err:
         logger.exception("failed to parse webhook body as JSON")
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
     if not isinstance(data, dict):
         logger.warning("audit: non-object webhook payload")
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
     provided_sign = data.pop("signature", "")
     expected_sign = compute_signature(HMAC_SECRET, data)
     if not hmac.compare_digest(provided_sign, expected_sign):
         logger.warning("audit: invalid payload signature")
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
+        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
 
     try:
         body = AutopayWebhook(**data, signature=provided_sign)
     except ValidationError as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     if body.status not in AUTOPAY_ALLOWED_STATUSES:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST")
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
@@ -352,16 +354,22 @@ async def cancel_autopay(
     x_csrf_token: str | None = Header(None, alias="X-CSRF-Token"),
 ):
     if not authorization or not authorization.lower().startswith("bearer "):
-        err = ErrorResponse(code="UNAUTHORIZED", message="Missing JWT")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Missing JWT"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
     token = authorization.split(" ", 1)[1]
     try:
         payload_jwt = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
     except Exception as exc:  # noqa: BLE001
-        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid JWT")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Invalid JWT"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump()) from exc
     if payload_jwt.get("user_id") != user_id:
-        err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="User ID mismatch"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     await validate_csrf(request, x_csrf_token)
@@ -369,15 +377,17 @@ async def cancel_autopay(
     try:
         payload = await request.json()
     except json.JSONDecodeError as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     try:
         body = AutopayCancelRequest.model_validate(payload)
     except ValidationError as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     if body.user_id != user_id:
-        err = ErrorResponse(code="UNAUTHORIZED", message="User ID mismatch")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="User ID mismatch"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     def _db_call() -> None:

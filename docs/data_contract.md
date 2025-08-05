@@ -133,6 +133,12 @@ status
 
 photo_status
 
+error_code
+
+error_code
+
+NULLABLE
+
 ts
 
 TIMESTAMP DEFAULT now()
@@ -364,7 +370,7 @@ INT
 CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');
 CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying','failed');
 CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');
-CREATE TYPE error_code     AS ENUM ('NO_LEAF','LIMIT_EXCEEDED','GPT_TIMEOUT','BAD_REQUEST','UNAUTHORIZED');
+CREATE TYPE error_code     AS ENUM ('NO_LEAF','LIMIT_EXCEEDED','GPT_TIMEOUT','BAD_REQUEST','UNAUTHORIZED','UPGRADE_REQUIRED','TOO_MANY_REQUESTS','SERVICE_UNAVAILABLE','FORBIDDEN');
 
 5 · Data Lifecycle
 

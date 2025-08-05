@@ -9,7 +9,7 @@ from app import db as db_module
 from app import dependencies
 from app.config import Settings
 from app.dependencies import ErrorResponse, verify_partner_hmac
-from app.models import PartnerOrder
+from app.models import PartnerOrder, ErrorCode
 
 settings = Settings()
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def partner_orders(
     client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.partner_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
-        raise HTTPException(status_code=403, detail="FORBIDDEN")
+        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
 
     ip_key = f"rate:partner-ip:{client_ip}"
     try:
@@ -51,18 +51,20 @@ async def partner_orders(
     except RedisError as exc:
         logger.exception("Redis unavailable for rate limiting: %s", exc)
         err = ErrorResponse(
-            code="SERVICE_UNAVAILABLE", message="Rate limiter unavailable"
+            code=ErrorCode.SERVICE_UNAVAILABLE, message="Rate limiter unavailable"
         )
         raise HTTPException(status_code=503, detail=err.model_dump()) from exc
     if count > 30:
-        err = ErrorResponse(code="TOO_MANY_REQUESTS", message="Rate limit exceeded")
+        err = ErrorResponse(
+            code=ErrorCode.TOO_MANY_REQUESTS, message="Rate limit exceeded"
+        )
         raise HTTPException(status_code=429, detail=err.model_dump())
 
     data, sign, provided_sign = await verify_partner_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)
     except ValidationError as err:
-        raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:

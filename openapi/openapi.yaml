@@ -292,7 +292,7 @@ components:
         code:
           type: string
           enum:
-            [NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, BAD_REQUEST, UNAUTHORIZED]
+            [NO_LEAF, LIMIT_EXCEEDED, GPT_TIMEOUT, BAD_REQUEST, UNAUTHORIZED, UPGRADE_REQUIRED, TOO_MANY_REQUESTS, SERVICE_UNAVAILABLE, FORBIDDEN]
         message:
           type: string
     LimitReached:
