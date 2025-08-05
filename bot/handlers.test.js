@@ -225,6 +225,34 @@ test('formatDiagnosis keeps original product name for callback', () => {
   assert.equal(getProductName(decoded), longName);
 });
 
+test('getProductName does not clean cache on read', { concurrency: false }, () => {
+  delete require.cache[require.resolve('./diagnosis')];
+  const { formatDiagnosis, getProductName } = require('./diagnosis');
+  const ctx = { from: { id: 1 } };
+  let firstHash;
+  let lastHash;
+  for (let i = 0; i < 100; i++) {
+    const data = {
+      crop: 'c',
+      disease: 'd',
+      confidence: 0.9,
+      protocol: {
+        product: `p${i}`,
+        dosage_value: 1,
+        dosage_unit: 'ml',
+        phi: 10,
+      },
+    };
+    const { keyboard } = formatDiagnosis(ctx, data);
+    const [, hash] = keyboard.inline_keyboard[0][0].callback_data.split('|');
+    const decoded = decodeURIComponent(hash);
+    if (i === 0) firstHash = decoded;
+    if (i === 99) lastHash = decoded;
+  }
+  assert.equal(getProductName(lastHash), 'p99');
+  assert.equal(getProductName(firstHash), 'p0');
+});
+
 test('photoHandler shows expert button when enabled', { concurrency: false }, async () => {
   process.env.BETA_EXPERT_CHAT = 'true';
   const pool = { query: async () => {} };
