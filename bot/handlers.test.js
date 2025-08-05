@@ -428,12 +428,13 @@ test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
   assert.equal(JSON.parse(req.opts.body).autopay, true);
 });
 
-test('cancelAutopay calls API', { concurrency: false }, async () => {
+test('cancelAutopay calls API with auth tokens', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 5 }, reply: async (m) => replies.push(m) };
   const calls = [];
   await withMockFetch(
     {
+      'http://localhost:8000/v1/auth/token': { json: async () => ({ jwt: 'j', csrf: 'c' }) },
       'http://localhost:8000/v1/payments/sbp/autopay/cancel': { status: 204 },
     },
     async () => {
@@ -441,8 +442,26 @@ test('cancelAutopay calls API', { concurrency: false }, async () => {
     },
     calls,
   );
-  assert.equal(JSON.parse(calls[0].opts.body).user_id, 5);
+  const cancelReq = calls.find((c) => c.url.endsWith('/autopay/cancel'));
+  assert.equal(cancelReq.opts.headers.Authorization, 'Bearer j');
+  assert.equal(cancelReq.opts.headers['X-CSRF-Token'], 'c');
+  assert.equal(JSON.parse(cancelReq.opts.body).user_id, 5);
   assert.equal(replies[0], tr('autopay_cancel_success'));
+});
+
+test('cancelAutopay handles unauthorized', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 6 }, reply: async (m) => replies.push(m) };
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/auth/token': { json: async () => ({ jwt: 'j', csrf: 'c' }) },
+      'http://localhost:8000/v1/payments/sbp/autopay/cancel': { status: 401 },
+    },
+    async () => {
+      await cancelAutopay(ctx);
+    },
+  );
+  assert.equal(replies[0], tr('error_UNAUTHORIZED'));
 });
 
 test('paywall disabled does not reply', { concurrency: false }, async () => {

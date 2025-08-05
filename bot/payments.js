@@ -87,6 +87,15 @@ async function buyProHandler(
 
 async function cancelAutopay(ctx) {
   try {
+    const sessionResp = await fetch(`${API_BASE}/v1/auth/token`, {
+      headers: {
+        'X-API-Key': API_KEY,
+        'X-API-Ver': API_VER,
+        'X-User-ID': ctx.from?.id,
+      },
+    });
+    const { jwt, csrf } = await sessionResp.json();
+
     const resp = await fetch(`${API_BASE}/v1/payments/sbp/autopay/cancel`, {
       method: 'POST',
       headers: {
@@ -94,9 +103,14 @@ async function cancelAutopay(ctx) {
         'X-API-Ver': API_VER,
         'X-User-ID': ctx.from?.id,
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+        'X-CSRF-Token': csrf,
       },
       body: JSON.stringify({ user_id: ctx.from.id }),
     });
+    if (resp.status === 401 || resp.status === 403) {
+      return ctx.reply(msg('error_UNAUTHORIZED'));
+    }
     if (resp.ok) {
       return ctx.reply(msg('autopay_cancel_success'));
     }
