@@ -114,6 +114,11 @@ def pdf_to_csv(pdf_path: Path, csv_path: Path) -> Path:
         csv_path.write_text("")
         return csv_path
     df = pd.concat([t.df for t in tables])
+    if df.shape[1] != len(FIELDNAMES):
+        raise ValueError(
+            "Unexpected number of columns in PDF table: "
+            f"{df.shape[1]} (expected {len(FIELDNAMES)})"
+        )
     df.columns = FIELDNAMES
     df.to_csv(csv_path, index=False)
     return csv_path
