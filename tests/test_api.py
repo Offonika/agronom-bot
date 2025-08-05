@@ -112,7 +112,9 @@ def test_diagnose_json_success(client):
         "confidence",
         "protocol_status",
         "protocol",
+        "roi",
     }
+    assert body["roi"] == 1.9
 
 
 def test_diagnose_multipart_success(client):
@@ -125,9 +127,11 @@ def test_diagnose_multipart_success(client):
 
 
 def test_diagnose_multipart_uses_process(monkeypatch, client):
-    async def fake_process(contents: bytes, user_id: int) -> tuple[str, str, str, float]:
+    async def fake_process(
+        contents: bytes, user_id: int
+    ) -> tuple[str, str, str, float, float]:
         assert contents == b"abc"
-        return "k", "wheat", "rust", 0.5
+        return "k", "wheat", "rust", 0.5, 2.1
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
     monkeypatch.setattr("app.controllers.photos.find_protocol", lambda *_, **__: None)
@@ -141,12 +145,15 @@ def test_diagnose_multipart_uses_process(monkeypatch, client):
     assert data["crop"] == "wheat"
     assert data["disease"] == "rust"
     assert data["confidence"] == 0.5
+    assert data["roi"] == 2.1
 
 
 def test_diagnose_base64_uses_process(monkeypatch, client):
-    async def fake_process(contents: bytes, user_id: int) -> tuple[str, str, str, float]:
+    async def fake_process(
+        contents: bytes, user_id: int
+    ) -> tuple[str, str, str, float, float]:
         assert contents == b"xyz"
-        return "k", "corn", "blight", 0.7
+        return "k", "corn", "blight", 0.7, 3.3
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
     monkeypatch.setattr("app.controllers.photos.find_protocol", lambda *_, **__: None)
@@ -161,6 +168,7 @@ def test_diagnose_base64_uses_process(monkeypatch, client):
     assert data["crop"] == "corn"
     assert data["disease"] == "blight"
     assert data["confidence"] == 0.7
+    assert data["roi"] == 3.3
 
 
 def test_diagnose_missing_api_version(client):
@@ -226,6 +234,7 @@ def test_diagnose_json_returns_stub(client):
     assert body["crop"] == "apple"
     assert body["disease"] == "powdery_mildew"
     assert body["confidence"] == 0.92
+    assert body["roi"] == 1.9
     assert body["protocol_status"] is None
     proto = body["protocol"]
     assert proto is not None
@@ -233,6 +242,25 @@ def test_diagnose_json_returns_stub(client):
     assert proto["dosage_value"] == 2.0
     assert proto["dosage_unit"] == "ml_10l"
     assert proto["phi"] == 30
+
+
+def test_diagnose_saves_roi(client):
+    seed_protocol()
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    roi = resp.json()["roi"]
+
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        photo = session.query(Photo).order_by(Photo.id.desc()).first()
+        assert photo is not None
+        assert photo.roi == roi
 
 
 def test_diagnose_without_protocol(client):
@@ -253,6 +281,7 @@ def test_diagnose_without_protocol(client):
     data = resp.json()
     assert data["protocol"] is None
     assert data["protocol_status"] == "Бета"
+    assert "roi" in data
 
 
 def test_diagnose_json_bad_prompt(client):
