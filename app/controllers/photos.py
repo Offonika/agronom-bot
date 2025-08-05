@@ -3,6 +3,7 @@ import base64
 import binascii
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -14,6 +15,13 @@ from sqlalchemy import text
 from app import db as db_module
 from app.config import Settings
 from app.dependencies import ErrorResponse, rate_limit
+from app.metrics import (
+    diag_latency_seconds,
+    diag_requests_total,
+    gpt_timeout_total,
+    quota_reject_total,
+    queue_size_pending,
+)
 from app.models import Event, Photo
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol
@@ -73,6 +81,7 @@ async def _enforce_paywall(user_id: int) -> JSONResponse | None:
                     db.commit()
 
             await asyncio.to_thread(_log)
+        quota_reject_total.inc()
         return JSONResponse(
             status_code=402,
             content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
@@ -101,7 +110,13 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, float
         crop = result.get("crop", "")
         disease = result.get("disease", "")
         conf = result.get("confidence", 0.0)
-    except (TimeoutError, ValueError, json.JSONDecodeError):
+    except TimeoutError:
+        gpt_timeout_total.inc()
+        logger.exception("GPT error")
+        crop = ""
+        disease = ""
+        conf = 0.0
+    except (ValueError, json.JSONDecodeError):
         logger.exception("GPT error")
         crop = ""
         disease = ""
@@ -206,10 +221,14 @@ async def diagnose(
         except binascii.Error:
             err = ErrorResponse(code="BAD_REQUEST", message="invalid base64")
             return JSONResponse(status_code=400, content=err.model_dump())
+    diag_requests_total.inc()
+    start_time = time.perf_counter()
     try:
         file_id, crop, disease, conf = await _process_image(contents, user_id)
     except _ProcessImageError as err:
+        diag_latency_seconds.observe(time.perf_counter() - start_time)
         return err.response
+    diag_latency_seconds.observe(time.perf_counter() - start_time)
     status = "ok" if crop and disease else "pending"
 
     def _save() -> int:
@@ -228,6 +247,7 @@ async def diagnose(
 
     photo_id = await asyncio.to_thread(_save)
     if status != "ok":
+        queue_size_pending.inc()
         return JSONResponse(status_code=202, content={"id": photo_id, "status": "pending"})
 
     proto = await asyncio.to_thread(find_protocol, "main", crop, disease)
