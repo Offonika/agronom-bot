@@ -5,13 +5,13 @@ const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 
-async function historyHandler(ctx, offset = 0, pool) {
+async function historyHandler(ctx, cursor = '', pool) {
   if (!ctx.from) {
     await ctx.reply(msg('history_error'));
     return;
   }
   if (pool) {
-    if (offset === 0) {
+    if (!cursor) {
       try {
         await logEvent(pool, ctx.from.id, 'history_open');
       } catch (err) {
@@ -19,7 +19,7 @@ async function historyHandler(ctx, offset = 0, pool) {
       }
     }
     try {
-      await logEvent(pool, ctx.from.id, `history_page_${offset}`);
+      await logEvent(pool, ctx.from.id, `history_page_${cursor || '0'}`);
     } catch (err) {
       console.error('logEvent history_page error', err);
     }
@@ -30,33 +30,31 @@ async function historyHandler(ctx, offset = 0, pool) {
       'X-API-Ver': API_VER,
     };
     if (ctx.from) headers['X-User-ID'] = ctx.from.id;
-    const resp = await fetch(
-      `${API_BASE}/v1/photos/history?limit=10&offset=${offset}`,
-      { headers },
-    );
+    const url = `${API_BASE}/v1/photos?limit=10${cursor ? `&cursor=${cursor}` : ''}`;
+    const resp = await fetch(url, { headers });
     if (!resp.ok) {
       await ctx.reply(msg('history_error'));
       return;
     }
     const data = await resp.json();
-    if (!Array.isArray(data)) {
+    if (!data || !Array.isArray(data.items)) {
       console.error('Unexpected history response', data);
       await ctx.reply(msg('history_error'));
       return;
     }
-    let text = data
+    const items = data.items;
+    let text = items
       .map((it, idx) => {
         const dt = new Date(it.ts);
         const date = dt.toLocaleDateString('ru-RU');
-        return `${idx + offset + 1}. ${date}, ${it.crop}, ${it.disease}, ${it.status}`;
+        return `${idx + 1}. ${date}, ${it.crop}, ${it.disease}`;
       })
       .join('\n');
     if (!text) text = msg('history_empty');
-    const keyboard = data.map((it) => [{ text: 'ℹ️', callback_data: `info|${it.photo_id}` }]);
-    keyboard.push([
-      { text: '◀️', callback_data: `history|${Math.max(offset - 10, 0)}` },
-      { text: '▶️', callback_data: `history|${offset + 10}` },
-    ]);
+    const keyboard = items.map((it) => [{ text: 'ℹ️', callback_data: `info|${it.id}` }]);
+    if (data.next_cursor) {
+      keyboard.push([{ text: '▶️', callback_data: `history|${data.next_cursor}` }]);
+    }
     await ctx.reply(text, { reply_markup: { inline_keyboard: keyboard } });
   } catch (err) {
     console.error('history fetch error', err);

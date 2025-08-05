@@ -407,6 +407,45 @@ def test_photos_limit_zero(client):
     assert body["next_cursor"] is None
 
 
+def test_photos_cursor_pagination(client):
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        session.query(Photo).delete()
+        p1 = Photo(
+            user_id=1,
+            file_id="a.jpg",
+            status="ok",
+            ts=datetime(2024, 1, 2, tzinfo=timezone.utc),
+        )
+        p2 = Photo(
+            user_id=1,
+            file_id="b.jpg",
+            status="ok",
+            ts=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        )
+        session.add_all([p1, p2])
+        session.commit()
+        first_id = p1.id
+        second_id = p2.id
+
+    resp1 = client.get("/v1/photos?limit=1", headers=HEADERS)
+    assert resp1.status_code == 200
+    data1 = resp1.json()
+    assert len(data1["items"]) == 1
+    assert data1["items"][0]["id"] == first_id
+    cursor = data1["next_cursor"]
+    assert cursor
+
+    resp2 = client.get(f"/v1/photos?limit=1&cursor={cursor}", headers=HEADERS)
+    assert resp2.status_code == 200
+    data2 = resp2.json()
+    assert len(data2["items"]) == 1
+    assert data2["items"][0]["id"] == second_id
+    assert data2["next_cursor"] is None
+
+
 def test_photos_unauthorized(client):
     resp = client.get("/v1/photos", headers={"X-API-Key": "bad", "X-API-Ver": "v1"})
     assert resp.status_code in {401, 404}

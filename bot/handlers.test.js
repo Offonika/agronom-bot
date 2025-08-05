@@ -502,21 +502,24 @@ test('historyHandler paginates', { concurrency: false }, async () => {
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/photos/history?limit=10&offset=0': {
-        json: async () => [
-          { photo_id: 1, ts: '2025-01-01T00:00:00Z', crop: 'apple', disease: 'scab', status: 'ok' },
-        ],
+      'http://localhost:8000/v1/photos?limit=10': {
+        json: async () => ({
+          items: [
+            { id: 1, ts: '2025-01-01T00:00:00Z', crop: 'apple', disease: 'scab' },
+          ],
+          next_cursor: 'abc',
+        }),
       },
     },
     async () => {
-      await historyHandler(ctx, 0, pool);
+      await historyHandler(ctx, '', pool);
     },
     calls,
   );
   assert.ok(replies[0].msg.includes('1.'));
   const kb = replies[0].opts.reply_markup.inline_keyboard;
   assert.equal(kb[0][0].callback_data, 'info|1');
-  assert.equal(kb[kb.length - 1][1].callback_data, 'history|10');
+  assert.equal(kb[kb.length - 1][0].callback_data, 'history|abc');
   assert.equal(events[0][1][1], 'history_open');
   assert.equal(events[1][1][1], 'history_page_0');
   assert.equal(calls[0].opts.headers['X-User-ID'], 1);
@@ -527,11 +530,11 @@ test('historyHandler logs page event', { concurrency: false }, async () => {
   const pool = { query: async (...a) => events.push(a) };
   const ctx = { from: { id: 2 }, reply: async () => {} };
   await withMockFetch({
-    'http://localhost:8000/v1/photos/history?limit=10&offset=10': { json: async () => [] },
+    'http://localhost:8000/v1/photos?limit=10&cursor=abc': { json: async () => ({ items: [], next_cursor: null }) },
   }, async () => {
-    await historyHandler(ctx, 10, pool);
+    await historyHandler(ctx, 'abc', pool);
   });
-  assert.equal(events[0][1][1], 'history_page_10');
+  assert.equal(events[0][1][1], 'history_page_abc');
 });
 
 test('historyHandler handles malformed responses', { concurrency: false }, async () => {
@@ -545,10 +548,10 @@ test('historyHandler handles malformed responses', { concurrency: false }, async
     };
     await withMockFetch(
       {
-        'http://localhost:8000/v1/photos/history?limit=10&offset=0': { json: async () => bad },
+        'http://localhost:8000/v1/photos?limit=10': { json: async () => bad },
       },
       async () => {
-        await historyHandler(ctx, 0);
+        await historyHandler(ctx, '');
       },
     );
     console.error = origErr;
