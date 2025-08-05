@@ -9,7 +9,7 @@ class PartnerOrder(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
-    order_id = Column(String)
+    order_id = Column(String, unique=True)
     protocol_id = Column(Integer)
     price_kopeks = Column(Integer)
     signature = Column(String)

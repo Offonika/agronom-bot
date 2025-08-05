@@ -152,7 +152,7 @@ def test_partner_orders_rate_limit():
     with TestClient(app, client=(allowed_ip, 5000)) as client:
         for _ in range(30):
             resp = client.post("/v1/partner/orders", headers=headers, json=payload)
-            assert resp.status_code == 202
+            assert resp.status_code in {200, 202}
         resp = client.post("/v1/partner/orders", headers=headers, json=payload)
         assert resp.status_code == 429
 

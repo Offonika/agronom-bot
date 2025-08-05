@@ -66,8 +66,15 @@ async def partner_orders(
     except ValidationError as err:
         raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
 
-    def _db_call() -> None:
+    def _db_call() -> tuple[str, bool]:
         with db_module.SessionLocal() as db:
+            existing = (
+                db.query(PartnerOrder)
+                .filter_by(order_id=body.order_id)
+                .first()
+            )
+            if existing:
+                return existing.status, False
             order = PartnerOrder(
                 user_id=body.user_tg_id,
                 order_id=body.order_id,
@@ -78,6 +85,8 @@ async def partner_orders(
             )
             db.add(order)
             db.commit()
+            return order.status, True
 
-    await asyncio.to_thread(_db_call)
-    return JSONResponse(status_code=202, content={"status": "queued"})
+    status, created = await asyncio.to_thread(_db_call)
+    code = 202 if created else 200
+    return JSONResponse(status_code=code, content={"status": status})
