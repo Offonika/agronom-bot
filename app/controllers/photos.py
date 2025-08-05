@@ -110,7 +110,7 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, 
 
     key = await upload_photo(user_id, contents)
     try:
-        result = call_gpt_vision_stub(key)
+        result = await asyncio.to_thread(call_gpt_vision_stub, key)
         crop = result.get("crop", "")
         disease = result.get("disease", "")
         conf = result.get("confidence", 0.0)
