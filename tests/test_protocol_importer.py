@@ -83,3 +83,22 @@ def test_bulk_insert_populates_tables(tmp_path):
             assert product.scalar_one() == "Хорус 75 ВДГ"
             product = session.execute(text("SELECT product FROM protocols_current"))
             assert product.scalar_one() == "Хорус 75 ВДГ"
+
+
+def test_pdf_to_csv_raises_on_column_mismatch(tmp_path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    import pandas as pd
+    from app.services import protocol_importer
+
+    def fake_read_pdf(*args, **kwargs):
+        df = pd.DataFrame([[1, 2, 3, 4, 5]])
+        return [SimpleNamespace(df=df)]
+
+    monkeypatch.setitem(sys.modules, "camelot", SimpleNamespace(read_pdf=fake_read_pdf))
+    pdf_path = tmp_path / "input.pdf"
+    pdf_path.write_text("dummy")
+    csv_path = tmp_path / "out.csv"
+    with pytest.raises(ValueError):
+        protocol_importer.pdf_to_csv(pdf_path, csv_path)
