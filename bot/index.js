@@ -132,6 +132,7 @@ async function init() {
     console.log('Bot started');
   } catch (err) {
     console.error('Bot initialization failed', err);
+    await pool.end();
     process.exit(1);
   }
 }
