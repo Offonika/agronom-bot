@@ -7,6 +7,7 @@ from .event import Event
 from .user import User
 from .catalog import Catalog
 from .catalog_item import CatalogItem
+from .error_code import ErrorCode
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "User",
     "Catalog",
     "CatalogItem",
+    "ErrorCode",
 ]

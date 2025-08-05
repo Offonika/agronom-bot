@@ -23,7 +23,7 @@ from app.metrics import (
     queue_size_pending,
     roi_calc_seconds,
 )
-from app.models import Event, Photo
+from app.models import Event, Photo, ErrorCode
 from app.services.gpt import call_gpt_vision_stub
 from app.services.protocols import find_protocol
 from app.services.storage import get_public_url, upload_photo
@@ -98,7 +98,9 @@ class _ProcessImageError(Exception):
 
 async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, float, float]:
     if len(contents) > 2 * 1024 * 1024:
-        err = ErrorResponse(code="BAD_REQUEST", message="image too large")
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="image too large"
+        )
         raise _ProcessImageError(
             JSONResponse(status_code=400, content=err.model_dump())
         )
@@ -209,25 +211,33 @@ async def diagnose(
 ):
     if image:
         if prompt_id not in (None, "v1"):
-            err = ErrorResponse(code="BAD_REQUEST", message="prompt_id must be 'v1'")
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="prompt_id must be 'v1'"
+            )
             return JSONResponse(status_code=400, content=err.model_dump())
         contents = await image.read()
     else:
         try:
             json_data = await request.json()
         except (json.JSONDecodeError, ValueError, RuntimeError):
-            err = ErrorResponse(code="BAD_REQUEST", message="invalid JSON")
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="invalid JSON"
+            )
             return JSONResponse(status_code=400, content=err.model_dump())
         try:
             body = DiagnoseRequestBase64(**json_data)
         except ValidationError as err:
             message = "; ".join(e.get("msg", "") for e in err.errors())
-            err = ErrorResponse(code="BAD_REQUEST", message=message)
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message=message
+            )
             return JSONResponse(status_code=400, content=err.model_dump())
         try:
             contents = base64.b64decode(body.image_base64, validate=True)
         except binascii.Error:
-            err = ErrorResponse(code="BAD_REQUEST", message="invalid base64")
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="invalid base64"
+            )
             return JSONResponse(status_code=400, content=err.model_dump())
     diag_requests_total.inc()
     start_time = time.perf_counter()
@@ -312,7 +322,9 @@ async def list_photos(
                     last_id = int(last_id_str)
                     last_ts = datetime.fromtimestamp(int(last_ts_str), tz=timezone.utc)
                 except (ValueError, TypeError) as err:
-                    raise HTTPException(status_code=400, detail="BAD_REQUEST") from err
+                    raise HTTPException(
+                        status_code=400, detail=ErrorCode.BAD_REQUEST
+                    ) from err
                 q = q.filter(
                     or_(
                         Photo.ts < last_ts,

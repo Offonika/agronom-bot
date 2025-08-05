@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from app import db as db_module
 from app.config import Settings
 from app.dependencies import ErrorResponse, compute_signature, rate_limit
-from app.models import Event, Payment, Photo, User
+from app.models import Event, Payment, Photo, User, ErrorCode
 
 settings = Settings()
 HMAC_SECRET = settings.hmac_secret
@@ -30,10 +30,14 @@ async def export_user(
     payload = {"user_id": user_id}
     expected_sign = compute_signature(HMAC_SECRET, payload)
     if not hmac.compare_digest(expected_sign, x_sign):
-        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid signature")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Invalid signature"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
     if auth_user != user_id:
-        err = ErrorResponse(code="FORBIDDEN", message="Cannot access other user")
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Cannot access other user"
+        )
         raise HTTPException(status_code=403, detail=err.model_dump())
 
     def _db_call() -> dict:
@@ -79,23 +83,31 @@ async def delete_user(
     try:
         payload = await request.json()
     except json.JSONDecodeError as err:
-        err_resp = ErrorResponse(code="BAD_REQUEST", message="Invalid JSON")
+        err_resp = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid JSON"
+        )
         raise HTTPException(status_code=400, detail=err_resp.model_dump()) from err
     except Exception:  # noqa: BLE001
         raise
 
     user_id = payload.get("user_id")
     if user_id is None:
-        err_resp = ErrorResponse(code="BAD_REQUEST", message="Missing user_id")
+        err_resp = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Missing user_id"
+        )
         raise HTTPException(status_code=400, detail=err_resp.model_dump())
 
     expected_sign = compute_signature(HMAC_SECRET, {"user_id": user_id})
     if not hmac.compare_digest(expected_sign, x_sign):
-        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid signature")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Invalid signature"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     if user_id != auth_user:
-        err = ErrorResponse(code="FORBIDDEN", message="Cannot delete other user")
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Cannot delete other user"
+        )
         raise HTTPException(status_code=403, detail=err.model_dump())
 
     def _db_delete() -> None:

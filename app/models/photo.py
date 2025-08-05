@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Enum
 from app.models.base import Base
 from datetime import datetime, timezone
 
+from .error_code import ErrorCode
+
 
 class Photo(Base):
     __tablename__ = "photos"
@@ -23,5 +25,6 @@ class Photo(Base):
         nullable=False,
         server_default="pending",
     )
+    error_code = Column(Enum(ErrorCode, name="error_code"), nullable=True)
     ts = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     deleted = Column(Boolean, default=False)

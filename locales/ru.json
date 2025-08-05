@@ -33,4 +33,14 @@
   "reminder_cancelled": "Напоминание отменено",
   "reminder_due": "Сработало напоминание",
   "reminder_error": "Ошибка напоминаний"
+  ,
+  "error_NO_LEAF": "Лист не обнаружен",
+  "error_LIMIT_EXCEEDED": "Превышен лимит",
+  "error_GPT_TIMEOUT": "GPT не ответил",
+  "error_BAD_REQUEST": "Некорректный запрос",
+  "error_UNAUTHORIZED": "Необходима авторизация",
+  "error_UPGRADE_REQUIRED": "Требуется обновление",
+  "error_TOO_MANY_REQUESTS": "Слишком много запросов",
+  "error_SERVICE_UNAVAILABLE": "Сервис недоступен",
+  "error_FORBIDDEN": "Доступ запрещён"
 }

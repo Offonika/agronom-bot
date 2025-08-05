@@ -11,6 +11,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from app.config import Settings
+from app.models import ErrorCode
 
 settings = Settings()
 HMAC_SECRET_PARTNER = settings.hmac_secret_partner
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorResponse(BaseModel):
-    code: str
+    code: ErrorCode
     message: str
 
 
@@ -31,19 +32,27 @@ async def require_api_headers(
     x_user_id: int | None = Header(None, alias="X-User-ID"),
 ) -> int:
     if x_api_ver is None:
-        err = ErrorResponse(code="UPGRADE_REQUIRED", message="Missing API version")
+        err = ErrorResponse(
+            code=ErrorCode.UPGRADE_REQUIRED, message="Missing API version"
+        )
         raise HTTPException(status_code=426, detail=err.model_dump())
 
     if x_api_ver != "v1":
-        err = ErrorResponse(code="UPGRADE_REQUIRED", message="Invalid API version")
+        err = ErrorResponse(
+            code=ErrorCode.UPGRADE_REQUIRED, message="Invalid API version"
+        )
         raise HTTPException(status_code=426, detail=err.model_dump())
 
     if x_api_key != settings.api_key:
-        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid API key")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Invalid API key"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     if x_user_id is None:
-        err = ErrorResponse(code="UNAUTHORIZED", message="Missing user ID")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Missing user ID"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     return x_user_id
@@ -72,11 +81,14 @@ async def rate_limit(request: Request, user_id: int = Depends(require_api_header
     except RedisError as exc:
         logger.exception("Redis unavailable for rate limiting: %s", exc)
         err = ErrorResponse(
-            code="SERVICE_UNAVAILABLE", message="Rate limiter unavailable"
+            code=ErrorCode.SERVICE_UNAVAILABLE,
+            message="Rate limiter unavailable",
         )
         raise HTTPException(status_code=503, detail=err.model_dump()) from exc
     if ip_count > 30 or user_count > 120:
-        err = ErrorResponse(code="TOO_MANY_REQUESTS", message="Rate limit exceeded")
+        err = ErrorResponse(
+            code=ErrorCode.TOO_MANY_REQUESTS, message="Rate limit exceeded"
+        )
         raise HTTPException(status_code=429, detail=err.model_dump())
 
     return user_id
@@ -92,16 +104,22 @@ async def verify_partner_hmac(request: Request, x_sign: str):
     try:
         payload = json.loads(raw_body)
     except json.JSONDecodeError as err:
-        err_payload = ErrorResponse(code="BAD_REQUEST", message="Malformed JSON")
+        err_payload = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Malformed JSON"
+        )
         raise HTTPException(status_code=400, detail=err_payload.model_dump()) from err
 
     if not isinstance(payload, dict):
-        err = ErrorResponse(code="BAD_REQUEST", message="Invalid payload")
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid payload"
+        )
         raise HTTPException(status_code=400, detail=err.model_dump())
 
     provided_sign = payload.get("signature")
     if not provided_sign:
-        err = ErrorResponse(code="BAD_REQUEST", message="Missing signature")
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Missing signature"
+        )
         raise HTTPException(status_code=400, detail=err.model_dump())
 
     payload.pop("signature", None)
@@ -110,7 +128,9 @@ async def verify_partner_hmac(request: Request, x_sign: str):
     if not hmac.compare_digest(calculated, x_sign) or not hmac.compare_digest(
         calculated, provided_sign
     ):
-        err = ErrorResponse(code="UNAUTHORIZED", message="Invalid signature")
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Invalid signature"
+        )
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     return payload, calculated, provided_sign
