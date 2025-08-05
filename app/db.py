@@ -23,7 +23,7 @@ SessionLocal = _SessionWrapper()
 
 
 def init_db(cfg: Settings) -> None:
-    """Create engine and session factory using provided settings."""
+    """Create engine and session factory using SQLAlchemy's ``create_engine``."""
     global engine, _session_factory
 
     engine = create_engine(
