@@ -49,9 +49,17 @@ async def _make_client() -> AioBaseClient:
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
     )
+    try:
+        client = await client_ctx.__aenter__()
+    except Exception:
+        try:
+            await client_ctx.__aexit__(None, None, None)
+        except Exception:  # pragma: no cover - best effort cleanup
+            logger.exception("Failed to close S3 client after failed entry")
+        raise
     global _client_ctx
     _client_ctx = client_ctx
-    return await client_ctx.__aenter__()
+    return client
 
 
 
