@@ -1,5 +1,5 @@
-import asyncio
-import hmac
+import asyncio  # required for async file operations
+import hmac  # required for HMAC signature checks
 import io
 import json
 import zipfile
