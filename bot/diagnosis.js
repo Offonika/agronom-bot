@@ -2,7 +2,17 @@ const crypto = require('node:crypto');
 const { msg } = require('./utils');
 const { sendPaywall } = require('./payments');
 
+const PRODUCT_NAMES_MAX = 100;
 const productNames = new Map();
+
+function cleanupProductNames() {
+  if (productNames.size >= PRODUCT_NAMES_MAX) {
+    const oldestKey = productNames.keys().next().value;
+    if (oldestKey !== undefined) {
+      productNames.delete(oldestKey);
+    }
+  }
+}
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
@@ -42,6 +52,7 @@ function formatDiagnosis(ctx, data) {
     const base = ['proto', '', ...other].join('|');
     const avail = 64 - base.length;
     const prodEncoded = safeSlice(encode(productHash), Math.max(avail, 0));
+    cleanupProductNames();
     productNames.set(decodeURIComponent(prodEncoded), product);
     const cb = ['proto', prodEncoded, ...other].join('|').slice(0, 64);
     const row = [{ text: 'Показать протокол', callback_data: cb }];
@@ -187,6 +198,7 @@ async function retryHandler(ctx, photoId) {
 }
 
 function getProductName(hash) {
+  cleanupProductNames();
   return productNames.get(hash);
 }
 
