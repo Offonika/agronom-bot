@@ -1,4 +1,5 @@
 from prometheus_client import Counter, Histogram, Gauge
+# Prometheus metrics definitions
 
 # Diagnosis related metrics
 # Total number of diagnosis requests
