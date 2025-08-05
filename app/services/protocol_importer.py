@@ -74,10 +74,26 @@ def find_latest_zip(html: str, base_url: str) -> str:
 def download_zip(url: str, dest: Path) -> Path:
     """Download ``url`` into ``dest`` and return the resulting path."""
 
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    dest.write_bytes(response.content)
-    return dest
+    try:
+        with requests.get(url, timeout=30, stream=True) as response:
+            response.raise_for_status()
+            total = int(response.headers.get("Content-Length", 0))
+            downloaded = 0
+            with dest.open("wb") as fh:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        fh.write(chunk)
+                        downloaded += len(chunk)
+        if total and downloaded < total:
+            dest.unlink(missing_ok=True)
+            raise IOError(
+                f"Incomplete download: expected {total} bytes, got {downloaded}"
+            )
+        return dest
+    except requests.RequestException as exc:
+        if dest.exists():
+            dest.unlink(missing_ok=True)
+        raise RuntimeError(f"Failed to download {url}") from exc
 
 
 def pdf_to_csv(pdf_path: Path, csv_path: Path) -> Path:
