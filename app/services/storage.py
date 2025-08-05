@@ -1,12 +1,21 @@
+import logging
 import os
 from asyncio import Lock
 from datetime import datetime, timezone
-from typing import AsyncContextManager as AbstractAsyncContextManager
 from uuid import uuid4
 
+try:  # pragma: no cover - Python < 3.12 fallback
+    from typing import AbstractAsyncContextManager  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover
+    from contextlib import AbstractAsyncContextManager  # type: ignore
+
 import aioboto3
-import logging  # noqa: I001
-from aiobotocore.client import AioBaseClient
+
+try:  # pragma: no cover - aiobotocore fallback
+    from botocore.client import AioBaseClient  # type: ignore
+except ImportError:  # pragma: no cover
+    from aiobotocore.client import AioBaseClient  # type: ignore
+
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import HTTPException
 
