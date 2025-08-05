@@ -92,7 +92,7 @@ async def create_payment(request: Request, user_id: int = Depends(rate_limit)):
     if body.months < 1 or body.months > MAX_MONTHS:
         raise HTTPException(status_code=400, detail="BAD_REQUEST")
 
-    amount = 19900 * body.months
+    amount = 34900 * body.months
     currency = "RUB"
     external_id = uuid4().hex
     url, binding_id = await create_sbp_link(

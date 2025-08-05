@@ -575,6 +575,7 @@ def test_create_payment_valid_json(client):
     with SessionLocal() as session:
         row = session.query(Payment).filter_by(external_id=data["payment_id"]).first()
         assert row is not None
+        assert row.amount == 34900
         assert row.status == "pending"
         event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
         assert event.event == "payment_created"
