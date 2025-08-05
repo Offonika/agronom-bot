@@ -120,8 +120,19 @@ async function photoHandler(pool, ctx) {
     }
     if (!apiResp.ok) {
       console.error('API error status', apiResp.status);
+      let errCode;
+      try {
+        const errData = await apiResp.json();
+        errCode = errData?.error_code;
+      } catch (err) {
+        console.error('Failed to parse API error response', err);
+      }
       if (typeof ctx.reply === 'function') {
-        await ctx.reply(msg('diagnose_error'));
+        if (errCode) {
+          await ctx.reply(msg('error_' + errCode));
+        } else {
+          await ctx.reply(msg('diagnose_error'));
+        }
       }
       return;
     }
