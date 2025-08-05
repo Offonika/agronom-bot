@@ -9,7 +9,8 @@ function paywallEnabled() {
 }
 
 function getLimit() {
-  return parseInt(process.env.FREE_PHOTO_LIMIT || '5', 10);
+  const limit = parseInt(process.env.FREE_PHOTO_LIMIT, 10);
+  return Number.isNaN(limit) ? 5 : limit;
 }
 
 async function logEvent(pool, userId, ev) {

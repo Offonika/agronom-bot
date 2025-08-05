@@ -14,6 +14,7 @@ const {
   buyProHandler,
   pollPaymentStatus,
   cancelAutopay,
+  getLimit,
 } = require('./payments');
 const { startHandler, helpHandler, feedbackHandler } = require('./commands');
 const { historyHandler } = require('./history');
@@ -363,6 +364,13 @@ test('startHandler replies with FAQ', { concurrency: false }, async () => {
   assert.equal(btns[0].callback_data, 'buy_pro');
   assert.equal(btns[0].text, tr('faq_buy_button'));
   assert.equal(btns[1].text, tr('faq_back_button'));
+});
+
+test('getLimit falls back to default for invalid env', () => {
+  const orig = process.env.FREE_PHOTO_LIMIT;
+  process.env.FREE_PHOTO_LIMIT = 'abc';
+  assert.equal(getLimit(), 5);
+  process.env.FREE_PHOTO_LIMIT = orig;
 });
 
 test('buyProHandler returns payment link', { concurrency: false }, async () => {
