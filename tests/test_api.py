@@ -63,6 +63,12 @@ def stub_upload(monkeypatch):
 
     monkeypatch.setattr("app.services.storage.upload_photo", _stub)
     monkeypatch.setattr("app.controllers.photos.upload_photo", _stub)
+    
+    def _gpt_stub(_key: str) -> dict:
+        return {"crop": "apple", "disease": "powdery_mildew", "confidence": 0.92}
+
+    monkeypatch.setattr("app.services.gpt.call_gpt_vision", _gpt_stub)
+    monkeypatch.setattr("app.controllers.photos.call_gpt_vision", _gpt_stub)
     # reset usage to avoid 402 errors between tests
     from app.db import SessionLocal
     from app.models import PhotoUsage
@@ -346,7 +352,7 @@ def test_diagnose_gpt_timeout(monkeypatch, client):
     def _fail(_key: str):
         raise TimeoutError("timeout")
 
-    monkeypatch.setattr("app.controllers.photos.call_gpt_vision_stub", _fail)
+    monkeypatch.setattr("app.controllers.photos.call_gpt_vision", _fail)
 
     resp = client.post(
         "/v1/ai/diagnose",
