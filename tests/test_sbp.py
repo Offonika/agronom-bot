@@ -1,7 +1,7 @@
 import asyncio
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import hmac
 import hashlib
 import jwt
@@ -258,6 +258,30 @@ def test_autopay_cancel_jwt_fail(client):
         _ensure_user(session)
     headers = HEADERS | {
         "Authorization": f"Bearer {JWT_USER2}",  # wrong user in token
+        "X-CSRF-Token": CSRF_TOKEN,
+    }
+    resp = client.post(
+        "/v1/payments/sbp/autopay/cancel",
+        headers=headers,
+        cookies={"csrf_token": CSRF_TOKEN},
+        json={"user_id": 1},
+    )
+    assert resp.status_code == 401
+
+
+def test_autopay_cancel_jwt_expired(client):
+    with SessionLocal() as session:
+        _ensure_user(session)
+    expired = jwt.encode(
+        {
+            "user_id": 1,
+            "exp": datetime.now(timezone.utc) - timedelta(seconds=1),
+        },
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+    headers = HEADERS | {
+        "Authorization": f"Bearer {expired}",
         "X-CSRF-Token": CSRF_TOKEN,
     }
     resp = client.post(

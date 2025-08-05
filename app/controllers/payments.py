@@ -360,7 +360,17 @@ async def cancel_autopay(
         raise HTTPException(status_code=401, detail=err.model_dump())
     token = authorization.split(" ", 1)[1]
     try:
-        payload_jwt = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+        payload_jwt = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=["HS256"],
+            options={"verify_exp": True},
+        )
+    except jwt.ExpiredSignatureError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.UNAUTHORIZED, message="Expired JWT"
+        )
+        raise HTTPException(status_code=401, detail=err.model_dump()) from exc
     except Exception as exc:  # noqa: BLE001
         err = ErrorResponse(
             code=ErrorCode.UNAUTHORIZED, message="Invalid JWT"
