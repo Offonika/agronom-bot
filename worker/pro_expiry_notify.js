@@ -8,11 +8,20 @@ async function sendTgMessage(chatId, text) {
     throw new Error('BOT_TOKEN_DEV not set');
   }
   const body = new URLSearchParams({ chat_id: String(chatId), text });
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!response.ok) {
+      console.error(`Telegram API responded with status ${response.status}`);
+      throw new Error(`Telegram API error: ${response.status}`);
+    }
+  } catch (err) {
+    console.error('Failed to send Telegram message', err);
+    throw err;
+  }
 }
 
 async function notifyExpiringUsers(pool, sendMessage = sendTgMessage) {
@@ -22,7 +31,14 @@ async function notifyExpiringUsers(pool, sendMessage = sendTgMessage) {
       "SELECT tg_id FROM users WHERE pro_expires_at::date = (now() + interval '3 day')::date"
     );
     for (const row of rows) {
-      await sendMessage(row.tg_id, 'Ваша подписка PRO истекает через 3 дня. Продлите её, чтобы сохранить доступ.');
+      try {
+        await sendMessage(
+          row.tg_id,
+          'Ваша подписка PRO истекает через 3 дня. Продлите её, чтобы сохранить доступ.'
+        );
+      } catch (err) {
+        console.error(`Failed to notify user ${row.tg_id}`, err);
+      }
     }
     console.log(`Pro expiry notify: notified=${rows.length}`);
   } finally {
