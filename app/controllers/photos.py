@@ -125,6 +125,11 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, 
         crop = ""
         disease = ""
         conf = 0.0
+    except Exception:
+        logger.exception("GPT error")
+        crop = ""
+        disease = ""
+        conf = 0.0
 
     roi_start = time.perf_counter()
     roi = calculate_roi(crop, disease) if crop and disease else 0.0
