@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
     hmac_secret: str = "test-hmac-secret"
+    jwt_secret: str = Field("test-jwt-secret", alias="JWT_SECRET")
     hmac_secret_partner: str = Field(
         "test-hmac-partner", alias="HMAC_SECRET_PARTNER"
     )

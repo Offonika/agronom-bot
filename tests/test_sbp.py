@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 import hmac
 import hashlib
+import jwt
 
 import httpx
 import pytest
@@ -16,12 +17,17 @@ from app.services.sbp import create_sbp_link
 
 settings = Settings()
 HMAC_SECRET = settings.hmac_secret
+JWT_SECRET = settings.jwt_secret
 
 HEADERS = {
     "X-API-Key": settings.api_key,
     "X-API-Ver": "v1",
     "X-User-ID": "1",
 }
+
+JWT_USER1 = jwt.encode({"user_id": 1}, JWT_SECRET, algorithm="HS256")
+JWT_USER2 = jwt.encode({"user_id": 2}, JWT_SECRET, algorithm="HS256")
+CSRF_TOKEN = "test-csrf"
 
 
 @pytest.mark.asyncio
@@ -195,9 +201,14 @@ def test_autopay_webhook_invalid_status(client, monkeypatch):
 def test_autopay_cancel_success(client):
     with SessionLocal() as session:
         _ensure_user(session)
+    headers = HEADERS | {
+        "Authorization": f"Bearer {JWT_USER1}",
+        "X-CSRF-Token": CSRF_TOKEN,
+    }
     resp = client.post(
         "/v1/payments/sbp/autopay/cancel",
-        headers=HEADERS,
+        headers=headers,
+        cookies={"csrf_token": CSRF_TOKEN},
         json={"user_id": 1},
     )
     assert resp.status_code == 204
@@ -209,16 +220,53 @@ def test_autopay_cancel_success(client):
 def test_autopay_cancel_user_mismatch(client):
     with SessionLocal() as session:
         _ensure_user(session)
-    headers = HEADERS | {"X-User-ID": "2"}
+    headers = HEADERS | {
+        "X-User-ID": "2",
+        "Authorization": f"Bearer {JWT_USER2}",
+        "X-CSRF-Token": CSRF_TOKEN,
+    }
     resp = client.post(
         "/v1/payments/sbp/autopay/cancel",
         headers=headers,
+        cookies={"csrf_token": CSRF_TOKEN},
         json={"user_id": 1},
     )
     assert resp.status_code == 401
     with SessionLocal() as session:
         user = session.get(User, 1)
         assert user and user.autopay_enabled in (1, True)
+
+
+def test_autopay_cancel_csrf_fail(client):
+    with SessionLocal() as session:
+        _ensure_user(session)
+    headers = HEADERS | {
+        "Authorization": f"Bearer {JWT_USER1}",
+        "X-CSRF-Token": "bad",  # mismatch token
+    }
+    resp = client.post(
+        "/v1/payments/sbp/autopay/cancel",
+        headers=headers,
+        cookies={"csrf_token": CSRF_TOKEN},
+        json={"user_id": 1},
+    )
+    assert resp.status_code == 403
+
+
+def test_autopay_cancel_jwt_fail(client):
+    with SessionLocal() as session:
+        _ensure_user(session)
+    headers = HEADERS | {
+        "Authorization": f"Bearer {JWT_USER2}",  # wrong user in token
+        "X-CSRF-Token": CSRF_TOKEN,
+    }
+    resp = client.post(
+        "/v1/payments/sbp/autopay/cancel",
+        headers=headers,
+        cookies={"csrf_token": CSRF_TOKEN},
+        json={"user_id": 1},
+    )
+    assert resp.status_code == 401
 
 
 @pytest.mark.parametrize(
