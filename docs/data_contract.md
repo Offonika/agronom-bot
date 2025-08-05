@@ -69,6 +69,10 @@ autopay_enabled
 
 BOOLEAN DEFAULT FALSE
 
+opt_in
+
+BOOLEAN DEFAULT FALSE
+
 created_at
 
 TIMESTAMP DEFAULT now()

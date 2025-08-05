@@ -1,22 +1,23 @@
 {
   "scripts": {
     "worker": "node worker/usage_reset.js",
-    "test": "node --test bot/handlers.test.js",
+    "test": "node --test bot/handlers.test.js worker/*.test.js",
     "k6:test": "k6 run load/full_journey.js",
     "rotate-secrets": "ts-node scripts/rotate_secrets.ts",
     "sca": "npm audit --json > sca.json && npx --yes npm-audit-html -i sca.json -o sca.html"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.859.0",
     "bullmq": "^4.18.3",
     "dotenv": "^17.2.1",
     "ioredis": "^5.3.2",
-    "pg": "^8.11.5",
-    "node-vault": "^0.10.5"
+    "node-vault": "^0.10.5",
+    "pg": "^8.11.5"
   },
   "devDependencies": {
+    "@stoplight/spectral-cli": "^6.15.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3",
-    "@stoplight/spectral-cli": "^6.15.0"
+    "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">=18"

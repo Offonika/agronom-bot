@@ -28,7 +28,7 @@
 * **Партнёрский заказ:** `/v1/partner/orders` (HMAC).
 * **Ограничение Free‑плана:** `/v1/limits`.
 * **Автопродление Pro:** cron‑нотификации и grace‑period.
-* **Хранение снимков:** TTL = 90 дней + экспорт в `ml-dataset` (opt-in).
+* **Хранение снимков:** TTL = 90 дней + экспорт в `ml-dataset` при `users.opt_in=true`.
 * **Интернационализация:** RU/EN fallback.
 
 ---
