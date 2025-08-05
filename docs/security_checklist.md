@@ -62,7 +62,8 @@ Vault CSI, policies:GPT API Key — 30 dHMAC secret — 90 dDB creds — 
 
 Retention
 
-Photos S3 — 90 d → soft‑delete 30 d → purge.ML‑dataset (Opt‑In) — 2 y.
+Photos S3 — 90 d → soft‑delete 30 d → purge.
+ML‑dataset (users.opt_in=true) — 2 y.
 
 Payments
 

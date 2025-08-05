@@ -376,7 +376,7 @@ SBP Webhook: HMAC‑SHA256 (X-Sign + body.signature), секреты в Vault,
 
 GPT Key: Vault, rotation 30 дн.
 
-Photos: S3 lifecycle delete 90 дн; при Opt‑In экспорт в ml-dataset (anonymised) на 2 года.
+Photos: S3 lifecycle delete 90 дн; при users.opt_in=true экспорт в ml-dataset (anonymised) на 2 года.
 
 Соответствие ФЗ‑152/GDPR: /v1/users/{id}/export, /v1/users/{id}/delete — SLA 30 дн.
 
