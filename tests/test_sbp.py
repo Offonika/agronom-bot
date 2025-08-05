@@ -123,7 +123,7 @@ def test_autopay_webhook_success(client, monkeypatch):
 
     resp = client.post(
         "/v1/payments/sbp/autopay/webhook",
-        headers=HEADERS | {"X-Signature": header_sig, "Content-Type": "application/json"},
+        headers=HEADERS | {"X-Sign": header_sig, "Content-Type": "application/json"},
         content=raw,
     )
     assert resp.status_code == 200
@@ -163,7 +163,7 @@ def test_autopay_webhook_bad_signature(client, monkeypatch):
 
     resp = client.post(
         "/v1/payments/sbp/autopay/webhook",
-        headers=HEADERS | {"X-Signature": bad_header, "Content-Type": "application/json"},
+        headers=HEADERS | {"X-Sign": bad_header, "Content-Type": "application/json"},
         content=raw,
     )
     assert resp.status_code == 403
@@ -186,7 +186,7 @@ def test_autopay_webhook_invalid_status(client, monkeypatch):
 
     resp = client.post(
         "/v1/payments/sbp/autopay/webhook",
-        headers=HEADERS | {"X-Signature": header_sig, "Content-Type": "application/json"},
+        headers=HEADERS | {"X-Sign": header_sig, "Content-Type": "application/json"},
         content=raw,
     )
     assert resp.status_code == 400

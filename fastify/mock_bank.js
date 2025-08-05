@@ -35,7 +35,7 @@ async function main() {
       'X-API-Key': process.env.API_KEY || 'test-api-key',
       'X-API-Ver': 'v1',
       'X-User-ID': '1',
-      'X-Signature': signature,
+      'X-Sign': signature,
     },
     body: JSON.stringify(payload),
   });

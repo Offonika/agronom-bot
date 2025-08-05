@@ -64,7 +64,7 @@ Webhook для единоразовых платежей.
   "signature": "<hmac>"
 }
 
-Backend проверяет HMAC‑SHA256 (X-Signature и signature в теле).
+Backend проверяет HMAC‑SHA256 (X-Sign и signature в теле).
 
 При success → payments.status=success, продлевается users.pro_expires_at.
 

@@ -71,7 +71,7 @@ def test_paywall_with_mock_payment(monkeypatch):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=headers | {"X-Signature": sig},
+        headers=headers | {"X-Sign": sig},
         json=payload,
     )
     assert resp.status_code == 200
