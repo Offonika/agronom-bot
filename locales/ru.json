@@ -32,8 +32,7 @@
   "reminder_cancel_button": "Отменить",
   "reminder_cancelled": "Напоминание отменено",
   "reminder_due": "Сработало напоминание",
-  "reminder_error": "Ошибка напоминаний"
-  ,
+  "reminder_error": "Ошибка напоминаний",
   "error_NO_LEAF": "Лист не обнаружен",
   "error_LIMIT_EXCEEDED": "Превышен лимит",
   "error_GPT_TIMEOUT": "GPT не ответил",
