@@ -371,7 +371,7 @@ async def cancel_autopay(
             code=ErrorCode.UNAUTHORIZED, message="Expired JWT"
         )
         raise HTTPException(status_code=401, detail=err.model_dump()) from exc
-    except Exception as exc:  # noqa: BLE001
+    except jwt.PyJWTError as exc:
         err = ErrorResponse(
             code=ErrorCode.UNAUTHORIZED, message="Invalid JWT"
         )
