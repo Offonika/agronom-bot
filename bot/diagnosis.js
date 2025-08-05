@@ -198,7 +198,6 @@ async function retryHandler(ctx, photoId) {
 }
 
 function getProductName(hash) {
-  cleanupProductNames();
   return productNames.get(hash);
 }
 
