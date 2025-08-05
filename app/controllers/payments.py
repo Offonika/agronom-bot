@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 import hmac
 import jwt
 from datetime import datetime, timezone, timedelta
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app import db as db_module
 from app.config import Settings
 from app.dependencies import ErrorResponse, compute_signature, rate_limit
+from app.metrics import autopay_charge_seconds, payment_fail_total
 from app.models import Event, Payment, User
 from app.services import create_sbp_link
 from app.services.hmac import verify_hmac
@@ -223,6 +225,8 @@ async def payments_webhook(
             db.commit()
 
     await asyncio.to_thread(_db_call)
+    if body.status != "success":
+        payment_fail_total.inc()
     return {}
 
 
@@ -328,7 +332,11 @@ async def autopay_webhook(
 
             db.commit()
 
+    start_time = time.perf_counter()
     await asyncio.to_thread(_db_call)
+    autopay_charge_seconds.observe(time.perf_counter() - start_time)
+    if body.status != "success":
+        payment_fail_total.inc()
     return {}
 
 

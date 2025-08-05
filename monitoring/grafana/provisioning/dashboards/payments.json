@@ -35,6 +35,13 @@
       "targets": [
         { "expr": "histogram_quantile(0.95, rate(payment_latency_seconds_bucket[5m]))" }
       ]
+    },
+    {
+      "title": "Autopay charge p95",
+      "type": "stat",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(autopay_charge_seconds_bucket[5m]))" }
+      ]
     }
   ],
   "timezone": "browser",
