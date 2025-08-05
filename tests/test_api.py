@@ -598,7 +598,7 @@ def test_payment_webhook_success(client):
     }
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
-    headers = HEADERS | {"X-Signature": sig}
+    headers = HEADERS | {"X-Sign": sig}
     resp = client.post(
         "/v1/payments/sbp/webhook",
         headers=headers,
@@ -650,7 +650,7 @@ def test_payment_webhook_updates_pro_expiration(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=HEADERS | {"X-Signature": sig},
+        headers=HEADERS | {"X-Sign": sig},
         json=payload,
     )
     assert resp.status_code == 200
@@ -697,7 +697,7 @@ def test_payment_webhook_cancel(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=HEADERS | {"X-Signature": sig},
+        headers=HEADERS | {"X-Sign": sig},
         json=payload,
     )
     assert resp.status_code == 200
@@ -798,7 +798,7 @@ def test_payment_webhook_bad_payload(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=HEADERS | {"X-Signature": sig},
+        headers=HEADERS | {"X-Sign": sig},
         json=payload,
     )
     assert resp.status_code in {400, 422}
@@ -831,7 +831,7 @@ def test_payment_webhook_bad_signature_returns_403(client, monkeypatch, caplog):
     }
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
-    headers = HEADERS | {"X-Signature": "bad"}
+    headers = HEADERS | {"X-Sign": "bad"}
     with caplog.at_level("WARNING"):
         resp = client.post(
             "/v1/payments/sbp/webhook",

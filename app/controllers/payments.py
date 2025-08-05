@@ -153,7 +153,7 @@ async def payment_status(payment_id: str, user_id: int = Depends(rate_limit)):
 async def payments_webhook(
     request: Request,
     _: None = Depends(rate_limit),
-    x_signature: str | None = Header(None, alias="X-Signature"),
+    x_sign: str | None = Header(None, alias="X-Sign"),
 ):
     raw_ip = request.headers.get(
         "X-Forwarded-For", request.client.host if request.client else ""
@@ -165,7 +165,7 @@ async def payments_webhook(
 
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
-    if secure and not verify_hmac(x_signature or "", raw_body, HMAC_SECRET):
+    if secure and not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
         logger.warning("audit: invalid webhook signature")
         raise HTTPException(status_code=403, detail="FORBIDDEN")
 
@@ -236,7 +236,7 @@ async def payments_webhook(
 async def autopay_webhook(
     request: Request,
     _: None = Depends(rate_limit),
-    x_signature: str | None = Header(None, alias="X-Signature"),
+    x_sign: str | None = Header(None, alias="X-Sign"),
 ):
     raw_ip = request.headers.get(
         "X-Forwarded-For", request.client.host if request.client else ""
@@ -248,7 +248,7 @@ async def autopay_webhook(
 
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
-    if secure and not verify_hmac(x_signature or "", raw_body, HMAC_SECRET):
+    if secure and not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
         logger.warning("audit: invalid webhook signature")
         raise HTTPException(status_code=403, detail="FORBIDDEN")
 
