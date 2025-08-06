@@ -74,7 +74,7 @@ Telegram Bot Token (dev)
 
 OPENAI_API_KEY
 
-GPT‑Vision (sandbox)
+GPT‑Vision (sandbox, required)
 
 TINKOFF_TERMINAL_KEY / TINKOFF_SECRET_KEY
 

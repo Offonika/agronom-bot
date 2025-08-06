@@ -6,6 +6,7 @@ from app import dependencies
 
 # Ensure tests run against SQLite when DATABASE_URL is not defined
 os.environ.setdefault("DATABASE_URL", "sqlite:///./app.db")
+os.environ.setdefault("OPENAI_API_KEY", "test")
 
 from fastapi.testclient import TestClient
 from app.main import app
