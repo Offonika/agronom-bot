@@ -533,6 +533,23 @@ test('cancelAutopay handles unauthorized', { concurrency: false }, async () => {
   assert.equal(replies[0], tr('error_UNAUTHORIZED'));
 });
 
+test('cancelAutopay handles session error', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 7 }, reply: async (m) => replies.push(m) };
+  const calls = [];
+  await withMockFetch(
+    {
+      'http://localhost:8000/v1/auth/token': { ok: false, status: 500 },
+    },
+    async () => {
+      await cancelAutopay(ctx);
+    },
+    calls,
+  );
+  assert.equal(replies[0], tr('autopay_cancel_error'));
+  assert.equal(calls.some((c) => c.url.endsWith('/autopay/cancel')), false);
+});
+
 test('paywall disabled does not reply', { concurrency: false }, async () => {
   process.env.PAYWALL_ENABLED = 'false';
   const replies = [];

@@ -116,6 +116,9 @@ async function cancelAutopay(ctx) {
         'X-User-ID': ctx.from?.id,
       },
     });
+    if (!sessionResp.ok) {
+      return ctx.reply(msg('autopay_cancel_error'));
+    }
     const { jwt, csrf } = await sessionResp.json();
 
     const resp = await fetch(`${API_BASE}/v1/payments/sbp/autopay/cancel`, {
