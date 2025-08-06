@@ -51,10 +51,12 @@ def test_call_gpt_vision_sends_image_url_object(monkeypatch):
     assert image_part["image_url"] == {"url": "https://example.com/x.jpg"}
 
 
-def test_build_client_requires_api_key(monkeypatch):
+def test_get_client_requires_api_key(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(gpt, "_client", None)
+    monkeypatch.setattr(gpt, "_http_client", None)
     with pytest.raises(RuntimeError):
-        gpt._build_client()
+        gpt._get_client()
 
 
 def test_client_lazy_init(monkeypatch):
@@ -64,12 +66,14 @@ def test_client_lazy_init(monkeypatch):
         def create(self, **kwargs):  # type: ignore[override]
             return _fake_openai_response()
 
-    def _fake_build() -> SimpleNamespace:
-        nonlocal calls
-        calls += 1
-        return SimpleNamespace(responses=_FakeResponses())
+    class _FakeOpenAI:
+        def __init__(self, **kwargs):
+            nonlocal calls
+            calls += 1
+            self.responses = _FakeResponses()
 
-    monkeypatch.setattr(gpt, "_build_client", _fake_build)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(gpt, "OpenAI", _FakeOpenAI)
     monkeypatch.setattr(gpt, "_client", None)
     monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
 

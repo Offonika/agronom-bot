@@ -17,32 +17,24 @@ _client: OpenAI | None = None
 _http_client: httpx.Client | None = None
 
 
-def _build_client() -> OpenAI:
-    """Configure OpenAI client honouring proxy environment variables."""
-
-    global _http_client
-
-    proxies: Dict[str, str] = {}
-    http_proxy = os.environ.get("HTTP_PROXY")
-    https_proxy = os.environ.get("HTTPS_PROXY")
-    if http_proxy:
-        proxies["http://"] = http_proxy
-    if https_proxy:
-        proxies["https://"] = https_proxy
-
-    _http_client = httpx.Client(proxies=proxies) if proxies else None
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
-    return OpenAI(api_key=api_key, http_client=_http_client)
-
-
 def _get_client() -> OpenAI:
     """Lazily build and cache the OpenAI client."""
 
-    global _client
+    global _client, _http_client
     if _client is None:
-        _client = _build_client()
+        proxies: Dict[str, str] = {}
+        http_proxy = os.environ.get("HTTP_PROXY")
+        https_proxy = os.environ.get("HTTPS_PROXY")
+        if http_proxy:
+            proxies["http://"] = http_proxy
+        if https_proxy:
+            proxies["https://"] = https_proxy
+
+        _http_client = httpx.Client(proxies=proxies) if proxies else None
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY environment variable is not set")
+        _client = OpenAI(api_key=api_key, http_client=_http_client)
     return _client
 
 
