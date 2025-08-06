@@ -38,6 +38,7 @@ def test_call_gpt_vision_sends_image_url_object(monkeypatch):
     class _FakeResponses:
         def create(self, **kwargs):  # type: ignore[override]
             captured["input"] = kwargs["input"]
+            captured["timeout"] = kwargs["timeout"]
             return _fake_openai_response()
 
     monkeypatch.setattr(
@@ -49,6 +50,7 @@ def test_call_gpt_vision_sends_image_url_object(monkeypatch):
 
     image_part = captured["input"][0]["content"][1]
     assert image_part["image_url"] == {"url": "https://example.com/x.jpg"}
+    assert captured["timeout"] == 30
 
 
 def test_get_client_requires_api_key(monkeypatch):
@@ -93,6 +95,23 @@ def test_call_gpt_vision_empty_output(monkeypatch):
     monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
 
     with pytest.raises(ValueError):
+        gpt.call_gpt_vision("photo.jpg")
+
+
+def test_call_gpt_vision_timeout(monkeypatch):
+    from openai import APITimeoutError
+    import httpx
+
+    class _FakeResponses:
+        def create(self, **kwargs):  # type: ignore[override]
+            raise APITimeoutError(httpx.Request("POST", "https://example.com"))
+
+    monkeypatch.setattr(
+        gpt, "_get_client", lambda: SimpleNamespace(responses=_FakeResponses())
+    )
+    monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
+
+    with pytest.raises(TimeoutError):
         gpt.call_gpt_vision("photo.jpg")
 
 
