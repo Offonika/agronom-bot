@@ -3,9 +3,11 @@ import hmac  # required for HMAC signature checks
 import io
 import json
 import zipfile
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from app import db as db_module
 from app.config import Settings
@@ -16,6 +18,45 @@ settings = Settings()
 HMAC_SECRET = settings.hmac_secret
 
 router = APIRouter()
+
+
+class PhotoExport(BaseModel):
+    file_id: str
+    file_unique_id: str | None = None
+    width: int | None = None
+    height: int | None = None
+    file_size: int | None = None
+    crop: str | None = None
+    disease: str | None = None
+    confidence: float | None = None
+    roi: float | None = None
+    status: str
+    error_code: ErrorCode | None = None
+    ts: datetime
+
+
+class PaymentExport(BaseModel):
+    amount: int | None = None
+    currency: str | None = None
+    provider: str | None = None
+    external_id: str | None = None
+    prolong_months: int | None = None
+    autopay: bool
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class EventExport(BaseModel):
+    event: str
+    ts: datetime
+
+
+def serialize(items: list, schema: type[BaseModel]) -> list[dict]:
+    return [
+        schema.model_validate(obj, from_attributes=True).model_dump()
+        for obj in items
+    ]
 
 
 @router.get(
@@ -46,16 +87,10 @@ async def export_user(
             payments = db.query(Payment).filter_by(user_id=user_id).all()
             events = db.query(Event).filter_by(user_id=user_id).all()
 
-            def serialize(items):
-                return [
-                    {k: v for k, v in vars(obj).items() if not k.startswith("_")}
-                    for obj in items
-                ]
-
             return {
-                "photos": serialize(photos),
-                "payments": serialize(payments),
-                "events": serialize(events),
+                "photos": serialize(photos, PhotoExport),
+                "payments": serialize(payments, PaymentExport),
+                "events": serialize(events, EventExport),
             }
 
     data = await asyncio.to_thread(_db_call)

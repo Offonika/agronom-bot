@@ -50,6 +50,37 @@ def test_export_user_data(client):
     assert len(data["payments"]) == 1
     assert len(data["events"]) == 1
 
+    photo_keys = {
+        "file_id",
+        "file_unique_id",
+        "width",
+        "height",
+        "file_size",
+        "crop",
+        "disease",
+        "confidence",
+        "roi",
+        "status",
+        "error_code",
+        "ts",
+    }
+    payment_keys = {
+        "amount",
+        "currency",
+        "provider",
+        "external_id",
+        "prolong_months",
+        "autopay",
+        "status",
+        "created_at",
+        "updated_at",
+    }
+    event_keys = {"event", "ts"}
+
+    assert set(data["photos"][0].keys()) == photo_keys
+    assert set(data["payments"][0].keys()) == payment_keys
+    assert set(data["events"][0].keys()) == event_keys
+
 
 def test_export_bad_signature(client):
     _prepare_db()
