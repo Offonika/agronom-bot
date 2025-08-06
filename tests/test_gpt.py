@@ -81,3 +81,17 @@ def test_client_lazy_init(monkeypatch):
     gpt.call_gpt_vision("key")
     assert calls == 1
 
+
+def test_call_gpt_vision_empty_output(monkeypatch):
+    class _FakeResponses:
+        def create(self, **kwargs):  # type: ignore[override]
+            return SimpleNamespace(output=[])
+
+    monkeypatch.setattr(
+        gpt, "_get_client", lambda: SimpleNamespace(responses=_FakeResponses())
+    )
+    monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
+
+    with pytest.raises(ValueError):
+        gpt.call_gpt_vision("photo.jpg")
+
