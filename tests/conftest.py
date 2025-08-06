@@ -1,6 +1,11 @@
 import os
-import subprocess
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+from pathlib import Path
+
 import pytest
+from alembic import command
+from alembic.config import Config
 
 from app import dependencies
 
@@ -16,7 +21,17 @@ from app.db import init_db
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations():
     """Apply Alembic migrations before running tests."""
-    subprocess.run(["alembic", "upgrade", "head"], check=True)
+    cfg_path = Path(__file__).resolve().parent.parent / "alembic.ini"
+    config = Config(str(cfg_path))
+    stdout_buf, stderr_buf = StringIO(), StringIO()
+    try:
+        with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+            command.upgrade(config, "head")
+    except Exception as exc:
+        print("Alembic upgrade failed:", exc)
+        print("stdout:\n", stdout_buf.getvalue())
+        print("stderr:\n", stderr_buf.getvalue())
+        raise
     init_db(Settings())
 
 
