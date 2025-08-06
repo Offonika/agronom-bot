@@ -1,6 +1,6 @@
 import asyncio
 import json
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 
@@ -27,19 +27,19 @@ async def ask_expert(
 
     try:
         payload = await request.json()
-    except json.JSONDecodeError as exc:
+    except json.JSONDecodeError:
         err = ErrorResponse(
             code=ErrorCode.BAD_REQUEST, message="Invalid JSON payload"
         )
-        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
+        return JSONResponse(status_code=400, content=err.model_dump())
 
     try:
         AskExpertRequest.model_validate(payload)
-    except ValidationError as exc:
+    except ValidationError:
         err = ErrorResponse(
             code=ErrorCode.BAD_REQUEST, message="Invalid request body"
         )
-        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
+        return JSONResponse(status_code=400, content=err.model_dump())
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
