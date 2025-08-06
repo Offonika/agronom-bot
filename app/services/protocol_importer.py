@@ -29,6 +29,12 @@ from app import db
 from app.models.catalog import Catalog
 from app.models.catalog_item import CatalogItem
 
+from app.config import Settings
+from app.db import init_db
+
+cfg = Settings()
+init_db(cfg)
+
 logger = logging.getLogger(__name__)
 
 
