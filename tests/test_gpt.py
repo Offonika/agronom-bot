@@ -14,17 +14,17 @@ def _fake_openai_response() -> SimpleNamespace:
     )
 
 
-def test_call_gpt_vision_parses_response(tmp_path, monkeypatch):
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"data")
-
+def test_call_gpt_vision_parses_response(monkeypatch):
     class _FakeResponses:
         def create(self, **kwargs):  # type: ignore[override]
             return _fake_openai_response()
 
-    monkeypatch.setattr(gpt, "client", SimpleNamespace(responses=_FakeResponses()))
+    monkeypatch.setattr(
+        gpt, "_get_client", lambda: SimpleNamespace(responses=_FakeResponses())
+    )
+    monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
 
-    resp = gpt.call_gpt_vision(str(img))
+    resp = gpt.call_gpt_vision("photo.jpg")
     assert resp == {
         "crop": "apple",
         "disease": "powdery_mildew",
@@ -41,9 +41,7 @@ def test_call_gpt_vision_sends_image_url_object(monkeypatch):
             return _fake_openai_response()
 
     monkeypatch.setattr(
-        gpt,
-        "client",
-        SimpleNamespace(responses=_FakeResponses()),
+        gpt, "_get_client", lambda: SimpleNamespace(responses=_FakeResponses())
     )
     monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
 
@@ -57,4 +55,25 @@ def test_build_client_requires_api_key(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(RuntimeError):
         gpt._build_client()
+
+
+def test_client_lazy_init(monkeypatch):
+    calls = 0
+
+    class _FakeResponses:
+        def create(self, **kwargs):  # type: ignore[override]
+            return _fake_openai_response()
+
+    def _fake_build() -> SimpleNamespace:
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(responses=_FakeResponses())
+
+    monkeypatch.setattr(gpt, "_build_client", _fake_build)
+    monkeypatch.setattr(gpt, "_client", None)
+    monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
+
+    gpt.call_gpt_vision("key")
+    gpt.call_gpt_vision("key")
+    assert calls == 1
 

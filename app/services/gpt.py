@@ -6,14 +6,21 @@ import json
 import os
 from typing import Dict
 
+import atexit
 import httpx
 from openai import OpenAI, OpenAIError
 
 from .storage import get_public_url
 
 
+_client: OpenAI | None = None
+_http_client: httpx.Client | None = None
+
+
 def _build_client() -> OpenAI:
     """Configure OpenAI client honouring proxy environment variables."""
+
+    global _http_client
 
     proxies: Dict[str, str] = {}
     http_proxy = os.environ.get("HTTP_PROXY")
@@ -23,15 +30,28 @@ def _build_client() -> OpenAI:
     if https_proxy:
         proxies["https://"] = https_proxy
 
-    http_client = httpx.Client(proxies=proxies) if proxies else None
+    _http_client = httpx.Client(proxies=proxies) if proxies else None
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY environment variable is not set")
-    return OpenAI(api_key=api_key, http_client=http_client)
+    return OpenAI(api_key=api_key, http_client=_http_client)
 
 
-# Reused in tests where it may be monkeypatched
-client = _build_client()
+def _get_client() -> OpenAI:
+    """Lazily build and cache the OpenAI client."""
+
+    global _client
+    if _client is None:
+        _client = _build_client()
+    return _client
+
+
+def _close_client() -> None:
+    if _http_client is not None:
+        _http_client.close()
+
+
+atexit.register(_close_client)
 
 _PROMPT = (
     "You are an agronomist assistant. "
@@ -51,6 +71,7 @@ def call_gpt_vision(key: str) -> dict:
 
     image_url = get_public_url(key)
 
+    client = _get_client()
     try:
         response = client.responses.create(
             model="gpt-4.1-mini",
