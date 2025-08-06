@@ -3,6 +3,8 @@ const { test } = require('node:test');
 const { Readable } = require('node:stream');
 
 process.env.FREE_PHOTO_LIMIT = '5';
+process.env.API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
+const API_BASE = process.env.API_BASE_URL;
 const {
   formatDiagnosis,
   photoHandler,
@@ -423,7 +425,7 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p1' }) },
+      [`${API_BASE}/v1/payments/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p1' }) },
       default: { json: async () => ({ status: 'success', pro_expires_at: '2025-01-01T00:00:00Z' }) },
     },
     async () => {
@@ -436,7 +438,7 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   assert.equal(btn.url, 'http://pay');
   assert.equal(btn.text, tr('payment_button'));
   assert.equal(ctx.paymentId, 'p1');
-  const req = calls.find((c) => c.url === 'http://localhost:8000/v1/payments/create');
+  const req = calls.find((c) => c.url === `${API_BASE}/v1/payments/create`);
   assert.equal(req.opts.method, 'POST');
   assert.equal(req.opts.headers['Content-Type'], 'application/json');
   assert.equal(req.opts.headers['X-API-Key'], 'test-api-key');
@@ -455,8 +457,8 @@ test('buyProHandler polls success', { concurrency: false }, async () => {
   const ctx = { from: { id: 2 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
   const pool = { query: async () => {} };
   await withMockFetch({
-    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p2' }) },
-    'http://localhost:8000/v1/payments/p2': { json: async () => ({ status: 'success', pro_expires_at: '2025-12-31T00:00:00Z' }) },
+    [`${API_BASE}/v1/payments/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p2' }) },
+    [`${API_BASE}/v1/payments/p2`]: { json: async () => ({ status: 'success', pro_expires_at: '2025-12-31T00:00:00Z' }) },
     default: { json: async () => ({ status: 'pending' }) },
   }, async () => {
     await buyProHandler(ctx, pool, 1);
@@ -470,8 +472,8 @@ test('buyProHandler polls fail', { concurrency: false }, async () => {
   const ctx = { from: { id: 3 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
   const pool = { query: async () => {} };
   await withMockFetch({
-    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p3' }) },
-    'http://localhost:8000/v1/payments/p3': { json: async () => ({ status: 'fail' }) },
+    [`${API_BASE}/v1/payments/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p3' }) },
+    [`${API_BASE}/v1/payments/p3`]: { json: async () => ({ status: 'fail' }) },
     default: { json: async () => ({ status: 'fail' }) },
   }, async () => {
     await buyProHandler(ctx, pool, 1);
@@ -486,7 +488,7 @@ test('buyProHandler handles non-ok API status', { concurrency: false }, async ()
   const pool = { query: async () => {} };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': { ok: false, status: 500 },
+      [`${API_BASE}/v1/payments/create`]: { ok: false, status: 500 },
     },
     async () => {
       await buyProHandler(ctx, pool, 0);
@@ -506,7 +508,7 @@ test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': {
+      [`${API_BASE}/v1/payments/create`]: {
         json: async () => ({ url: 'http://pay', payment_id: 'p4' }),
       },
       default: {
@@ -518,7 +520,7 @@ test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
     },
     calls,
   );
-  const req = calls.find((c) => c.url === 'http://localhost:8000/v1/payments/create');
+  const req = calls.find((c) => c.url === `${API_BASE}/v1/payments/create`);
   assert.equal(JSON.parse(req.opts.body).autopay, true);
 });
 
@@ -528,8 +530,8 @@ test('cancelAutopay calls API with auth tokens', { concurrency: false }, async (
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/auth/token': { json: async () => ({ jwt: 'j', csrf: 'c' }) },
-      'http://localhost:8000/v1/payments/sbp/autopay/cancel': { status: 204 },
+      [`${API_BASE}/v1/auth/token`]: { json: async () => ({ jwt: 'j', csrf: 'c' }) },
+      [`${API_BASE}/v1/payments/sbp/autopay/cancel`]: { status: 204 },
     },
     async () => {
       await cancelAutopay(ctx);
@@ -548,8 +550,8 @@ test('cancelAutopay handles unauthorized', { concurrency: false }, async () => {
   const ctx = { from: { id: 6 }, reply: async (m) => replies.push(m) };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/auth/token': { json: async () => ({ jwt: 'j', csrf: 'c' }) },
-      'http://localhost:8000/v1/payments/sbp/autopay/cancel': { status: 401 },
+      [`${API_BASE}/v1/auth/token`]: { json: async () => ({ jwt: 'j', csrf: 'c' }) },
+      [`${API_BASE}/v1/payments/sbp/autopay/cancel`]: { status: 401 },
     },
     async () => {
       await cancelAutopay(ctx);
@@ -564,7 +566,7 @@ test('cancelAutopay handles session error', { concurrency: false }, async () => 
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/auth/token': { ok: false, status: 500 },
+      [`${API_BASE}/v1/auth/token`]: { ok: false, status: 500 },
     },
     async () => {
       await cancelAutopay(ctx);
@@ -609,7 +611,7 @@ test('retryHandler returns result', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch({
-    'http://localhost:8000/v1/photos/42': {
+    [`${API_BASE}/v1/photos/42`]: {
       json: async () => ({
         status: 'ok',
         crop: 'apple',
@@ -632,11 +634,11 @@ test('historyHandler paginates', { concurrency: false }, async () => {
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/photos?limit=10': {
+      [`${API_BASE}/v1/photos?limit=10`]: {
         json: async () => ({
           items: [
             { id: 1, ts: '2025-01-01T00:00:00Z', crop: 'apple', disease: 'scab' },
-          ],
+            ],
           next_cursor: 'abc',
         }),
       },
@@ -660,7 +662,7 @@ test('historyHandler logs page event', { concurrency: false }, async () => {
   const pool = { query: async (...a) => events.push(a) };
   const ctx = { from: { id: 2 }, reply: async () => {} };
   await withMockFetch({
-    'http://localhost:8000/v1/photos?limit=10&cursor=abc': { json: async () => ({ items: [], next_cursor: null }) },
+    [`${API_BASE}/v1/photos?limit=10&cursor=abc`]: { json: async () => ({ items: [], next_cursor: null }) },
   }, async () => {
     await historyHandler(ctx, 'abc', pool);
   });
@@ -678,7 +680,7 @@ test('historyHandler handles malformed responses', { concurrency: false }, async
     };
     await withMockFetch(
       {
-        'http://localhost:8000/v1/photos?limit=10': { json: async () => bad },
+        [`${API_BASE}/v1/photos?limit=10`]: { json: async () => bad },
       },
       async () => {
         await historyHandler(ctx, '');
@@ -786,7 +788,7 @@ test('pollPaymentStatus notifies on timeout', { concurrency: false }, async () =
   const ctx = { from: { id: 1 }, reply: async (m) => replies.push(m) };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/42': { json: async () => ({ status: 'processing' }) },
+      [`${API_BASE}/v1/payments/42`]: { json: async () => ({ status: 'processing' }) },
     },
     async () => {
       await pollPaymentStatus(ctx, 42, 1, 5);
@@ -802,7 +804,7 @@ test('pollPaymentStatus stops when aborted', { concurrency: false }, async () =>
   setTimeout(() => controller.abort(), 2);
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/42': { json: async () => ({ status: 'processing' }) },
+      [`${API_BASE}/v1/payments/42`]: { json: async () => ({ status: 'processing' }) },
     },
     async () => {
       await pollPaymentStatus(ctx, 42, 10, 100, controller.signal);
@@ -820,10 +822,10 @@ test('buyProHandler aborts existing poll', { concurrency: false }, async () => {
   const pool = { query: async () => {} };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': {
+      [`${API_BASE}/v1/payments/create`]: {
         json: async () => ({ payment_id: 1, url: 'http://pay' }),
       },
-      'http://localhost:8000/v1/payments/1': {
+      [`${API_BASE}/v1/payments/1`]: {
         json: async () => ({ status: 'success', pro_expires_at: new Date().toISOString() }),
       },
     },
