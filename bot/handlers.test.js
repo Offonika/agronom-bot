@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const { Readable } = require('node:stream');
 
 process.env.FREE_PHOTO_LIMIT = '5';
 const {
@@ -73,7 +74,7 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -94,7 +95,7 @@ test('photoHandler handles non-ok API status', { concurrency: false }, async () 
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { ok: false, status: 500 },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -112,7 +113,7 @@ test('photoHandler responds with error_code message', { concurrency: false }, as
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { ok: false, status: 400, json: async () => ({ error_code: 'NO_LEAF' }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -130,12 +131,36 @@ test('photoHandler handles invalid JSON response', { concurrency: false }, async
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => { throw new Error('bad json'); } },
   }, async () => {
     await photoHandler(pool, ctx);
   });
   assert.equal(replies[0], msg('diagnose_error'));
+});
+
+test('photoHandler rejects oversized photo', { concurrency: false }, async () => {
+  const calls = [];
+  const pool = { query: async (...args) => { calls.push(args); } };
+  const replies = [];
+  let linkCalled = false;
+  const ctx = {
+    message: {
+      photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 2 * 1024 * 1024 + 1 }],
+    },
+    from: { id: 1 },
+    reply: async (msg) => replies.push(msg),
+    telegram: {
+      getFileLink: async () => {
+        linkCalled = true;
+        return { href: 'http://file' };
+      },
+    },
+  };
+  await photoHandler(pool, ctx);
+  assert.equal(replies[0], msg('photo_too_large'));
+  assert.equal(linkCalled, false);
+  assert.equal(calls.length, 0);
 });
 
 test('messageHandler ignores non-photo', { concurrency: false }, () => {
@@ -157,7 +182,7 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: {
       json: async () => ({
         crop: 'apple',
@@ -283,7 +308,7 @@ test('photoHandler shows expert button when enabled', { concurrency: false }, as
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -304,7 +329,7 @@ test('photoHandler hides expert button when disabled', { concurrency: false }, a
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -323,7 +348,7 @@ test('photoHandler paywall on 402', { concurrency: false }, async () => {
   };
   process.env.FREE_PHOTO_LIMIT = '4';
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { status: 402, json: async () => ({ error: 'limit_reached', limit: 5 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -569,7 +594,7 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { status: 202, json: async () => ({ status: 'pending', id: 42 }) },
   }, async () => {
     await photoHandler(pool, ctx);
