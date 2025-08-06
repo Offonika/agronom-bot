@@ -560,7 +560,7 @@ test('cancelAutopay handles unauthorized', { concurrency: false }, async () => {
       await cancelAutopay(ctx);
     },
   );
-  assert.equal(replies[0], tr('error_UNAUTHORIZED'));
+  assert.equal(replies[0], msg('error_UNAUTHORIZED'));
 });
 
 test('cancelAutopay handles session error', { concurrency: false }, async () => {
