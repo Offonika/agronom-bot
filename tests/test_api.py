@@ -359,17 +359,10 @@ def test_diagnose_gpt_timeout(monkeypatch, client):
         headers=HEADERS,
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
-    assert resp.status_code in {200, 202}
+    assert resp.status_code == 502
     data = resp.json()
-    assert data["status"] == "pending"
-    assert "id" in data
-
-    from app.db import SessionLocal
-    from app.models import Photo
-
-    with SessionLocal() as session:
-        photo = session.query(Photo).order_by(Photo.id.desc()).first()
-        assert photo.status == "pending"
+    assert data["code"] == ErrorCode.GPT_TIMEOUT
+    assert data["message"]
 
 
 def test_quota_exceeded(client):

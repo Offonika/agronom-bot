@@ -114,22 +114,32 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, 
         crop = result.get("crop", "")
         disease = result.get("disease", "")
         conf = result.get("confidence", 0.0)
-    except TimeoutError:
+    except TimeoutError as exc:
         gpt_timeout_total.inc()
+        logger.exception("GPT timeout")
+        err = ErrorResponse(
+            code=ErrorCode.GPT_TIMEOUT, message="GPT timeout"
+        )
+        raise _ProcessImageError(
+            JSONResponse(status_code=502, content=err.model_dump())
+        ) from exc
+    except (ValueError, json.JSONDecodeError) as exc:
+        logger.exception("Invalid GPT response")
+        err = ErrorResponse(
+            code=ErrorCode.SERVICE_UNAVAILABLE,
+            message="Invalid GPT response",
+        )
+        raise _ProcessImageError(
+            JSONResponse(status_code=502, content=err.model_dump())
+        ) from exc
+    except Exception as exc:
         logger.exception("GPT error")
-        crop = ""
-        disease = ""
-        conf = 0.0
-    except (ValueError, json.JSONDecodeError):
-        logger.exception("GPT error")
-        crop = ""
-        disease = ""
-        conf = 0.0
-    except Exception:
-        logger.exception("GPT error")
-        crop = ""
-        disease = ""
-        conf = 0.0
+        err = ErrorResponse(
+            code=ErrorCode.SERVICE_UNAVAILABLE, message="GPT error"
+        )
+        raise _ProcessImageError(
+            JSONResponse(status_code=502, content=err.model_dump())
+        ) from exc
 
     roi_start = time.perf_counter()
     roi = calculate_roi(crop, disease) if crop and disease else 0.0
