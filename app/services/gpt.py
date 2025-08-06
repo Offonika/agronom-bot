@@ -89,7 +89,7 @@ def call_gpt_vision(key: str) -> dict:
         crop = data["crop"]
         disease = data["disease"]
         confidence = float(data["confidence"])
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError, IndexError) as exc:
         raise ValueError("Malformed GPT response") from exc
 
     return {"crop": crop, "disease": disease, "confidence": confidence}
