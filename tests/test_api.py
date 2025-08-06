@@ -587,7 +587,12 @@ def test_create_payment_invalid_json(client):
         content="{not-valid",
     )
     assert resp.status_code == 400
-    assert resp.json() == {"detail": ErrorCode.BAD_REQUEST}
+    assert resp.json() == {
+        "detail": {
+            "code": ErrorCode.BAD_REQUEST,
+            "message": "Invalid JSON payload",
+        }
+    }
 
 
 def test_create_payment_user_id_mismatch(client):

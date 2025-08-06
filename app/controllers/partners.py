@@ -40,7 +40,8 @@ async def partner_orders(
     client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.partner_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
-        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
+        err = ErrorResponse(code=ErrorCode.FORBIDDEN, message="IP address forbidden")
+        raise HTTPException(status_code=403, detail=err.model_dump())
 
     ip_key = f"rate:partner-ip:{client_ip}"
     try:
@@ -63,8 +64,11 @@ async def partner_orders(
     data, sign, provided_sign = await verify_partner_hmac(request, x_sign)
     try:
         body = PartnerOrderRequest(**data, signature=provided_sign)
-    except ValidationError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except ValidationError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid order payload"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     def _db_call() -> tuple[str, bool]:
         with db_module.SessionLocal() as db:

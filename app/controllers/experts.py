@@ -27,13 +27,19 @@ async def ask_expert(
 
     try:
         payload = await request.json()
-    except json.JSONDecodeError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except json.JSONDecodeError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid JSON payload"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     try:
         AskExpertRequest.model_validate(payload)
-    except ValidationError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except ValidationError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid request body"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
