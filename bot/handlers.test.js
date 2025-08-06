@@ -90,6 +90,21 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
   delete process.env.BETA_EXPERT_CHAT;
 });
 
+test('photoHandler replies on DB error', { concurrency: false }, async () => {
+  const pool = { query: async () => { throw new Error('fail'); } };
+  const replies = [];
+  let called = false;
+  const ctx = {
+    message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 1 },
+    reply: async (msg) => replies.push(msg),
+    telegram: { getFileLink: async () => { called = true; } },
+  };
+  await photoHandler(pool, ctx);
+  assert.equal(replies[0], msg('db_error'));
+  assert.equal(called, false);
+});
+
 test('photoHandler handles non-ok API status', { concurrency: false }, async () => {
   const pool = { query: async () => {} };
   const replies = [];

@@ -94,6 +94,10 @@ async function photoHandler(pool, ctx) {
     );
   } catch (err) {
     console.error('DB insert error', err);
+    if (typeof ctx.reply === 'function') {
+      await ctx.reply(msg('db_error'));
+    }
+    return;
   }
 
   try {
