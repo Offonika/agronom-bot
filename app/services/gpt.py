@@ -7,7 +7,7 @@ import os
 import atexit
 
 import httpx
-from openai import OpenAI, OpenAIError
+from openai import APITimeoutError, OpenAI, OpenAIError
 
 from .storage import get_public_url
 
@@ -53,6 +53,8 @@ _PROMPT = (
     "Respond in JSON with fields crop, disease and confidence (0..1)."
 )
 
+_TIMEOUT_SECONDS = 30
+
 
 def call_gpt_vision(key: str) -> dict:
     """Send photo to GPT‑Vision and parse the diagnosis.
@@ -82,7 +84,10 @@ def call_gpt_vision(key: str) -> dict:
                 }
             ],
             response_format={"type": "json_object"},
+            timeout=_TIMEOUT_SECONDS,
         )
+    except APITimeoutError as exc:
+        raise TimeoutError("OpenAI request timed out") from exc
     except OpenAIError as exc:  # pragma: no cover - network/SDK errors
         raise RuntimeError("OpenAI request failed") from exc
 
