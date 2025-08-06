@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 from dataclasses import dataclass
@@ -34,21 +35,19 @@ class ProtocolRow:
 # --------------------------------------------------------------------------- #
 def _query_protocol(crop: str, disease: str) -> ProtocolRow | None:
     """Fetch a protocol row from the ``protocols_current`` view."""
-    session = db.SessionLocal()
     try:
-        row = session.execute(
-            text(
-                "SELECT id, crop, disease, product, dosage_value, dosage_unit, phi "
-                "FROM protocols_current WHERE crop = :crop AND disease = :disease LIMIT 1"
-            ),
-            {"crop": crop, "disease": disease},
-        ).first()
-        return ProtocolRow(**row._mapping) if row else None
+        with db.SessionLocal() as session:
+            row = session.execute(
+                text(
+                    "SELECT id, crop, disease, product, dosage_value, dosage_unit, phi "
+                    "FROM protocols_current WHERE crop = :crop AND disease = :disease LIMIT 1"
+                ),
+                {"crop": crop, "disease": disease},
+            ).first()
+            return ProtocolRow(**row._mapping) if row else None
     except OperationalError as exc:
         logger.warning("protocols_current view query failed: %s", exc)
         return None
-    finally:
-        session.close()
 
 
 # --------------------------------------------------------------------------- #
@@ -79,3 +78,10 @@ def find_protocol(category: str, crop: str, disease: str) -> ProtocolRow | None:
     # ``category`` is currently unused as the view lacks this column, but the
     # signature is kept for forward compatibility.
     return _cache_protocol(crop, disease)
+
+
+async def async_find_protocol(
+    category: str, crop: str, disease: str
+) -> ProtocolRow | None:
+    """Async wrapper for :func:`find_protocol` using ``asyncio.to_thread``."""
+    return await asyncio.to_thread(find_protocol, category, crop, disease)

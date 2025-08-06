@@ -140,7 +140,11 @@ def test_diagnose_multipart_uses_process(monkeypatch, client):
         return "k", "wheat", "rust", 0.5, 2.1
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
-    monkeypatch.setattr("app.controllers.photos.find_protocol", lambda *_, **__: None)
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
     resp = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -162,7 +166,11 @@ def test_diagnose_base64_uses_process(monkeypatch, client):
         return "k", "corn", "blight", 0.7, 3.3
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
-    monkeypatch.setattr("app.controllers.photos.find_protocol", lambda *_, **__: None)
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
     encoded = base64.b64encode(b"xyz").decode()
     resp = client.post(
         "/v1/ai/diagnose",
