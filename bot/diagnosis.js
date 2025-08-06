@@ -140,7 +140,7 @@ async function photoHandler(pool, ctx) {
       let errCode;
       try {
         const errData = await apiResp.json();
-        errCode = errData?.error_code;
+        errCode = errData?.code;
       } catch (err) {
         console.error('Failed to parse API error response', err);
       }
