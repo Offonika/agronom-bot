@@ -1,3 +1,4 @@
+import base64
 import os
 import re
 import logging
@@ -15,6 +16,11 @@ from app.services.storage import upload_photo, get_public_url, get_client
 
 
 ORIGINAL_MAKE_CLIENT = storage._make_client
+
+PNG_BASE64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBgN4abH0AAAAASUVORK5CYII="
+)
+PNG_BYTES = base64.b64decode(PNG_BASE64)
 
 
 class _AsyncWrapper:
@@ -76,10 +82,11 @@ async def test_upload_and_url():
             s3 = boto3.client("s3", region_name="us-east-1")
             s3.create_bucket(Bucket="testbucket")
 
-            key = await upload_photo(42, b"hello")
-            assert re.fullmatch(r"42/\d{14}-[0-9a-f]{32}\.jpg", key)
+            key = await upload_photo(42, PNG_BYTES)
+            assert re.fullmatch(r"42/\d{14}-[0-9a-f]{32}\.png", key)
             obj = s3.get_object(Bucket="testbucket", Key=key)
-            assert obj["Body"].read() == b"hello"
+            assert obj["Body"].read() == PNG_BYTES
+            assert obj["ContentType"] == "image/png"
 
             url = get_public_url(key)
             assert url == f"http://localhost:9000/{key}"
@@ -205,7 +212,7 @@ async def test_upload_failure():
         with mock_aws():
             # Intentionally do not create bucket to trigger error
             with pytest.raises(HTTPException) as exc:
-                await upload_photo(42, b"hello")
+                await upload_photo(42, PNG_BYTES)
             assert exc.value.status_code == 500
     finally:
         for name, value in original_env.items():

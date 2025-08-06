@@ -1,5 +1,6 @@
 import logging
 import os
+import imghdr
 from asyncio import Lock
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -114,8 +115,16 @@ async def init_storage(cfg: Settings) -> None:
 
 async def upload_photo(user_id: int, data: bytes) -> str:
     """Upload bytes to S3 and return the object key."""
+    img_type = imghdr.what(None, data)
+    if img_type is None:
+        raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    ext_map = {"jpeg": "jpg"}
+    content_type = f"image/{img_type}"
+    extension = ext_map.get(img_type, img_type)
+
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    key = f"{user_id}/{ts}-{uuid4().hex}.jpg"
+    key = f"{user_id}/{ts}-{uuid4().hex}.{extension}"
     bucket = os.getenv(
         "S3_BUCKET",
         _settings.s3_bucket if _settings is not None else BUCKET,
@@ -123,7 +132,7 @@ async def upload_photo(user_id: int, data: bytes) -> str:
     try:
         client = await get_client()
         await client.put_object(
-            Bucket=bucket, Key=key, Body=data, ContentType="image/jpeg"
+            Bucket=bucket, Key=key, Body=data, ContentType=content_type
         )
     except (BotoCoreError, ClientError) as exc:
         logger.exception("🔥 Ошибка при загрузке в S3: %s", exc)
