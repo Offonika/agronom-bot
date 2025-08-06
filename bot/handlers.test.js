@@ -3,7 +3,10 @@ const { test } = require('node:test');
 const { Readable } = require('node:stream');
 
 process.env.FREE_PHOTO_LIMIT = '5';
-process.env.API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
+
+process.env.API_BASE_URL = 'http://localhost:8000';
+
+
 const API_BASE = process.env.API_BASE_URL;
 const {
   formatDiagnosis,
