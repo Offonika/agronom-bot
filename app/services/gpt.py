@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Dict
-
 import atexit
+
 import httpx
 from openai import OpenAI, OpenAIError
 
@@ -22,15 +21,15 @@ def _get_client() -> OpenAI:
 
     global _client, _http_client
     if _client is None:
-        proxies: Dict[str, str] = {}
+        mounts: dict[str, httpx.HTTPTransport] = {}
         http_proxy = os.environ.get("HTTP_PROXY")
         https_proxy = os.environ.get("HTTPS_PROXY")
         if http_proxy:
-            proxies["http://"] = http_proxy
+            mounts["http://"] = httpx.HTTPTransport(proxy=http_proxy)
         if https_proxy:
-            proxies["https://"] = https_proxy
+            mounts["https://"] = httpx.HTTPTransport(proxy=https_proxy)
 
-        _http_client = httpx.Client(proxy=proxies) if proxies else None
+        _http_client = httpx.Client(mounts=mounts) if mounts else None
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY environment variable is not set")
