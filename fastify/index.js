@@ -1,4 +1,5 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const Fastify = require('fastify');
 const fastifyMultipart = require('@fastify/multipart');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
@@ -44,7 +45,8 @@ app.post('/v1/ai/diagnose', async function (request, reply) {
 
   if (request.isMultipart()) {
     const data = await request.file();
-    filename = Date.now() + '-' + (data.filename || 'upload');
+    filename =
+      Date.now() + '-' + crypto.randomUUID() + '-' + (data.filename || 'upload');
     buffer = await data.toBuffer();
   } else {
     const body = request.body;
@@ -52,7 +54,7 @@ app.post('/v1/ai/diagnose', async function (request, reply) {
       return reply.code(400).send({ code: 'BAD_REQUEST', message: 'No image' });
     }
     buffer = Buffer.from(body.image_base64, 'base64');
-    filename = Date.now() + '-base64.jpg';
+    filename = Date.now() + '-' + crypto.randomUUID() + '-base64.jpg';
   }
 
   try {
