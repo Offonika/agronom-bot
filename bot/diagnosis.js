@@ -1,4 +1,6 @@
 const crypto = require('node:crypto');
+const { Readable } = require('node:stream');
+const FormData = require('form-data');
 const { msg } = require('./utils');
 const { sendPaywall } = require('./payments');
 
@@ -17,6 +19,7 @@ function cleanupProductNames() {
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 
 function formatDiagnosis(ctx, data) {
   let text =
@@ -78,6 +81,12 @@ function formatDiagnosis(ctx, data) {
 async function photoHandler(pool, ctx) {
   const photo = ctx.message.photo[ctx.message.photo.length - 1];
   const { file_id, file_unique_id, width, height, file_size } = photo;
+  if (file_size > MAX_FILE_SIZE) {
+    if (typeof ctx.reply === 'function') {
+      await ctx.reply(msg('photo_too_large'));
+    }
+    return;
+  }
   const userId = ctx.from.id;
   try {
     await pool.query(
@@ -100,9 +109,12 @@ async function photoHandler(pool, ctx) {
       }
       return;
     }
-    const buffer = Buffer.from(await res.arrayBuffer());
     const form = new FormData();
-    form.append('image', new Blob([buffer], { type: 'image/jpeg' }), 'photo.jpg');
+    let stream = res.body;
+    if (stream?.getReader) {
+      stream = Readable.fromWeb(stream);
+    }
+    form.append('image', stream, { filename: 'photo.jpg', contentType: 'image/jpeg' });
 
     console.log('Sending to API', API_BASE + '/v1/ai/diagnose');
     const apiResp = await fetch(API_BASE + '/v1/ai/diagnose', {
@@ -111,6 +123,7 @@ async function photoHandler(pool, ctx) {
         'X-API-Key': API_KEY,
         'X-API-Ver': API_VER,
         'X-User-ID': userId,
+        ...form.getHeaders(),
       },
       body: form,
     });
