@@ -22,7 +22,9 @@ def upgrade() -> None:
     cols = {c["name"] for c in inspector.get_columns("payments")}
     with op.batch_alter_table("payments") as batch_op:
         if "autopay" not in cols:
-            batch_op.add_column(sa.Column("autopay", sa.Boolean(), server_default=sa.text("0")))
+            batch_op.add_column(
+                sa.Column("autopay", sa.Boolean(), server_default=sa.false())
+            )
         if "autopay_binding_id" not in cols:
             batch_op.add_column(sa.Column("autopay_binding_id", sa.String()))
 
