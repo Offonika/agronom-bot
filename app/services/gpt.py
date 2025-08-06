@@ -38,8 +38,11 @@ def _get_client() -> OpenAI:
 
 
 def _close_client() -> None:
+    global _client, _http_client
     if _http_client is not None:
         _http_client.close()
+    _http_client = None
+    _client = None
 
 
 atexit.register(_close_client)
