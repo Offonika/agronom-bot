@@ -23,3 +23,14 @@ test('history caps limit at 50', async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(received[1], 50);
 });
+
+test('history treats negative offset as 0', async () => {
+  let received;
+  pool.query = async (sql, params) => {
+    received = params;
+    return { rows: [] };
+  };
+  const res = await app.inject('/v1/photos/history?offset=-5');
+  assert.equal(res.statusCode, 200);
+  assert.equal(received[2], 0);
+});
