@@ -6,9 +6,6 @@ process.env.FREE_PHOTO_LIMIT = '5';
 
 process.env.API_BASE_URL = 'http://localhost:8000';
 
-=======
-
-
 const API_BASE = process.env.API_BASE_URL;
 const PAYMENTS_BASE = `${API_BASE}/v1/payments`;
 const {
