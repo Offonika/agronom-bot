@@ -60,6 +60,13 @@ async def _make_client() -> AioBaseClient:
     )
     try:
         client = await client_ctx.__aenter__()
+    except (BotoCoreError, ClientError) as exc:
+        try:
+            await client_ctx.__aexit__(None, None, None)
+        except Exception:  # pragma: no cover - best effort cleanup
+            logger.exception("Failed to close S3 client after failed entry")
+        logger.exception("Failed to create S3 client: %s", exc)
+        raise
     except Exception:
         try:
             await client_ctx.__aexit__(None, None, None)
