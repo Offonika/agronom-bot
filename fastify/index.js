@@ -58,15 +58,17 @@ app.post('/v1/ai/diagnose', async function (request, reply) {
   try {
     await saveToS3(filename, buffer);
     await logToDb(filename);
+    return {
+      crop: 'apple',
+      disease: 'powdery mildew',
+      confidence: 0.87,
+    };
   } catch (err) {
     app.log.error('S3/DB error', err);
+    return reply
+      .code(500)
+      .send({ code: 'SERVICE_UNAVAILABLE', message: 'Failed to process image' });
   }
-
-  return {
-    crop: 'apple',
-    disease: 'powdery mildew',
-    confidence: 0.87,
-  };
 });
 
 app.get('/v1/photos/history', async function (request) {
