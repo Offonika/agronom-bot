@@ -20,7 +20,7 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "users",
-        sa.Column("opt_in", sa.Boolean(), server_default=sa.text("0"), nullable=False),
+        sa.Column("opt_in", sa.Boolean(), server_default=sa.false(), nullable=False),
     )
 
 
