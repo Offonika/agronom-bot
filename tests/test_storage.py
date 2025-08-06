@@ -4,6 +4,7 @@ import logging
 import boto3
 import pytest
 import pytest_asyncio
+from botocore.exceptions import BotoCoreError
 
 from moto import mock_aws
 
@@ -11,6 +12,9 @@ from fastapi import HTTPException
 from app.services import storage
 from app.config import Settings
 from app.services.storage import upload_photo, get_public_url, get_client
+
+
+ORIGINAL_MAKE_CLIENT = storage._make_client
 
 
 class _AsyncWrapper:
@@ -85,6 +89,29 @@ async def test_upload_and_url():
                 os.environ.pop(name, None)
             else:
                 os.environ[name] = value
+
+
+@pytest.mark.asyncio
+async def test_make_client_logs_error(monkeypatch, caplog):
+    class FailingCtx:
+        async def __aenter__(self):
+            raise BotoCoreError()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeSession:
+        def client(self, *args, **kwargs):
+            return FailingCtx()
+
+    monkeypatch.setattr(storage, "_make_client", ORIGINAL_MAKE_CLIENT)
+    monkeypatch.setattr(storage.aioboto3, "Session", lambda: FakeSession())
+    storage._client = None
+    storage._client_ctx = None
+    with caplog.at_level(logging.ERROR, logger="s3"):
+        with pytest.raises(BotoCoreError):
+            await storage._make_client()
+    assert "Failed to create S3 client" in caplog.text
 
 
 class DummyClient:
