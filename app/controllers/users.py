@@ -80,13 +80,16 @@ async def delete_user(
     x_sign: str = Header(..., alias="X-Sign"),
     auth_user: int = Depends(rate_limit),
 ):
+    # Only JSON decoding errors are transformed into HTTP 400 responses.
     try:
         payload = await request.json()
     except json.JSONDecodeError as err:
-        err_resp = ErrorResponse(
-            code=ErrorCode.BAD_REQUEST, message="Invalid JSON"
-        )
-        raise HTTPException(status_code=400, detail=err_resp.model_dump()) from err
+        raise HTTPException(
+            status_code=400,
+            detail=ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="Invalid JSON"
+            ).model_dump(),
+        ) from err
 
     user_id = payload.get("user_id")
     if user_id is None:
