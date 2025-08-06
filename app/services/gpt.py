@@ -57,7 +57,10 @@ def call_gpt_vision(key: str) -> dict:
                     "role": "user",
                     "content": [
                         {"type": "text", "text": _PROMPT},
-                        {"type": "image_url", "image_url": image_url},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_url},
+                        },
                     ],
                 }
             ],
