@@ -24,7 +24,9 @@ def _build_client() -> OpenAI:
         proxies["https://"] = https_proxy
 
     http_client = httpx.Client(proxies=proxies) if proxies else None
-    api_key = os.environ.get("OPENAI_API_KEY", "test")
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
     return OpenAI(api_key=api_key, http_client=http_client)
 
 

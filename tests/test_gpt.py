@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from app.services import gpt
 
 
@@ -49,4 +51,10 @@ def test_call_gpt_vision_sends_image_url_object(monkeypatch):
 
     image_part = captured["input"][0]["content"][1]
     assert image_part["image_url"] == {"url": "https://example.com/x.jpg"}
+
+
+def test_build_client_requires_api_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(RuntimeError):
+        gpt._build_client()
 
