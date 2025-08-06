@@ -179,6 +179,48 @@ def test_autopay_webhook_bad_signature(client, monkeypatch):
     assert resp.status_code == 403
 
 
+def test_autopay_webhook_insecure_skips_signature(client, monkeypatch):
+    monkeypatch.setenv("SECURE_WEBHOOK", "false")
+    with SessionLocal() as session:
+        if not session.get(User, 1):
+            session.add(User(id=1, tg_id=1))
+            session.commit()
+
+    payload = {
+        "autopay_charge_id": "CHG-2a",
+        "binding_id": "BND-1",
+        "user_id": 1,
+        "amount": 34900,
+        "status": "success",
+        "charged_at": datetime.now(timezone.utc).isoformat(),
+    }
+    sig = compute_signature(HMAC_SECRET, payload)
+    body = {**payload, "signature": sig}
+    raw = json.dumps(body, separators=(",", ":"), sort_keys=True)
+
+    resp = client.post(
+        "/v1/payments/sbp/autopay/webhook",
+        headers=HEADERS | {"X-Sign": "bad", "Content-Type": "application/json"},
+        content=raw,
+    )
+    assert resp.status_code == 200
+    with SessionLocal() as session:
+        payment = (
+            session.query(Payment)
+            .filter_by(autopay_charge_id="CHG-2a")
+            .first()
+        )
+        assert payment is not None
+        # cleanup
+        session.delete(payment)
+        user = session.get(User, 1)
+        if user:
+            user.pro_expires_at = None
+            user.autopay_enabled = False
+            session.add(user)
+        session.commit()
+
+
 def test_autopay_webhook_invalid_status(client, monkeypatch):
     monkeypatch.setenv("SECURE_WEBHOOK", "1")
     payload = {

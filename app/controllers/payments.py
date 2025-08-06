@@ -285,13 +285,15 @@ async def autopay_webhook(
         raise HTTPException(status_code=403, detail=err.model_dump())
 
     raw_body = await request.body()
-    secure = os.getenv("SECURE_WEBHOOK")
-    if secure and not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
-        logger.warning("audit: invalid webhook signature")
-        err = ErrorResponse(
-            code=ErrorCode.FORBIDDEN, message="Invalid webhook signature"
-        )
-        raise HTTPException(status_code=403, detail=err.model_dump())
+    secure_env = os.getenv("SECURE_WEBHOOK", "")
+    secure = secure_env.lower() in {"1", "true", "yes", "on"}
+    if secure:
+        if not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
+            logger.warning("audit: invalid webhook signature")
+            err = ErrorResponse(
+                code=ErrorCode.FORBIDDEN, message="Invalid webhook signature"
+            )
+            raise HTTPException(status_code=403, detail=err.model_dump())
 
     try:
         data = json.loads(raw_body)
