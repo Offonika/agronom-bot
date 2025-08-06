@@ -71,7 +71,8 @@ app.post('/v1/ai/diagnose', async function (request, reply) {
 
 app.get('/v1/photos/history', async function (request) {
   const limitParam = parseInt(request.query.limit ?? '10', 10);
-  const offset = parseInt(request.query.offset ?? '0', 10);
+  const parsedOffset = parseInt(request.query.offset ?? '0', 10);
+  const offset = Math.max(0, parsedOffset);
   const limit = Math.min(Number.isNaN(limitParam) ? 10 : limitParam, 50);
 
   let userId = 1;
