@@ -10,7 +10,7 @@ from alembic.config import Config
 from app import dependencies
 
 # Ensure tests run against SQLite when DATABASE_URL is not defined
-os.environ.setdefault("DATABASE_URL", "sqlite:///./app.db")
+os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/agronom_test.db")
 os.environ.setdefault("OPENAI_API_KEY", "test")
 
 from fastapi.testclient import TestClient
@@ -33,6 +33,17 @@ def apply_migrations():
         print("stderr:\n", stderr_buf.getvalue())
         raise
     init_db(Settings())
+
+
+@pytest.fixture(scope="session", autouse=True)
+def remove_test_db():
+    """Remove temporary SQLite database after tests finish."""
+    yield
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url and db_url.startswith("sqlite:///"):
+        db_path = Path(db_url.replace("sqlite:///", ""))
+        if db_path.exists():
+            db_path.unlink()
 
 
 @pytest.fixture(scope="module")

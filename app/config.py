@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     api_key: str = "test-api-key"
 
-    database_url: str = Field("sqlite:///./app.db", alias="DATABASE_URL")
+    database_url: str = Field("sqlite:////tmp/agronom_test.db", alias="DATABASE_URL")
     db_create_all: bool = Field(False, alias="DB_CREATE_ALL")
 
     redis_url: str = Field("redis://localhost:6379", alias="REDIS_URL")
