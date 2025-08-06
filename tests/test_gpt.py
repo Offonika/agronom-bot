@@ -95,3 +95,24 @@ def test_call_gpt_vision_empty_output(monkeypatch):
     with pytest.raises(ValueError):
         gpt.call_gpt_vision("photo.jpg")
 
+
+def test_get_client_recreates_after_close(monkeypatch):
+    calls = 0
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs):
+            nonlocal calls
+            calls += 1
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(gpt, "OpenAI", _FakeOpenAI)
+    monkeypatch.setattr(gpt, "_client", None)
+    monkeypatch.setattr(gpt, "_http_client", None)
+
+    first = gpt._get_client()
+    gpt._close_client()
+    second = gpt._get_client()
+
+    assert calls == 2
+    assert first is not second
+
