@@ -2,6 +2,9 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
 process.env.FREE_PHOTO_LIMIT = '5';
+process.env.API_BASE_URL = 'http://localhost:8000';
+
+const API_BASE = process.env.API_BASE_URL;
 const {
   formatDiagnosis,
   photoHandler,
@@ -503,8 +506,8 @@ test('cancelAutopay calls API with auth tokens', { concurrency: false }, async (
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/auth/token': { json: async () => ({ jwt: 'j', csrf: 'c' }) },
-      'http://localhost:8000/v1/payments/sbp/autopay/cancel': { status: 204 },
+      [`${API_BASE}/v1/auth/token`]: { json: async () => ({ jwt: 'j', csrf: 'c' }) },
+      [`${API_BASE}/v1/payments/sbp/autopay/cancel`]: { status: 204 },
     },
     async () => {
       await cancelAutopay(ctx);
@@ -523,8 +526,8 @@ test('cancelAutopay handles unauthorized', { concurrency: false }, async () => {
   const ctx = { from: { id: 6 }, reply: async (m) => replies.push(m) };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/auth/token': { json: async () => ({ jwt: 'j', csrf: 'c' }) },
-      'http://localhost:8000/v1/payments/sbp/autopay/cancel': { status: 401 },
+      [`${API_BASE}/v1/auth/token`]: { json: async () => ({ jwt: 'j', csrf: 'c' }) },
+      [`${API_BASE}/v1/payments/sbp/autopay/cancel`]: { status: 401 },
     },
     async () => {
       await cancelAutopay(ctx);
@@ -539,7 +542,7 @@ test('cancelAutopay handles session error', { concurrency: false }, async () => 
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/auth/token': { ok: false, status: 500 },
+      [`${API_BASE}/v1/auth/token`]: { ok: false, status: 500 },
     },
     async () => {
       await cancelAutopay(ctx);
