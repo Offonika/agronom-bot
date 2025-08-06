@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("dosage_value", sa.Numeric(), nullable=False),
         sa.Column("dosage_unit", sa.String(), nullable=False),
         sa.Column("phi", sa.Integer(), nullable=False, server_default=sa.text("0")),
-        sa.Column("is_current", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_current", sa.Boolean(), nullable=False, server_default=sa.true()),
     )
     op.execute(
         """
@@ -39,7 +39,7 @@ def upgrade() -> None:
                ci.phi AS phi
         FROM catalog_items ci
         JOIN catalogs c ON c.id = ci.catalog_id
-        WHERE ci.is_current = 1
+        WHERE ci.is_current
         """
     )
     op.drop_table("protocols")
