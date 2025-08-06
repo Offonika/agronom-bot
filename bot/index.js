@@ -140,14 +140,17 @@ async function init() {
 init();
 
 // Gracefully stop bot and close DB connections on termination
+let metricsServer;
 async function shutdown() {
   await bot.stop();
-  try {
-    await new Promise((resolve, reject) =>
-      metricsServer.close((err) => (err ? reject(err) : resolve())),
-    );
-  } catch (err) {
-    console.error('Metrics server close failed', err);
+  if (metricsServer) {
+    try {
+      await new Promise((resolve, reject) =>
+        metricsServer.close((err) => (err ? reject(err) : resolve())),
+      );
+    } catch (err) {
+      console.error('Metrics server close failed', err);
+    }
   }
   try {
     await pool.end();
@@ -171,7 +174,7 @@ const http = require('http');
 client.collectDefaultMetrics(); // собираем базовые метрики
 
 // Запускаем HTTP-сервер на порту 3000 для Prometheus
-const metricsServer = http.createServer(async (req, res) => {
+metricsServer = http.createServer(async (req, res) => {
   if (req.url === '/metrics') {
     res.setHeader('Content-Type', client.register.contentType);
     res.end(await client.register.metrics());
