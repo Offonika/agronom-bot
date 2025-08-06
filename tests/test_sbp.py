@@ -88,6 +88,10 @@ def _ensure_user(session):
     session.commit()
 
 
+def _set_csrf_cookie(client):
+    client.cookies.set("csrf_token", CSRF_TOKEN)
+
+
 def test_create_payment_with_autopay(client):
     with SessionLocal() as session:
         if not session.get(User, 1):
@@ -205,7 +209,7 @@ def test_autopay_cancel_success(client):
         "Authorization": f"Bearer {JWT_USER1}",
         "X-CSRF-Token": CSRF_TOKEN,
     }
-    client.cookies.set("csrf_token", CSRF_TOKEN)
+    _set_csrf_cookie(client)
     resp = client.post(
         "/v1/payments/sbp/autopay/cancel",
         headers=headers,
@@ -225,7 +229,7 @@ def test_autopay_cancel_user_mismatch(client):
         "Authorization": f"Bearer {JWT_USER2}",
         "X-CSRF-Token": CSRF_TOKEN,
     }
-    client.cookies.set("csrf_token", CSRF_TOKEN)
+    _set_csrf_cookie(client)
     resp = client.post(
         "/v1/payments/sbp/autopay/cancel",
         headers=headers,
@@ -244,7 +248,7 @@ def test_autopay_cancel_csrf_fail(client):
         "Authorization": f"Bearer {JWT_USER1}",
         "X-CSRF-Token": "bad",  # mismatch token
     }
-    client.cookies.set("csrf_token", CSRF_TOKEN)
+    _set_csrf_cookie(client)
     resp = client.post(
         "/v1/payments/sbp/autopay/cancel",
         headers=headers,
@@ -260,7 +264,7 @@ def test_autopay_cancel_jwt_fail(client):
         "Authorization": f"Bearer {JWT_USER2}",  # wrong user in token
         "X-CSRF-Token": CSRF_TOKEN,
     }
-    client.cookies.set("csrf_token", CSRF_TOKEN)
+    _set_csrf_cookie(client)
     resp = client.post(
         "/v1/payments/sbp/autopay/cancel",
         headers=headers,
@@ -284,7 +288,7 @@ def test_autopay_cancel_jwt_expired(client):
         "Authorization": f"Bearer {expired}",
         "X-CSRF-Token": CSRF_TOKEN,
     }
-    client.cookies.set("csrf_token", CSRF_TOKEN)
+    _set_csrf_cookie(client)
     resp = client.post(
         "/v1/payments/sbp/autopay/cancel",
         headers=headers,
