@@ -42,6 +42,11 @@ def test_ask_expert_empty_question(client):
         json={"question": ""},
     )
     assert resp.status_code == 400
+    assert resp.json() == {
+        "code": "BAD_REQUEST",
+        "message": "Invalid request body",
+    }
+    assert "detail" not in resp.json()
 
 
 def test_ask_expert_too_long_question(client):
@@ -51,3 +56,22 @@ def test_ask_expert_too_long_question(client):
         json={"question": "a" * 501},
     )
     assert resp.status_code == 400
+    assert resp.json() == {
+        "code": "BAD_REQUEST",
+        "message": "Invalid request body",
+    }
+    assert "detail" not in resp.json()
+
+
+def test_ask_expert_invalid_json(client):
+    resp = client.post(
+        "/v1/ask_expert",
+        headers={**HEADERS, "Content-Type": "application/json"},
+        content="not json",
+    )
+    assert resp.status_code == 400
+    assert resp.json() == {
+        "code": "BAD_REQUEST",
+        "message": "Invalid JSON payload",
+    }
+    assert "detail" not in resp.json()
