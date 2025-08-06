@@ -67,11 +67,12 @@ async def _make_client() -> AioBaseClient:
             logger.exception("Failed to close S3 client after failed entry")
         logger.exception("Failed to create S3 client: %s", exc)
         raise
-    except Exception:
+    except Exception as exc:
         try:
             await client_ctx.__aexit__(None, None, None)
         except Exception:  # pragma: no cover - best effort cleanup
             logger.exception("Failed to close S3 client after failed entry")
+        logger.exception("Failed to create S3 client: %s", exc)
         raise
     global _client_ctx
     _client_ctx = client_ctx

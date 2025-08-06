@@ -114,6 +114,29 @@ async def test_make_client_logs_error(monkeypatch, caplog):
     assert "Failed to create S3 client" in caplog.text
 
 
+@pytest.mark.asyncio
+async def test_make_client_logs_unexpected_error(monkeypatch, caplog):
+    class FailingCtx:
+        async def __aenter__(self):
+            raise RuntimeError("boom")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeSession:
+        def client(self, *args, **kwargs):
+            return FailingCtx()
+
+    monkeypatch.setattr(storage, "_make_client", ORIGINAL_MAKE_CLIENT)
+    monkeypatch.setattr(storage.aioboto3, "Session", lambda: FakeSession())
+    storage._client = None
+    storage._client_ctx = None
+    with caplog.at_level(logging.ERROR, logger="s3"):
+        with pytest.raises(RuntimeError):
+            await storage._make_client()
+    assert "Failed to create S3 client" in caplog.text
+
+
 class DummyClient:
     def __init__(self):
         self.closed = False
