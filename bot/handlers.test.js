@@ -119,7 +119,7 @@ test('photoHandler responds with error_code message', { concurrency: false }, as
   };
   await withMockFetch({
     'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { ok: false, status: 400, json: async () => ({ error_code: 'NO_LEAF' }) },
+    default: { ok: false, status: 400, json: async () => ({ code: 'NO_LEAF' }) },
   }, async () => {
     await photoHandler(pool, ctx);
   });
