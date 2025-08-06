@@ -1,8 +1,13 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const { Readable } = require('node:stream');
 
 process.env.FREE_PHOTO_LIMIT = '5';
+
 process.env.API_BASE_URL = 'http://localhost:8000';
+
+=======
+
 
 const API_BASE = process.env.API_BASE_URL;
 const {
@@ -76,7 +81,7 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -97,7 +102,7 @@ test('photoHandler handles non-ok API status', { concurrency: false }, async () 
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { ok: false, status: 500 },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -115,7 +120,7 @@ test('photoHandler responds with error_code message', { concurrency: false }, as
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { ok: false, status: 400, json: async () => ({ error_code: 'NO_LEAF' }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -133,12 +138,36 @@ test('photoHandler handles invalid JSON response', { concurrency: false }, async
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => { throw new Error('bad json'); } },
   }, async () => {
     await photoHandler(pool, ctx);
   });
   assert.equal(replies[0], msg('diagnose_error'));
+});
+
+test('photoHandler rejects oversized photo', { concurrency: false }, async () => {
+  const calls = [];
+  const pool = { query: async (...args) => { calls.push(args); } };
+  const replies = [];
+  let linkCalled = false;
+  const ctx = {
+    message: {
+      photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 2 * 1024 * 1024 + 1 }],
+    },
+    from: { id: 1 },
+    reply: async (msg) => replies.push(msg),
+    telegram: {
+      getFileLink: async () => {
+        linkCalled = true;
+        return { href: 'http://file' };
+      },
+    },
+  };
+  await photoHandler(pool, ctx);
+  assert.equal(replies[0], msg('photo_too_large'));
+  assert.equal(linkCalled, false);
+  assert.equal(calls.length, 0);
 });
 
 test('messageHandler ignores non-photo', { concurrency: false }, () => {
@@ -160,7 +189,7 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: {
       json: async () => ({
         crop: 'apple',
@@ -286,7 +315,7 @@ test('photoHandler shows expert button when enabled', { concurrency: false }, as
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -307,7 +336,7 @@ test('photoHandler hides expert button when disabled', { concurrency: false }, a
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -326,7 +355,7 @@ test('photoHandler paywall on 402', { concurrency: false }, async () => {
   };
   process.env.FREE_PHOTO_LIMIT = '4';
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { status: 402, json: async () => ({ error: 'limit_reached', limit: 5 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -401,7 +430,7 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p1' }) },
+      [`${API_BASE}/v1/payments/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p1' }) },
       default: { json: async () => ({ status: 'success', pro_expires_at: '2025-01-01T00:00:00Z' }) },
     },
     async () => {
@@ -414,7 +443,7 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   assert.equal(btn.url, 'http://pay');
   assert.equal(btn.text, tr('payment_button'));
   assert.equal(ctx.paymentId, 'p1');
-  const req = calls.find((c) => c.url === 'http://localhost:8000/v1/payments/create');
+  const req = calls.find((c) => c.url === `${API_BASE}/v1/payments/create`);
   assert.equal(req.opts.method, 'POST');
   assert.equal(req.opts.headers['Content-Type'], 'application/json');
   assert.equal(req.opts.headers['X-API-Key'], 'test-api-key');
@@ -433,8 +462,8 @@ test('buyProHandler polls success', { concurrency: false }, async () => {
   const ctx = { from: { id: 2 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
   const pool = { query: async () => {} };
   await withMockFetch({
-    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p2' }) },
-    'http://localhost:8000/v1/payments/p2': { json: async () => ({ status: 'success', pro_expires_at: '2025-12-31T00:00:00Z' }) },
+    [`${API_BASE}/v1/payments/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p2' }) },
+    [`${API_BASE}/v1/payments/p2`]: { json: async () => ({ status: 'success', pro_expires_at: '2025-12-31T00:00:00Z' }) },
     default: { json: async () => ({ status: 'pending' }) },
   }, async () => {
     await buyProHandler(ctx, pool, 1);
@@ -448,8 +477,8 @@ test('buyProHandler polls fail', { concurrency: false }, async () => {
   const ctx = { from: { id: 3 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
   const pool = { query: async () => {} };
   await withMockFetch({
-    'http://localhost:8000/v1/payments/create': { json: async () => ({ url: 'http://pay', payment_id: 'p3' }) },
-    'http://localhost:8000/v1/payments/p3': { json: async () => ({ status: 'fail' }) },
+    [`${API_BASE}/v1/payments/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p3' }) },
+    [`${API_BASE}/v1/payments/p3`]: { json: async () => ({ status: 'fail' }) },
     default: { json: async () => ({ status: 'fail' }) },
   }, async () => {
     await buyProHandler(ctx, pool, 1);
@@ -464,7 +493,7 @@ test('buyProHandler handles non-ok API status', { concurrency: false }, async ()
   const pool = { query: async () => {} };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': { ok: false, status: 500 },
+      [`${API_BASE}/v1/payments/create`]: { ok: false, status: 500 },
     },
     async () => {
       await buyProHandler(ctx, pool, 0);
@@ -484,7 +513,7 @@ test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
   const calls = [];
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': {
+      [`${API_BASE}/v1/payments/create`]: {
         json: async () => ({ url: 'http://pay', payment_id: 'p4' }),
       },
       default: {
@@ -496,7 +525,7 @@ test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
     },
     calls,
   );
-  const req = calls.find((c) => c.url === 'http://localhost:8000/v1/payments/create');
+  const req = calls.find((c) => c.url === `${API_BASE}/v1/payments/create`);
   assert.equal(JSON.parse(req.opts.body).autopay, true);
 });
 
@@ -572,7 +601,7 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
   await withMockFetch({
-    'http://file': { arrayBuffer: async () => Buffer.from('x') },
+    'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { status: 202, json: async () => ({ status: 'pending', id: 42 }) },
   }, async () => {
     await photoHandler(pool, ctx);
@@ -587,7 +616,7 @@ test('retryHandler returns result', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch({
-    'http://localhost:8000/v1/photos/42': {
+    [`${API_BASE}/v1/photos/42`]: {
       json: async () => ({
         status: 'ok',
         crop: 'apple',
@@ -610,11 +639,11 @@ test('historyHandler paginates', { concurrency: false }, async () => {
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/photos?limit=10': {
+      [`${API_BASE}/v1/photos?limit=10`]: {
         json: async () => ({
           items: [
             { id: 1, ts: '2025-01-01T00:00:00Z', crop: 'apple', disease: 'scab' },
-          ],
+            ],
           next_cursor: 'abc',
         }),
       },
@@ -638,7 +667,7 @@ test('historyHandler logs page event', { concurrency: false }, async () => {
   const pool = { query: async (...a) => events.push(a) };
   const ctx = { from: { id: 2 }, reply: async () => {} };
   await withMockFetch({
-    'http://localhost:8000/v1/photos?limit=10&cursor=abc': { json: async () => ({ items: [], next_cursor: null }) },
+    [`${API_BASE}/v1/photos?limit=10&cursor=abc`]: { json: async () => ({ items: [], next_cursor: null }) },
   }, async () => {
     await historyHandler(ctx, 'abc', pool);
   });
@@ -656,7 +685,7 @@ test('historyHandler handles malformed responses', { concurrency: false }, async
     };
     await withMockFetch(
       {
-        'http://localhost:8000/v1/photos?limit=10': { json: async () => bad },
+        [`${API_BASE}/v1/photos?limit=10`]: { json: async () => bad },
       },
       async () => {
         await historyHandler(ctx, '');
@@ -764,7 +793,7 @@ test('pollPaymentStatus notifies on timeout', { concurrency: false }, async () =
   const ctx = { from: { id: 1 }, reply: async (m) => replies.push(m) };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/42': { json: async () => ({ status: 'processing' }) },
+      [`${API_BASE}/v1/payments/42`]: { json: async () => ({ status: 'processing' }) },
     },
     async () => {
       await pollPaymentStatus(ctx, 42, 1, 5);
@@ -780,7 +809,7 @@ test('pollPaymentStatus stops when aborted', { concurrency: false }, async () =>
   setTimeout(() => controller.abort(), 2);
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/42': { json: async () => ({ status: 'processing' }) },
+      [`${API_BASE}/v1/payments/42`]: { json: async () => ({ status: 'processing' }) },
     },
     async () => {
       await pollPaymentStatus(ctx, 42, 10, 100, controller.signal);
@@ -798,10 +827,10 @@ test('buyProHandler aborts existing poll', { concurrency: false }, async () => {
   const pool = { query: async () => {} };
   await withMockFetch(
     {
-      'http://localhost:8000/v1/payments/create': {
+      [`${API_BASE}/v1/payments/create`]: {
         json: async () => ({ payment_id: 1, url: 'http://pay' }),
       },
-      'http://localhost:8000/v1/payments/1': {
+      [`${API_BASE}/v1/payments/1`]: {
         json: async () => ({ status: 'success', pro_expires_at: new Date().toISOString() }),
       },
     },

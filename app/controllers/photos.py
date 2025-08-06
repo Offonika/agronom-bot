@@ -25,7 +25,7 @@ from app.metrics import (
 )
 from app.models import Event, Photo, ErrorCode
 from app.services.gpt import call_gpt_vision
-from app.services.protocols import find_protocol
+from app.services.protocols import async_find_protocol
 from app.services.storage import get_public_url, upload_photo
 from app.services.roi import calculate_roi
 
@@ -284,7 +284,7 @@ async def diagnose(
         queue_size_pending.inc()
         return JSONResponse(status_code=202, content={"id": photo_id, "status": "pending"})
 
-    proto = await asyncio.to_thread(find_protocol, "main", crop, disease)
+    proto = await async_find_protocol("main", crop, disease)
     if proto:
         proto_resp = ProtocolResponse(
             id=proto.id,
@@ -459,8 +459,8 @@ async def photo_status(photo_id: int, user_id: int = Depends(rate_limit)):
         and photo_data["crop"]
         and photo_data["disease"]
     ):
-        p = await asyncio.to_thread(
-            find_protocol, "main", photo_data["crop"], photo_data["disease"]
+        p = await async_find_protocol(
+            "main", photo_data["crop"], photo_data["disease"]
         )
         if p:
             proto = ProtocolResponse(
