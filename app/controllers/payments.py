@@ -77,13 +77,19 @@ class PaymentStatusResponse(BaseModel):
 async def create_payment(request: Request, user_id: int = Depends(rate_limit)):
     try:
         payload = await request.json()
-    except json.JSONDecodeError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except json.JSONDecodeError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid JSON payload"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     try:
         body = PaymentCreateRequest.model_validate(payload)
-    except ValidationError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except ValidationError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid payment data"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     if body.user_id != user_id:
         err = ErrorResponse(
@@ -92,7 +98,10 @@ async def create_payment(request: Request, user_id: int = Depends(rate_limit)):
         raise HTTPException(status_code=401, detail=err.model_dump())
 
     if body.months < 1 or body.months > MAX_MONTHS:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid months value"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump())
 
     amount = 34900 * body.months
     currency = "RUB"
@@ -167,32 +176,50 @@ async def payments_webhook(
     client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.tinkoff_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
-        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="IP address forbidden"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
 
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
     if secure and not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
         logger.warning("audit: invalid webhook signature")
-        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Invalid webhook signature"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
 
     try:
         data = json.loads(raw_body)
-    except (json.JSONDecodeError, TypeError) as err:
+    except (json.JSONDecodeError, TypeError) as exc:
         logger.exception("failed to parse webhook body as JSON")
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Malformed JSON body"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
     if not isinstance(data, dict):
         logger.warning("audit: non-object webhook payload")
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Payload must be a JSON object"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump())
     provided_sign = data.pop("signature", "")
     expected_sign = compute_signature(HMAC_SECRET, data)
     if not hmac.compare_digest(provided_sign, expected_sign):
         logger.warning("audit: invalid payload signature")
-        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Invalid payload signature"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
 
     try:
         body = PaymentWebhook(**data, signature=provided_sign)
-    except ValidationError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except ValidationError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid webhook payload"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
@@ -252,35 +279,56 @@ async def autopay_webhook(
     client_ip = raw_ip.split(",")[0].strip()
     if client_ip not in settings.tinkoff_ips:
         logger.warning("audit: forbidden ip %s", client_ip)
-        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="IP address forbidden"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
 
     raw_body = await request.body()
     secure = os.getenv("SECURE_WEBHOOK")
     if secure and not verify_hmac(x_sign or "", raw_body, HMAC_SECRET):
         logger.warning("audit: invalid webhook signature")
-        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Invalid webhook signature"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
 
     try:
         data = json.loads(raw_body)
-    except (json.JSONDecodeError, TypeError) as err:
+    except (json.JSONDecodeError, TypeError) as exc:
         logger.exception("failed to parse webhook body as JSON")
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Malformed JSON body"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
     if not isinstance(data, dict):
         logger.warning("audit: non-object webhook payload")
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Payload must be a JSON object"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump())
     provided_sign = data.pop("signature", "")
     expected_sign = compute_signature(HMAC_SECRET, data)
     if not hmac.compare_digest(provided_sign, expected_sign):
         logger.warning("audit: invalid payload signature")
-        raise HTTPException(status_code=403, detail=ErrorCode.FORBIDDEN)
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Invalid payload signature"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
 
     try:
         body = AutopayWebhook(**data, signature=provided_sign)
-    except ValidationError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except ValidationError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid webhook payload"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     if body.status not in AUTOPAY_ALLOWED_STATUSES:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST)
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Unsupported status value"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump())
 
     def _db_call() -> None:
         with db_module.SessionLocal() as db:
@@ -386,13 +434,19 @@ async def cancel_autopay(
 
     try:
         payload = await request.json()
-    except json.JSONDecodeError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except json.JSONDecodeError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid JSON payload"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     try:
         body = AutopayCancelRequest.model_validate(payload)
-    except ValidationError as err:
-        raise HTTPException(status_code=400, detail=ErrorCode.BAD_REQUEST) from err
+    except ValidationError as exc:
+        err = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST, message="Invalid cancel request"
+        )
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
     if body.user_id != user_id:
         err = ErrorResponse(
