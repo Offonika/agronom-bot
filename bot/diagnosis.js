@@ -1,6 +1,4 @@
 const crypto = require('node:crypto');
-const { Readable } = require('node:stream');
-const FormData = require('form-data');
 const { msg } = require('./utils');
 const { sendPaywall } = require('./payments');
 
@@ -110,11 +108,18 @@ async function photoHandler(pool, ctx) {
       return;
     }
     const form = new FormData();
-    let stream = res.body;
-    if (stream?.getReader) {
-      stream = Readable.fromWeb(stream);
+    let buffer;
+    if (typeof res.arrayBuffer === 'function') {
+      buffer = Buffer.from(await res.arrayBuffer());
+    } else {
+      const chunks = [];
+      for await (const chunk of res.body ?? []) {
+        chunks.push(Buffer.from(chunk));
+      }
+      buffer = Buffer.concat(chunks);
     }
-    form.append('image', stream, { filename: 'photo.jpg', contentType: 'image/jpeg' });
+    const blob = new Blob([buffer], { type: 'image/jpeg' });
+    form.append('image', blob, 'photo.jpg');
 
     console.log('Sending to API', API_BASE + '/v1/ai/diagnose');
     const apiResp = await fetch(API_BASE + '/v1/ai/diagnose', {
@@ -123,7 +128,6 @@ async function photoHandler(pool, ctx) {
         'X-API-Key': API_KEY,
         'X-API-Ver': API_VER,
         'X-User-ID': userId,
-        ...form.getHeaders(),
       },
       body: form,
     });
