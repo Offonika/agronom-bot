@@ -29,3 +29,24 @@ def test_call_gpt_vision_parses_response(tmp_path, monkeypatch):
         "confidence": 0.92,
     }
 
+
+def test_call_gpt_vision_sends_image_url_object(monkeypatch):
+    captured: dict = {}
+
+    class _FakeResponses:
+        def create(self, **kwargs):  # type: ignore[override]
+            captured["input"] = kwargs["input"]
+            return _fake_openai_response()
+
+    monkeypatch.setattr(
+        gpt,
+        "client",
+        SimpleNamespace(responses=_FakeResponses()),
+    )
+    monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
+
+    gpt.call_gpt_vision("some-key")
+
+    image_part = captured["input"][0]["content"][1]
+    assert image_part["image_url"] == {"url": "https://example.com/x.jpg"}
+
