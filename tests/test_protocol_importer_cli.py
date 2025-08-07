@@ -54,7 +54,8 @@ def test_run_import_logs_ssl_error(monkeypatch, caplog, tmp_path: Path) -> None:
 
     with tmp_db(tmp_path):
         with caplog.at_level("ERROR"):
-            protocol_importer.run_import("main")
+            result = protocol_importer.run_import("main")
 
+    assert result is None
     assert "CATALOG_CA_BUNDLE" in caplog.text
     assert "CATALOG_SSL_VERIFY" in caplog.text

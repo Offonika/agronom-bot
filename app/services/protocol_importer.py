@@ -208,12 +208,12 @@ def run_import(category: str, force: bool = False) -> None:
             # Allow custom CA bundle or skipping verification if required
             verify=cfg.catalog_ca_bundle or cfg.catalog_ssl_verify,
         )
-        response.raise_for_status()
     except requests.exceptions.SSLError:
         logger.error(
             "SSL error fetching catalog page. Set CATALOG_CA_BUNDLE or CATALOG_SSL_VERIFY."
         )
         return
+    response.raise_for_status()
     zip_url = find_latest_zip(response.text, page_url)
     logger.info("Latest archive URL: %s", zip_url)
 
