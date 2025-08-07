@@ -200,13 +200,18 @@ def run_import(category: str, force: bool = False) -> None:
     page_url = CATALOG_PAGES.get(category)
     if not page_url:
         raise ValueError(f"Unknown catalog category: {category}")
-
-    response = requests.get(
-        page_url,
-        timeout=30,
-        verify=cfg.catalog_ca_bundle or cfg.catalog_ssl_verify,
-    )
-    response.raise_for_status()
+    try:
+        response = requests.get(
+            page_url,
+            timeout=30,
+            verify=cfg.catalog_ca_bundle or cfg.catalog_ssl_verify,
+        )
+        response.raise_for_status()
+    except requests.exceptions.SSLError:
+        logger.error(
+            "SSL error fetching catalog page. Set CATALOG_CA_BUNDLE or CATALOG_SSL_VERIFY."
+        )
+        return
     zip_url = find_latest_zip(response.text, page_url)
     logger.info("Latest archive URL: %s", zip_url)
 
