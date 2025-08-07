@@ -134,6 +134,7 @@ agronom-bot/
    POSTGRES_PORT=5432
    DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
    BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
+   API_BASE_URL=http://localhost:8000
 
    S3_BUCKET=agronom
    S3_ENDPOINT=http://localhost:9000
@@ -148,6 +149,28 @@ agronom-bot/
 `postgresql+<driver>://` (например, `postgresql+psycopg://`). Скрипт
 `migrate_safe.sh` автоматически преобразует такие DSN к виду
 `postgresql://` перед передачей в `psql`.
+
+`postgres` и `api` — это имена сервисов в `docker-compose.yml`.
+Они разрешаются только внутри сети Docker Compose. Если запускать API и бот
+на хост‑машине без Docker, используйте `localhost`:
+
+```env
+BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
+API_BASE_URL=http://localhost:8000
+```
+
+Чтобы обращаться к сервисам по имени, сперва поднимите контейнеры:
+
+```bash
+docker-compose up -d
+# после этого доступны DSN с именами сервисов
+BOT_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/agronom
+API_BASE_URL=http://api:8000
+```
+
+Если при подключении появляются ошибки DNS вроде `EAI_AGAIN`, проверьте, что
+контейнеры запущены, используйте `localhost`/`127.0.0.1` для приложений вне
+Docker и при необходимости очистите DNS‑кеш (`sudo systemd-resolve --flush-caches`).
 
 2. Создайте виртуальное окружение под **Python 3.11+ (3.12 experimental)** (в нём уже есть SQLite 3.35+):
 
@@ -200,7 +223,8 @@ agronom-bot/
    - `BOT_TOKEN_DEV=ваш_токен_бота`
    - `PARTNER_LINK_BASE=https://agrostore.ru/agronom`
    - `PAYWALL_ENABLED=true`  # включить показ paywall
-   - `BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom`  # строка подключения для бота
+   - `BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom`  # строка подключения для бота (в Docker: postgres)
+   - `API_BASE_URL=http://localhost:8000`  # адрес API (в Docker: http://api:8000)
    - `FREE_PHOTO_LIMIT=5`  # число бесплатных фото в месяц для Telegram-бота ([пример](.env.template#L89))
    - `TINKOFF_TERMINAL_KEY=your-terminal-key`
    - `TINKOFF_SECRET_KEY=your-secret-key`
