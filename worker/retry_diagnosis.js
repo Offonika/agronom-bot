@@ -33,7 +33,7 @@ async function schedule() {
   );
 }
 
-schedule();
+schedule().catch(console.error);
 
 new Worker(
   queueName,
