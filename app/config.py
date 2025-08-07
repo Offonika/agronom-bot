@@ -55,8 +55,16 @@ class Settings(BaseSettings):
     catalog_agrochem_url: str = Field(
         DEFAULT_CATALOG_URL, alias="CATALOG_AGROCHEM_URL"
     )
-    catalog_ssl_verify: bool = Field(True, alias="CATALOG_SSL_VERIFY")
-    catalog_ca_bundle: str | None = Field(None, alias="CATALOG_CA_BUNDLE")
+    catalog_ssl_verify: bool = Field(
+        True,
+        alias="CATALOG_SSL_VERIFY",
+        description="Verify TLS certificates when downloading catalog data",
+    )
+    catalog_ca_bundle: str | None = Field(
+        None,
+        alias="CATALOG_CA_BUNDLE",
+        description="Path to a custom CA bundle for catalog requests",
+    )
 
     model_config = ConfigDict(
         extra="ignore",
