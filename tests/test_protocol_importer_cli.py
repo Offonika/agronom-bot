@@ -44,3 +44,17 @@ def test_run_import_inserts_data(monkeypatch, tmp_path: Path) -> None:
         with protocol_importer.db.SessionLocal() as session:
             product = session.execute(text("SELECT product FROM catalog_items"))
             assert product.scalar_one() == "Хорус 75 ВДГ"
+
+
+def test_run_import_logs_ssl_error(monkeypatch, caplog, tmp_path: Path) -> None:
+    def fake_get(*args, **kwargs):
+        raise protocol_importer.requests.exceptions.SSLError("bad ssl")
+
+    monkeypatch.setattr(protocol_importer.requests, "get", fake_get)
+
+    with tmp_db(tmp_path):
+        with caplog.at_level("ERROR"):
+            protocol_importer.run_import("main")
+
+    assert "CATALOG_CA_BUNDLE" in caplog.text
+    assert "CATALOG_SSL_VERIFY" in caplog.text
