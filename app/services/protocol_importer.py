@@ -86,6 +86,7 @@ def download_zip(url: str, dest: Path) -> Path:
             url,
             timeout=30,
             stream=True,
+            # Allow pointing to a custom CA bundle or disabling verification
             verify=cfg.catalog_ca_bundle or cfg.catalog_ssl_verify,
         ) as response:
             response.raise_for_status()
@@ -204,6 +205,7 @@ def run_import(category: str, force: bool = False) -> None:
         response = requests.get(
             page_url,
             timeout=30,
+            # Allow custom CA bundle or skipping verification if required
             verify=cfg.catalog_ca_bundle or cfg.catalog_ssl_verify,
         )
         response.raise_for_status()
