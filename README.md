@@ -296,6 +296,10 @@ python -m app.services.protocol_importer <zip_url> --category main
 В продакшене утилита запускается ежемесячным CRON‑джобом для актуализации
 протоколов.
 
+Если сервер каталога использует самоподписанный сертификат, задайте путь к
+файлу доверенного сертификата через переменную окружения `CATALOG_CA_BUNDLE`.
+Чтобы полностью отключить проверку TLS, установите `CATALOG_SSL_VERIFY=false`.
+
 ### Ежемесячные задачи CRON
 
 - `python -m app.services.protocol_importer` — обновляет таблицы `catalogs` и

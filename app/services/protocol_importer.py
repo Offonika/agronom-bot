@@ -82,7 +82,12 @@ def download_zip(url: str, dest: Path) -> Path:
     """Download ``url`` into ``dest`` and return the resulting path."""
 
     try:
-        with requests.get(url, timeout=30, stream=True) as response:
+        with requests.get(
+            url,
+            timeout=30,
+            stream=True,
+            verify=cfg.catalog_ca_bundle or cfg.catalog_ssl_verify,
+        ) as response:
             response.raise_for_status()
             total = int(response.headers.get("Content-Length", 0))
             downloaded = 0
@@ -196,7 +201,11 @@ def run_import(category: str, force: bool = False) -> None:
     if not page_url:
         raise ValueError(f"Unknown catalog category: {category}")
 
-    response = requests.get(page_url, timeout=30)
+    response = requests.get(
+        page_url,
+        timeout=30,
+        verify=cfg.catalog_ca_bundle or cfg.catalog_ssl_verify,
+    )
     response.raise_for_status()
     zip_url = find_latest_zip(response.text, page_url)
     logger.info("Latest archive URL: %s", zip_url)

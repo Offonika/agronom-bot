@@ -20,7 +20,7 @@ def test_run_import_inserts_data(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         protocol_importer.requests,
         "get",
-        lambda url, timeout=30: DummyResponse(html),
+        lambda url, timeout=30, **kwargs: DummyResponse(html),
     )
 
     def fake_download_zip(url: str, dest: Path) -> Path:
