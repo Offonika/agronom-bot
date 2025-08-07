@@ -40,13 +40,12 @@ logger = logging.getLogger(__name__)
 
 FIELDNAMES = ["crop", "disease", "product", "dosage_value", "dosage_unit", "phi"]
 
-# Mapping of catalog categories to pages that list available archives.  The
-# values here are placeholders; in production they should point to real pages
-# on the Ministry of Agriculture website.
+# Mapping of catalog categories to pages that list available archives.  URLs
+# are configurable via environment variables, see ``Settings``.
 CATALOG_PAGES = {
-    "main": "https://example.com/",
-    "pesticide": "https://example.com/pesticide/",
-    "agrochem": "https://example.com/agrochem/",
+    "main": cfg.catalog_main_url,
+    "pesticide": cfg.catalog_pesticide_url,
+    "agrochem": cfg.catalog_agrochem_url,
 }
 
 

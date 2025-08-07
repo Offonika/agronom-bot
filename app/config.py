@@ -3,6 +3,14 @@ from __future__ import annotations
 from pydantic import ConfigDict, Field
 from pydantic_settings import BaseSettings
 
+DEFAULT_CATALOG_URL = (
+    "https://mcx.gov.ru/ministry/departments/"
+    "departament-rastenievodstva-mekhanizatsii-khimizatsii-"
+    "zashchity-rasteniy/industry-information/"
+    "info-gosudarstvennaya-usluga-po-gosudarstvennoy-registratsii-"
+    "pestitsidov-i-agrokhimikatov/"
+)
+
 
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
@@ -39,6 +47,14 @@ class Settings(BaseSettings):
     s3_access_key: str | None = None
     s3_secret_key: str | None = None
     s3_public_url: str | None = None
+
+    catalog_main_url: str = Field(DEFAULT_CATALOG_URL, alias="CATALOG_MAIN_URL")
+    catalog_pesticide_url: str = Field(
+        DEFAULT_CATALOG_URL, alias="CATALOG_PESTICIDE_URL"
+    )
+    catalog_agrochem_url: str = Field(
+        DEFAULT_CATALOG_URL, alias="CATALOG_AGROCHEM_URL"
+    )
 
     model_config = ConfigDict(
         extra="ignore",
