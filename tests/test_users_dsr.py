@@ -1,6 +1,7 @@
 import io
 import json
 import zipfile
+import pytest
 
 from app.config import Settings
 from app.db import SessionLocal
@@ -166,3 +167,27 @@ def test_delete_user_forbidden(client):
         "/v1/dsr/delete_user", headers=headers, json={"user_id": 1}
     )
     assert resp.status_code == 403
+
+
+
+@pytest.mark.parametrize("user_id", ["oops", ["1"]])
+def test_delete_user_invalid_user_id_type(client, user_id):
+    _prepare_db()
+    sig = compute_signature(HMAC_SECRET, {"user_id": user_id})
+    resp = client.post(
+        "/v1/dsr/delete_user",
+        headers=HEADERS | {"X-Sign": sig},
+        json={"user_id": user_id},
+    )
+    assert resp.status_code == 400
+
+
+def test_delete_user_success_int_id(client):
+    _prepare_db()
+    sig = compute_signature(HMAC_SECRET, {"user_id": 1})
+    resp = client.post(
+        "/v1/dsr/delete_user",
+        headers=HEADERS | {"X-Sign": sig},
+        json={"user_id": 1},
+    )
+    assert resp.status_code == 200

@@ -191,10 +191,19 @@ async def delete_user(
             ).model_dump(),
         ) from err
 
-    user_id = payload.get("user_id")
-    if user_id is None:
+    raw_user_id = payload.get("user_id")
+    if raw_user_id is None:
         err_resp = ErrorResponse(
-            code=ErrorCode.BAD_REQUEST, message="Missing user_id"
+            code=ErrorCode.BAD_REQUEST, message="Missing user_id",
+        )
+        raise HTTPException(status_code=400, detail=err_resp.model_dump())
+
+    try:
+        user_id = int(raw_user_id)
+    except (TypeError, ValueError):
+        err_resp = ErrorResponse(
+            code=ErrorCode.BAD_REQUEST,
+            message="user_id must be an integer",
         )
         raise HTTPException(status_code=400, detail=err_resp.model_dump())
 
