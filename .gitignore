@@ -10,6 +10,7 @@ __pycache__/
 .env
 *.env
 !.env.template
+.env*
 
 # 🐍 Virtualenv
 venv/
@@ -48,3 +49,5 @@ dist/
 last_protocol*.pdf
 mcx_debug_page.html
 debug_protocols/
+
+.env*
