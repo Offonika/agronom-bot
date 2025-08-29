@@ -31,16 +31,16 @@ const bot = new Telegraf(token);
 async function init() {
   try {
     await bot.telegram.setMyCommands([
-      { command: 'start', description: 'Начать работу' },
-      { command: 'help', description: 'Помощь' },
-      { command: 'history', description: 'История запросов' },
-      { command: 'retry', description: 'Повторить диагностику' },
-      { command: 'subscribe', description: 'Купить PRO' },
-      { command: 'autopay_enable', description: 'Включить автоплатёж' },
-      { command: 'cancel_autopay', description: 'Отключить автоплатёж' },
-      { command: 'ask_expert', description: 'Задать вопрос эксперту' },
-      { command: 'reminder', description: 'Управление напоминаниями' },
-      { command: 'feedback', description: 'Оставить отзыв' },
+      { command: 'start', description: '🌱 Начать работу' },
+      { command: 'help', description: 'ℹ️ Помощь' },
+      { command: 'history', description: '📜 История запросов' },
+      { command: 'retry', description: '🔄 Повторить диагностику' },
+      { command: 'subscribe', description: '💳 Купить PRO' },
+      { command: 'autopay_enable', description: '▶️ Включить автоплатёж' },
+      { command: 'cancel_autopay', description: '⛔ Отключить автоплатёж' },
+      { command: 'ask_expert', description: '🧑‍🌾 Задать вопрос эксперту' },
+      { command: 'reminder', description: '⏰ Управление напоминаниями' },
+      { command: 'feedback', description: '💬 Оставить отзыв' },
     ]);
 
     bot.start(async (ctx) => {

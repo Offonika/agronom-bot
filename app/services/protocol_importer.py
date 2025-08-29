@@ -811,8 +811,10 @@ def run_import(category: str, force: bool = False) -> None:
         zip_path = download_zip(zip_url, tmpdir / "archive.zip")
 
         # Папка для отладочных дампов (только текст, и только первые страницы)
-        dbg_root = Path("debug_protocols"); dbg_root.mkdir(exist_ok=True)
-        ts_dir = dbg_root / datetime.now().strftime("%Y%m%d-%H%M%S"); ts_dir.mkdir(exist_ok=True)
+        dbg_root = Path("debug_protocols")
+        dbg_root.mkdir(exist_ok=True)
+        ts_dir = dbg_root / datetime.now().strftime("%Y%m%d-%H%M%S")
+        ts_dir.mkdir(exist_ok=True)
 
         all_rows: List[dict] = []
         first_pdf_saved = False
