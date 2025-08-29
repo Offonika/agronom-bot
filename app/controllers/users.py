@@ -52,11 +52,31 @@ class EventExport(BaseModel):
     ts: datetime
 
 
-def serialize(items: list, schema: type[BaseModel]) -> list[dict]:
-    return [
-        schema.model_validate(obj, from_attributes=True).model_dump()
-        for obj in items
-    ]
+BATCH_SIZE = 100
+
+
+class _StreamingBuffer(io.RawIOBase):
+    """Write-only buffer for incremental ZIP streaming."""
+
+    def __init__(self) -> None:
+        self._buffer = bytearray()
+        self._pos = 0
+
+    def writable(self) -> bool:  # pragma: no cover - required by IOBase
+        return True
+
+    def write(self, b: bytes) -> int:  # pragma: no cover - I/O bound
+        self._buffer.extend(b)
+        self._pos += len(b)
+        return len(b)
+
+    def tell(self) -> int:  # pragma: no cover - used by zipfile
+        return self._pos
+
+    def read(self) -> bytes:
+        data = bytes(self._buffer)
+        self._buffer.clear()
+        return data
 
 
 @router.get(
@@ -81,29 +101,74 @@ async def export_user(
         )
         raise HTTPException(status_code=403, detail=err.model_dump())
 
-    def _db_call() -> dict:
+    def _stream() -> bytes:
+        stream = _StreamingBuffer()
         with db_module.SessionLocal() as db:
-            photos = db.query(Photo).filter_by(user_id=user_id).all()
-            payments = db.query(Payment).filter_by(user_id=user_id).all()
-            events = db.query(Event).filter_by(user_id=user_id).all()
-
-            return {
-                "photos": serialize(photos, PhotoExport),
-                "payments": serialize(payments, PaymentExport),
-                "events": serialize(events, EventExport),
-            }
-
-    data = await asyncio.to_thread(_db_call)
-
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("data.json", json.dumps(data, default=str))
-    buffer.seek(0)
+            with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as zf:
+                with zf.open("data.json", "w") as data_file:
+                    data_file.write(b"{\"photos\":[")
+                    first = True
+                    for photo in (
+                        db.query(Photo)
+                        .filter_by(user_id=user_id)
+                        .yield_per(BATCH_SIZE)
+                    ):
+                        if not first:
+                            data_file.write(b",")
+                        payload = PhotoExport.model_validate(
+                            photo, from_attributes=True
+                        ).model_dump()
+                        data_file.write(json.dumps(payload, default=str).encode())
+                        chunk = stream.read()
+                        if chunk:
+                            yield chunk
+                        first = False
+                    data_file.write(b"],\"payments\":[")
+                    first = True
+                    for payment in (
+                        db.query(Payment)
+                        .filter_by(user_id=user_id)
+                        .yield_per(BATCH_SIZE)
+                    ):
+                        if not first:
+                            data_file.write(b",")
+                        payload = PaymentExport.model_validate(
+                            payment, from_attributes=True
+                        ).model_dump()
+                        data_file.write(json.dumps(payload, default=str).encode())
+                        chunk = stream.read()
+                        if chunk:
+                            yield chunk
+                        first = False
+                    data_file.write(b"],\"events\":[")
+                    first = True
+                    for event in (
+                        db.query(Event)
+                        .filter_by(user_id=user_id)
+                        .yield_per(BATCH_SIZE)
+                    ):
+                        if not first:
+                            data_file.write(b",")
+                        payload = EventExport.model_validate(
+                            event, from_attributes=True
+                        ).model_dump()
+                        data_file.write(json.dumps(payload, default=str).encode())
+                        chunk = stream.read()
+                        if chunk:
+                            yield chunk
+                        first = False
+                    data_file.write(b"]}")
+                chunk = stream.read()
+                if chunk:
+                    yield chunk
+        chunk = stream.read()
+        if chunk:
+            yield chunk
 
     headers = {
         "Content-Disposition": f'attachment; filename="user_{user_id}_export.zip"'
     }
-    return StreamingResponse(buffer, media_type="application/zip", headers=headers)
+    return StreamingResponse(_stream(), media_type="application/zip", headers=headers)
 
 
 @router.post(

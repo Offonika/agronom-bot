@@ -37,6 +37,28 @@ def _prepare_db():
         db.commit()
 
 
+def _prepare_db_many(n: int):
+    with SessionLocal() as db:
+        db.query(Photo).filter_by(user_id=1).delete()
+        db.query(Payment).filter_by(user_id=1).delete()
+        db.query(Event).filter_by(user_id=1).delete()
+        db.query(User).filter_by(id=1).delete()
+        db.add(User(id=1, tg_id=1))
+        for i in range(n):
+            db.add(Photo(user_id=1, file_id=f"f{i}"))
+            db.add(
+                Payment(
+                    user_id=1,
+                    amount=100,
+                    currency="RUB",
+                    provider="test",
+                    status="success",
+                )
+            )
+            db.add(Event(user_id=1, event="login"))
+        db.commit()
+
+
 def test_export_user_data(client):
     _prepare_db()
     sig = compute_signature(HMAC_SECRET, {"user_id": 1})
@@ -88,6 +110,23 @@ def test_export_bad_signature(client):
         "/v1/users/1/export", headers=HEADERS | {"X-Sign": "bad"}
     )
     assert resp.status_code == 401
+
+
+def test_export_large_dataset_streaming(client):
+    _prepare_db_many(1000)
+    sig = compute_signature(HMAC_SECRET, {"user_id": 1})
+    import tracemalloc
+
+    tracemalloc.start()
+    with client.stream(
+        "GET", "/v1/users/1/export", headers=HEADERS | {"X-Sign": sig}
+    ) as resp:
+        assert resp.status_code == 200
+        for _ in resp.iter_bytes():
+            pass
+    _, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    assert peak < 50 * 1024 * 1024
 
 
 def test_delete_user_cascade(client):
