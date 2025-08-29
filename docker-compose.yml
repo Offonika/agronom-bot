@@ -25,6 +25,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./bot:/usr/src/app
+      - ./locales:/usr/src/locales
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
