@@ -505,6 +505,23 @@ def test_photos_history_forbidden_other_user(client):
     assert resp.status_code == 200
 
 
+def test_photos_history_confidence_nullable(client):
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        photo = Photo(user_id=1, file_id="null.jpg", status="ok", confidence=None)
+        session.add(photo)
+        session.commit()
+        pid = photo.id
+
+    resp = client.get("/v1/photos/history", headers=HEADERS)
+    assert resp.status_code == 200
+    items = resp.json()
+    item = next(i for i in items if i["photo_id"] == pid)
+    assert item["confidence"] is None
+
+
 def test_photo_status_pending(client):
     from app.db import SessionLocal
     from app.models import Photo

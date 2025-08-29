@@ -161,6 +161,7 @@ components:
         confidence:
           type: number
           format: float
+          nullable: true
           example: 0.92
         thumb_url:
           type: string

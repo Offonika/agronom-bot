@@ -107,7 +107,7 @@ app.get('/v1/photos/history', async function (request) {
     crop: r.crop,
     disease: r.disease,
     status: r.status,
-    confidence: parseFloat(r.confidence),
+    confidence: r.confidence === null ? null : parseFloat(r.confidence),
     thumb_url: `${baseUrl}/${r.file_id}`,
   }));
 });

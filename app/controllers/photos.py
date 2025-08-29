@@ -209,7 +209,7 @@ class PhotoHistoryItem(BaseModel):
     crop: str
     disease: str
     status: str
-    confidence: float
+    confidence: float | None = None
     thumb_url: str
 
 
@@ -413,7 +413,7 @@ async def list_photos_history(
                     crop=r.crop or "",
                     disease=r.disease or "",
                     status=r.status,
-                    confidence=float(r.confidence or 0),
+                    confidence=float(r.confidence) if r.confidence is not None else None,
                     thumb_url=get_public_url(r.file_id),
                 )
                 for r in rows
