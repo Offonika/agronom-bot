@@ -102,7 +102,7 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, 
             code=ErrorCode.BAD_REQUEST, message="image too large"
         )
         raise _ProcessImageError(
-            JSONResponse(status_code=400, content=err.model_dump())
+            JSONResponse(status_code=413, content=err.model_dump())
         )
 
     if resp := await _enforce_paywall(user_id):
@@ -216,7 +216,12 @@ class PhotoHistoryItem(BaseModel):
 @router.post(
     "/ai/diagnose",
     response_model=DiagnoseResponse,
-    responses={400: {"model": ErrorResponse}, 429: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        413: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+        502: {"model": ErrorResponse},
+    },
 )
 async def diagnose(
     request: Request,
@@ -224,24 +229,24 @@ async def diagnose(
     image: UploadFile | None = OPTIONAL_FILE,
     prompt_id: str | None = Form(None),
 ):
+    limit = 2 * 1024 * 1024
     if image:
         if prompt_id not in (None, "v1"):
             err = ErrorResponse(
                 code=ErrorCode.BAD_REQUEST, message="prompt_id must be 'v1'"
             )
             return JSONResponse(status_code=400, content=err.model_dump())
-        limit = 2 * 1024 * 1024
         if getattr(image, "size", None) and image.size > limit:
             err = ErrorResponse(
                 code=ErrorCode.BAD_REQUEST, message="image too large"
             )
-            return JSONResponse(status_code=400, content=err.model_dump())
+            return JSONResponse(status_code=413, content=err.model_dump())
         contents = await image.read(limit + 1)
         if len(contents) > limit:
             err = ErrorResponse(
                 code=ErrorCode.BAD_REQUEST, message="image too large"
             )
-            return JSONResponse(status_code=400, content=err.model_dump())
+            return JSONResponse(status_code=413, content=err.model_dump())
     else:
         try:
             json_data = await request.json()
@@ -258,6 +263,12 @@ async def diagnose(
                 code=ErrorCode.BAD_REQUEST, message=message
             )
             return JSONResponse(status_code=400, content=err.model_dump())
+        b64_limit = ((limit + 2) // 3) * 4
+        if len(body.image_base64) > b64_limit:
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="image too large"
+            )
+            return JSONResponse(status_code=413, content=err.model_dump())
         try:
             contents = base64.b64decode(body.image_base64, validate=True)
         except binascii.Error:
@@ -265,6 +276,11 @@ async def diagnose(
                 code=ErrorCode.BAD_REQUEST, message="invalid base64"
             )
             return JSONResponse(status_code=400, content=err.model_dump())
+        if len(contents) > limit:
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="image too large"
+            )
+            return JSONResponse(status_code=413, content=err.model_dump())
     diag_requests_total.inc()
     start_time = time.perf_counter()
     try:
