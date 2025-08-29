@@ -124,16 +124,16 @@ agronom-bot/
 
 Перед началом убедитесь, что у вас установлен Node.js версии 18 или выше.
 
-1. Скопируйте файл шаблона переменных окружения командой `cp .env.template .env` и укажите параметры подключения к БД и S3. Минимально нужны:
+1. Скопируйте файл шаблона переменных окружения командой `cp .env.template .env` и укажите параметры подключения к БД и S3. Минимально нужны (обязательно задайте `POSTGRES_PASSWORD` в `.env`):
 
    ```env
    POSTGRES_USER=postgres
-   POSTGRES_PASSWORD=postgres
+   POSTGRES_PASSWORD=your-postgres-password
    POSTGRES_DB=agronom
    POSTGRES_HOST=localhost
    POSTGRES_PORT=5432
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
-   BOT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/agronom
+   DATABASE_URL=postgresql://postgres:your-postgres-password@localhost:5432/agronom
+   BOT_DATABASE_URL=postgresql://postgres:your-postgres-password@localhost:5432/agronom
    API_BASE_URL=http://localhost:8000
 
    S3_BUCKET=agronom
