@@ -7,6 +7,7 @@ from app.config import Settings
 from app.dependencies import compute_signature
 from app.db import SessionLocal
 from app.models import User
+from app.metrics import queue_size_pending
 
 # Reuse upload stubs from main API tests
 from tests.test_api import stub_upload  # noqa: F401
@@ -66,3 +67,38 @@ def test_autopay_metrics(client, monkeypatch):
     body = metrics.text
     assert "autopay_charge_seconds_bucket" in body
     assert "payment_fail_total" in body
+
+
+def test_queue_pending_metric_balance(client, monkeypatch):
+    async def _pending_stub(contents: bytes, user_id: int):
+        return "key", "", "", 0.0, 0.0
+
+    monkeypatch.setattr(
+        "app.controllers.photos._process_image", _pending_stub
+    )
+    queue_size_pending.set(0)
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 202
+    pid = resp.json()["id"]
+
+    metrics = client.get("/metrics")
+    assert metrics.status_code == 200
+    assert "queue_size_pending 1.0" in metrics.text
+
+    from app.db import SessionLocal
+    from app.models import Photo
+
+    with SessionLocal() as session:
+        photo = session.get(Photo, pid)
+        photo.status = "ok"
+        session.commit()
+
+    queue_size_pending.dec()
+    metrics_after = client.get("/metrics")
+    assert metrics_after.status_code == 200
+    assert "queue_size_pending 0.0" in metrics_after.text

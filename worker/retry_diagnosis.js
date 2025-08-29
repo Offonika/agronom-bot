@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Queue, Worker } = require('bullmq');
 const { Pool } = require('pg');
 const { callGptVisionStub } = require('./gpt_stub');
+const prom = require('prom-client');
 
 const connection = { connectionString: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = 'retry-diagnosis';
@@ -9,6 +10,11 @@ const queueName = 'retry-diagnosis';
 const queue = new Queue(queueName, { connection });
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const queueSizePending = new prom.Gauge({
+  name: 'queue_size_pending',
+  help: 'Number of pending photos awaiting diagnosis',
+});
 
 const retryCron = process.env.RETRY_CRON || '0 1 * * *';
 const RETRY_CONCURRENCY = parseInt(process.env.RETRY_CONCURRENCY || '1', 10);
@@ -43,7 +49,9 @@ new Worker(
     let success = 0;
     let failed = 0;
     try {
-      const { rows } = await client.query("SELECT id, file_id FROM photos WHERE status IN ('pending','retrying')");
+      const { rows } = await client.query(
+        "SELECT id, file_id, retry_attempts FROM photos WHERE status IN ('pending','retrying')"
+      );
       processed = rows.length;
       for (const row of rows) {
         try {
@@ -52,14 +60,18 @@ new Worker(
             "UPDATE photos SET crop=$1, disease=$2, confidence=$3, status='ok' WHERE id=$4",
             [resp.crop || null, resp.disease || null, resp.confidence || 0, row.id]
           );
+          queueSizePending.dec();
           success += 1;
         } catch (err) {
+          const attempts = row.retry_attempts + 1;
+          const status = attempts >= RETRY_LIMIT ? 'failed' : 'retrying';
           await client.query(
-            "UPDATE photos SET retry_attempts=retry_attempts+1, " +
-              "status=CASE WHEN retry_attempts+1 >= $2 THEN 'failed' ELSE 'retrying' END " +
-              "WHERE id=$1",
-            [row.id, RETRY_LIMIT]
+            "UPDATE photos SET retry_attempts=$2, status=$3 WHERE id=$1",
+            [row.id, attempts, status]
           );
+          if (status === 'failed') {
+            queueSizePending.dec();
+          }
           failed += 1;
         }
       }
