@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     catalog_pesticide_url: str = Field(
         DEFAULT_CATALOG_URL, alias="CATALOG_PESTICIDE_URL"
     )
+    catalog_referer: str = Field(
+        DEFAULT_CATALOG_URL,
+        alias="CATALOG_REFERER",
+        description="Referer header to use for catalog downloads",
+    )
     catalog_agrochem_url: str = Field(
         DEFAULT_CATALOG_URL, alias="CATALOG_AGROCHEM_URL"
     )

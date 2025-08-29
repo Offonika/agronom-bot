@@ -44,3 +44,7 @@ client/
 bot/node_modules/
 node_modules/
 dist/
+# PDF и дампы
+last_protocol*.pdf
+mcx_debug_page.html
+debug_protocols/
