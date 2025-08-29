@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app import db as db_module
 from app.config import Settings
 from app.dependencies import ErrorResponse, compute_signature, rate_limit
-from app.models import Event, Payment, Photo, User, ErrorCode
+from app.models import Event, Payment, Photo, PhotoUsage, User, ErrorCode
 
 settings = Settings()
 HMAC_SECRET = settings.hmac_secret
@@ -151,6 +151,7 @@ async def delete_user(
             db.query(Photo).filter_by(user_id=user_id).delete()
             db.query(Payment).filter_by(user_id=user_id).delete()
             db.query(Event).filter_by(user_id=user_id).delete()
+            db.query(PhotoUsage).filter_by(user_id=user_id).delete()
             db.query(User).filter_by(id=user_id).delete()
             db.commit()
 

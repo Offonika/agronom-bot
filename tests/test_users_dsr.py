@@ -5,7 +5,7 @@ import zipfile
 from app.config import Settings
 from app.db import SessionLocal
 from app.dependencies import compute_signature
-from app.models import Event, Payment, Photo, User
+from app.models import Event, Payment, Photo, PhotoUsage, User
 
 HEADERS = {
     "X-API-Key": "test-api-key",
@@ -21,6 +21,7 @@ def _prepare_db():
         db.query(Photo).filter_by(user_id=1).delete()
         db.query(Payment).filter_by(user_id=1).delete()
         db.query(Event).filter_by(user_id=1).delete()
+        db.query(PhotoUsage).filter_by(user_id=1).delete()
         db.query(User).filter_by(id=1).delete()
         db.add(User(id=1, tg_id=1))
         db.add(Photo(user_id=1, file_id="f1"))
@@ -34,6 +35,7 @@ def _prepare_db():
             )
         )
         db.add(Event(user_id=1, event="login"))
+        db.add(PhotoUsage(user_id=1, month="2024-01", used=1))
         db.commit()
 
 
@@ -104,6 +106,7 @@ def test_delete_user_cascade(client):
         assert db.query(Photo).filter_by(user_id=1).count() == 0
         assert db.query(Payment).filter_by(user_id=1).count() == 0
         assert db.query(Event).filter_by(user_id=1).count() == 0
+        assert db.query(PhotoUsage).filter_by(user_id=1).count() == 0
 
 
 def test_delete_user_bad_signature(client):
