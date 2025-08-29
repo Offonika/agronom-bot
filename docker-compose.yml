@@ -24,7 +24,7 @@ services:
       context: ./bot
       dockerfile: Dockerfile
     volumes:
-      - .:/usr/src/app
+      - ./bot:/usr/src/app
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
