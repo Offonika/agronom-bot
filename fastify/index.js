@@ -22,6 +22,7 @@ const s3 = new S3Client({
 
 const bucket = process.env.S3_BUCKET || 'agronom';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const HMAC_SECRET = process.env.HMAC_SECRET || 'test-hmac-secret';
 
 async function saveToS3(key, buffer) {
   const cmd = new PutObjectCommand({ Bucket: bucket, Key: key, Body: buffer });
@@ -73,19 +74,48 @@ app.post('/v1/ai/diagnose', async function (request, reply) {
   }
 });
 
-app.get('/v1/photos/history', async function (request) {
+function verifyToken(token) {
+  const [id, sig] = token.split(':');
+  if (!id || !sig) return null;
+  const expected = crypto
+    .createHmac('sha256', HMAC_SECRET)
+    .update(id)
+    .digest('hex');
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  const parsed = parseInt(id, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+async function auth(request, reply) {
+  const header = request.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return reply
+      .code(401)
+      .send({ code: 'UNAUTHORIZED', message: 'Missing or invalid token' });
+  }
+  const token = header.slice('Bearer '.length);
+  const userId = verifyToken(token);
+  if (!userId) {
+    return reply
+      .code(401)
+      .send({ code: 'UNAUTHORIZED', message: 'Missing or invalid token' });
+  }
+  request.userId = userId;
+}
+
+app.get('/v1/photos/history', { preHandler: auth }, async function (request) {
   const limitParam = parseInt(request.query.limit ?? '10', 10);
   const parsedOffset = parseInt(request.query.offset ?? '0', 10);
   const offset = Math.max(0, parsedOffset);
   const limit = Math.min(Number.isNaN(limitParam) ? 10 : limitParam, 50);
 
-  let userId = 1;
-  if (request.headers['x-user-id']) {
-    const parsed = parseInt(request.headers['x-user-id'], 10);
-    if (!Number.isNaN(parsed)) {
-      userId = parsed;
-    }
-  }
+  const userId = request.userId;
 
   const res = await pool.query(
     `SELECT id AS photo_id, ts, crop, disease, status, confidence, file_id
@@ -93,7 +123,7 @@ app.get('/v1/photos/history', async function (request) {
      WHERE user_id = $1
      ORDER BY ts DESC
      LIMIT $2 OFFSET $3`,
-    [userId, limit, offset]
+    [userId, limit, offset],
   );
 
   const baseUrl = process.env.S3_PUBLIC_URL ||
