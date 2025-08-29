@@ -28,11 +28,11 @@ async function saveToS3(key, buffer) {
   await s3.send(cmd);
 }
 
-async function logToDb(key) {
+async function logToDb(key, userId) {
   try {
     await pool.query(
       'INSERT INTO photos (user_id, file_id, status) VALUES ($1, $2, $3)',
-      [1, key, 'processed']
+      [userId, key, 'processed']
     );
   } catch (err) {
     app.log.error('DB error', err);
@@ -57,9 +57,17 @@ app.post('/v1/ai/diagnose', async function (request, reply) {
     filename = Date.now() + '-' + crypto.randomUUID() + '-base64.jpg';
   }
 
+  let userId = 1;
+  if (request.headers['x-user-id']) {
+    const parsed = parseInt(request.headers['x-user-id'], 10);
+    if (!Number.isNaN(parsed)) {
+      userId = parsed;
+    }
+  }
+
   try {
     await saveToS3(filename, buffer);
-    await logToDb(filename);
+    await logToDb(filename, userId);
     return {
       crop: 'apple',
       disease: 'powdery mildew',
