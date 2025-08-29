@@ -230,7 +230,18 @@ async def diagnose(
                 code=ErrorCode.BAD_REQUEST, message="prompt_id must be 'v1'"
             )
             return JSONResponse(status_code=400, content=err.model_dump())
-        contents = await image.read()
+        limit = 2 * 1024 * 1024
+        if getattr(image, "size", None) and image.size > limit:
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="image too large"
+            )
+            return JSONResponse(status_code=400, content=err.model_dump())
+        contents = await image.read(limit + 1)
+        if len(contents) > limit:
+            err = ErrorResponse(
+                code=ErrorCode.BAD_REQUEST, message="image too large"
+            )
+            return JSONResponse(status_code=400, content=err.model_dump())
     else:
         try:
             json_data = await request.json()

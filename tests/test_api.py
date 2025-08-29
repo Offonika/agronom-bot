@@ -225,6 +225,19 @@ def test_diagnose_large_image(client):
     assert resp.status_code == 400
 
 
+def test_diagnose_large_image_error_payload(client):
+    large = b"0" * (2 * 1024 * 1024 + 1)
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files={"image": ("big.jpg", large, "image/jpeg")},
+    )
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["code"] == ErrorCode.BAD_REQUEST
+    assert body["message"] == "image too large"
+
+
 def test_diagnose_large_base64(client):
     large_bytes = b"0" * (2 * 1024 * 1024 + 1)
     encoded = base64.b64encode(large_bytes).decode()
