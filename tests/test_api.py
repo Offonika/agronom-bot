@@ -222,7 +222,7 @@ def test_diagnose_large_image(client):
         headers=HEADERS,
         files={"image": ("big.jpg", large, "image/jpeg")},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 413
 
 
 def test_diagnose_large_image_error_payload(client):
@@ -232,7 +232,7 @@ def test_diagnose_large_image_error_payload(client):
         headers=HEADERS,
         files={"image": ("big.jpg", large, "image/jpeg")},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 413
     body = resp.json()
     assert body["code"] == ErrorCode.BAD_REQUEST
     assert body["message"] == "image too large"
@@ -246,7 +246,50 @@ def test_diagnose_large_base64(client):
         headers=HEADERS,
         json={"image_base64": encoded, "prompt_id": "v1"},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 413
+
+
+def test_diagnose_max_size_image_ok(monkeypatch, client):
+    limit = 2 * 1024 * 1024
+
+    async def fake_process(contents: bytes, user_id: int):
+        return "k", "crop", "disease", 0.1, 1.0
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files={"image": ("ok.jpg", b"0" * limit, "image/jpeg")},
+    )
+    assert resp.status_code == 200
+
+
+def test_diagnose_max_size_base64_ok(monkeypatch, client):
+    limit = 2 * 1024 * 1024
+
+    async def fake_process(contents: bytes, user_id: int):
+        return "k", "crop", "disease", 0.1, 1.0
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
+
+    encoded = base64.b64encode(b"0" * limit).decode()
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": encoded, "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
 
 
 def test_diagnose_json_returns_stub(client):
