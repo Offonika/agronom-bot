@@ -21,8 +21,8 @@ services:
 
   bot:
     build:
-      context: ./bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bot/Dockerfile
     volumes:
       - ./bot:/usr/src/app
       - ./locales:/usr/src/locales
