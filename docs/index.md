@@ -10,6 +10,7 @@
 
 | Раздел | Назначение |
 |--------|------------|
+| [prd.md](./prd.md) | Product Requirements Document — бизнес-цели, сценарии, метрики |
 | [srs.md](./srs.md) | System Requirements Specification — описание функционала, API, UX |
 | [data_contract.md](./data_contract.md) | Структура базы данных, таблицы, TTL, типы данных |
 | [adr.md](./adr.md) | Архитектурные решения: стек, масштабирование, безопасность |
