@@ -6,7 +6,7 @@ async function startHandler(ctx, pool) {
     await logEvent(pool, ctx.from.id, 'paywall_click_buy');
   } else if (ctx.startPayload === 'faq') {
     await logEvent(pool, ctx.from.id, 'paywall_click_faq');
-    return ctx.reply(msg('faq'), {
+    return ctx.reply(msg('faq_text'), {
       reply_markup: {
         inline_keyboard: [
           [
@@ -60,41 +60,10 @@ async function autopayEnableHandler(ctx, pool) {
   return buyProHandler(ctx, pool, 3000, 60000, true);
 }
 
-async function askExpertHandler(ctx, pool) {
-  const [, ...parts] = ctx.message.text.split(' ');
-  const question = parts.join(' ').trim();
-  if (!question) {
-    return ctx.reply('Укажите вопрос после команды /ask_expert');
-  }
-  const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
-  const API_KEY = process.env.API_KEY || 'test-api-key';
-  const API_VER = process.env.API_VER || 'v1';
-  try {
-    await fetch(`${API_BASE}/v1/ask_expert`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': API_KEY,
-        'X-API-Ver': API_VER,
-        'X-User-ID': ctx.from.id.toString(),
-      },
-      body: JSON.stringify({ question }),
-    });
-    if (ctx.from) {
-      await logEvent(pool, ctx.from.id, 'ask_expert_command');
-    }
-    return ctx.reply('Ваш вопрос отправлен эксперту.');
-  } catch (err) {
-    console.error('ask_expert error', err);
-    return ctx.reply('Не удалось отправить вопрос эксперту.');
-  }
-}
-
 module.exports = {
   startHandler,
   helpHandler,
   feedbackHandler,
   cancelAutopayHandler,
   autopayEnableHandler,
-  askExpertHandler,
 };

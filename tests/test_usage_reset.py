@@ -1,5 +1,10 @@
+from __future__ import annotations
 from datetime import datetime
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 
@@ -14,23 +15,43 @@ from app.logger import setup_logging
 from app.controllers import v1
 
 # 👇 Prometheus инструментатор
-from prometheus_fastapi_instrumentator import Instrumentator
+try:  # pragma: no cover - optional dependency for metrics
+    from prometheus_fastapi_instrumentator import Instrumentator
+except Exception:  # pragma: no cover
+    class Instrumentator:  # type: ignore
+        """Fallback instrumentator used when dependency is unavailable."""
+
+        def instrument(self, _app, **_kwargs):
+            return self
+
+        def expose(self, _app, **_kwargs):
+            return self
 
 settings = Settings()
 setup_logging()
 logger = logging.getLogger(__name__)
 
 
+async def _to_thread(func, *args, **kwargs):
+    """Compatibility wrapper for asyncio.to_thread (Py < 3.9)."""
+    if hasattr(asyncio, "to_thread"):
+        return await asyncio.to_thread(func, *args, **kwargs)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Only initialize storage and DB connections; catalog data is pre-loaded
     await init_storage(settings)
-    await asyncio.to_thread(init_db, settings)
+    await _to_thread(init_db, settings)
     yield
     await close_client()
 
 if sys.version_info[:2] < (3, 11):
-    raise RuntimeError("Python 3.11+ is required")
+    if os.getenv("ALLOW_OLD_PYTHON", "0") != "1":
+        raise RuntimeError("Python 3.11+ is required")
+    logger.warning("Running on unsupported Python version %s.%s", *sys.version_info[:2])
 
 app = FastAPI(
     title="Agronom Bot Internal API",

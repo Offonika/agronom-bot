@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
@@ -155,4 +156,3 @@ def test_partner_orders_rate_limit():
             assert resp.status_code in {200, 202}
         resp = client.post("/v1/partner/orders", headers=headers, json=payload)
         assert resp.status_code == 429
-

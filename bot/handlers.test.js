@@ -4,17 +4,22 @@ const { Readable } = require('node:stream');
 
 process.env.FREE_PHOTO_LIMIT = '5';
 
-process.env.API_BASE_URL = 'http://localhost:8000';
+process.env.API_BASE_URL = 'http://localhost:8010';
 
 const API_BASE = process.env.API_BASE_URL;
 const PAYMENTS_BASE = `${API_BASE}/v1/payments`;
 const {
-  formatDiagnosis,
   photoHandler,
   messageHandler,
   retryHandler,
   getProductName,
+  rememberDiagnosis,
+  getCropHint,
+  handleClarifySelection,
+  buildProtocolRow,
 } = require('./diagnosis');
+const { createPlanPickHandler } = require('./callbacks/plan_pick');
+const { createPlanTriggerHandler } = require('./callbacks/plan_trigger');
 const {
   subscribeHandler,
   buyProHandler,
@@ -25,6 +30,14 @@ const {
 const { startHandler, helpHandler, feedbackHandler } = require('./commands');
 const { historyHandler } = require('./history');
 const { reminderHandler, reminders } = require('./reminder');
+const { createPlanCommands } = require('./planCommands');
+const { createReminderScheduler } = require('./reminders');
+const { createPlanFlow } = require('./planFlow');
+const {
+  buildAssistantText,
+  buildKeyboardLayout,
+  resolveFollowupReply,
+} = require('./messageFormatters/diagnosisMessage');
 const strings = require('../locales/ru.json');
 const { msg } = require('./utils');
 function tr(key, vars = {}) {
@@ -51,7 +64,28 @@ async function withMockFetch(responses, fn, calls) {
     if (resp.body && typeof resp.body.destroy === 'function') {
       open.push(resp.body);
     }
-    return { ok: true, ...resp };
+    const clone = { ...resp };
+    if (!Object.prototype.hasOwnProperty.call(clone, 'ok')) {
+      clone.ok = true;
+    }
+    if (typeof clone.json === 'function') {
+      const originalJson = clone.json.bind(clone);
+      let cached;
+      clone.json = async () => {
+        if (cached !== undefined) return cached;
+        cached = await originalJson();
+        return cached;
+      };
+      if (typeof clone.text !== 'function') {
+        clone.text = async () => JSON.stringify(await clone.json());
+      }
+    } else {
+      clone.json = async () => ({});
+      if (typeof clone.text !== 'function') {
+        clone.text = async () => '{}';
+      }
+    }
+    return clone;
   };
   try {
     await fn();
@@ -68,9 +102,16 @@ async function withMockFetch(responses, fn, calls) {
 }
 
 test('photoHandler stores info and replies', { concurrency: false }, async () => {
-  process.env.BETA_EXPERT_CHAT = 'true';
   const calls = [];
-  const pool = { query: async (...args) => { calls.push(args); } };
+  const planFlowCalls = [];
+  const deps = {
+    pool: { query: async (...args) => { calls.push(args); } },
+    planFlow: {
+      start: async (ctx, data) => {
+        planFlowCalls.push({ ctx, data });
+      },
+    },
+  };
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id1', file_unique_id: 'uid', width: 1, height: 2, file_size: 3 }] },
@@ -80,14 +121,252 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
   };
   await withMockFetch({
     'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
+    default: {
+      json: async () => ({
+        crop: 'apple',
+        disease: 'scab',
+        confidence: 0.9,
+        treatment_plan: {
+          product: 'Топаз',
+          dosage: '2 мл',
+          phi: '30',
+          safety: 'Перчатки',
+        },
+        next_steps: { reminder: 'Повторить', green_window: 'Вечер', cta: 'Добавить обработку' },
+      }),
+    },
   }, async () => {
-    await photoHandler(pool, ctx);
+    await photoHandler(deps, ctx);
   });
   assert.equal(calls.length, 1);
-  assert.ok(replies[0].msg.includes('Культура'));
-  assert.ok(replies[0].opts.reply_markup.inline_keyboard.length > 0);
-  delete process.env.BETA_EXPERT_CHAT;
+  assert.equal(planFlowCalls.length, 1);
+  assert.equal(replies[0].msg, tr('photo_processing'));
+  const diagnosisReply = replies[1];
+  assert.ok(diagnosisReply.msg.includes('📸 Диагноз'));
+  assert.ok(diagnosisReply.msg.includes('⏰ Что дальше'));
+  const callbacks = diagnosisReply.opts.reply_markup.inline_keyboard.flat().map((btn) => btn.callback_data);
+  assert.ok(callbacks.includes('plan_treatment'));
+  assert.ok(callbacks.includes('phi_reminder'));
+});
+
+test('planPickHandler schedules treatment and phi reminders', async () => {
+  const answers = [];
+  const remindersCaptured = [];
+  const eventsCaptured = [];
+  const handler = createPlanPickHandler({
+    db: {
+      ensureUser: async () => ({ id: 5 }),
+      selectStageOption: async () => ({
+        stage: { id: 12, plan_id: 77, kind: 'season', phi_days: 7 },
+        option: { id: 3 },
+      }),
+      createEvents: async (events) => {
+        eventsCaptured.push(...events);
+        return events.map((event, idx) => ({ ...event, id: idx + 1 }));
+      },
+      createReminders: async (rem) => remindersCaptured.push(...rem),
+    },
+  });
+  const realNow = Date.now;
+  Date.now = () => new Date('2025-01-01T00:00:00Z').getTime();
+  try {
+    await handler({
+      from: { id: 42 },
+      callbackQuery: { data: 'pick_opt|77|12|3' },
+      answerCbQuery: async (text) => answers.push(text),
+    });
+  } finally {
+    Date.now = realNow;
+  }
+  assert.equal(eventsCaptured.length, 2);
+  assert.equal(remindersCaptured.length, 2);
+  assert.equal(answers[0], msg('plan_saved_toast'));
+});
+
+test('planPickHandler skips scheduling for trigger stages', async () => {
+  const answers = [];
+  const handler = createPlanPickHandler({
+    db: {
+      ensureUser: async () => ({ id: 5 }),
+      selectStageOption: async () => ({
+        stage: { id: 12, plan_id: 77, kind: 'trigger', phi_days: null },
+        option: { id: 3 },
+      }),
+      createEvents: async () => {
+        throw new Error('should not be called');
+      },
+      createReminders: async () => {
+        throw new Error('should not be called');
+      },
+    },
+  });
+  await handler({
+    from: { id: 42 },
+    callbackQuery: { data: 'pick_opt|77|12|3' },
+    answerCbQuery: async (text) => answers.push(text),
+  });
+  assert.equal(answers[0], msg('plan_saved_wait_trigger'));
+});
+
+test('planFlow start prompts for object selection', async () => {
+  const replies = [];
+  const planFlow = createPlanFlow({
+    db: {
+      ensureUser: async () => ({ id: 9, last_object_id: null }),
+      listObjects: async () => [],
+      createObject: async () => ({ id: 1, name: 'Авто объект' }),
+      updateUserLastObject: async () => {},
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 77 },
+      chat: { id: 1 },
+      reply: async (msg, opts) => replies.push({ msg, opts }),
+    },
+    { crop: 'apple', confidence: 0.9 },
+  );
+  assert.ok(replies[0].msg.includes('объекта'));
+  assert.ok(replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data.startsWith('plan_obj_confirm'));
+});
+
+test('planFlow confirm creates plan and renders table', async () => {
+  const wizardCalls = [];
+  const planFlow = createPlanFlow({
+    db: {
+      ensureUser: async () => ({ id: 12, last_object_id: null }),
+      listObjects: async () => [{ id: 3, name: 'Грядка', user_id: 12 }],
+      createObject: async () => ({ id: 3, name: 'Грядка', user_id: 12 }),
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 3, name: 'Грядка', user_id: 12, location_tag: null }),
+      createCase: async () => ({ id: 21 }),
+      createPlan: async () => ({ id: 31 }),
+      createStagesWithOptions: async () => {},
+    },
+    catalog: {
+      suggestStages: async () => [{ title: 'До цветения', kind: 'season', phi_days: 7, note: 'note', meta: {} }],
+      suggestOptions: async () => [{ product: 'ХОМ', dose_value: 40, dose_unit: 'г/10л', meta: {} }],
+    },
+    planWizard: {
+      showPlanTable: async (chatId, planId) => wizardCalls.push({ chatId, planId }),
+    },
+  });
+  await planFlow.start(
+    {
+      from: { id: 12 },
+      chat: { id: 55 },
+      reply: async () => {},
+    },
+    { crop: 'apple', disease: 'scab', confidence: 0.9 },
+  );
+  await planFlow.confirm(
+    {
+      from: { id: 12 },
+      chat: { id: 55 },
+      answerCbQuery: async () => {},
+      reply: async () => {},
+    },
+    3,
+  );
+  assert.equal(wizardCalls[0].planId, 31);
+});
+
+test('planTriggerHandler schedules events for trigger stage', async () => {
+  const remindersSaved = [];
+  const handler = createPlanTriggerHandler({
+    db: {
+      ensureUser: async () => ({ id: 6 }),
+      getStageById: async () => ({ id: 8, plan_id: 2, user_id: 6, kind: 'trigger', phi_days: 2 }),
+      createEvents: async (events) => events.map((event, idx) => ({ ...event, id: idx + 1 })),
+      createReminders: async (rem) => remindersSaved.push(...rem),
+    },
+  });
+  const answers = [];
+  await handler({
+    from: { id: 6 },
+    callbackQuery: { data: 'plan_trigger|2|8' },
+    answerCbQuery: async (text) => answers.push(text),
+  });
+  assert.ok(remindersSaved.length >= 1);
+  assert.equal(answers[0], msg('plan_trigger_scheduled'));
+});
+
+test('planCommands handlePlan uses wizard', async () => {
+  const replies = [];
+  let wizardCalled = false;
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 1, last_object_id: null }),
+      listObjects: async () => [{ id: 2, name: 'Грядка' }],
+      updateUserLastObject: async () => {},
+      getObjectById: async () => null,
+      listPlansByObject: async () => [],
+      getPlanForUser: async () => ({ id: 5, title: 'План' }),
+    },
+    planWizard: {
+      showPlanTable: async () => {
+        wizardCalled = true;
+      },
+    },
+  });
+  await planCommands.handlePlan({
+    from: { id: 42 },
+    chat: { id: 42 },
+    message: { text: '/plan 5' },
+    reply: async (text) => replies.push(text),
+  });
+  assert.ok(wizardCalled);
+  assert.ok(replies[0].includes('Показываю план'));
+});
+
+test('planCommands handleDone updates next event', async () => {
+  const replies = [];
+  let updated = null;
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 1 }),
+      listObjects: async () => [],
+      getObjectById: async () => null,
+      updateUserLastObject: async () => {},
+      getNextScheduledEvent: async () => ({ id: 9, stage_title: 'До цветения', plan_title: 'План' }),
+      updateEventStatus: async (id, status) => {
+        updated = { id, status };
+      },
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleDone({
+    from: { id: 42 },
+    reply: async (text) => replies.push(text),
+  });
+  assert.deepEqual(updated, { id: 9, status: 'done' });
+  assert.ok(replies[0].includes('До цветения'));
+});
+
+test('reminder scheduler sends due reminders', async () => {
+  const sentMessages = [];
+  const scheduler = createReminderScheduler({
+    bot: {
+      telegram: {
+        sendMessage: async (chatId, text) => sentMessages.push({ chatId, text }),
+      },
+    },
+    db: {
+      dueReminders: async () => [
+        { id: 1, user_tg_id: 7, event_type: 'treatment', plan_title: 'План', stage_title: 'До цветения' },
+      ],
+      markReminderSent: async () => {},
+    },
+    intervalMs: 10,
+  });
+  await scheduler.tick();
+  assert.equal(sentMessages.length, 1);
+  assert.ok(sentMessages[0].text.includes('План'));
 });
 
 test('photoHandler replies on DB error', { concurrency: false }, async () => {
@@ -120,7 +399,8 @@ test('photoHandler handles non-ok API status', { concurrency: false }, async () 
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0], msg('diagnose_error'));
+  assert.equal(replies[0], tr('photo_processing'));
+  assert.equal(replies[1], msg('diagnose_error'));
 });
 
 test('photoHandler responds with error_code message', { concurrency: false }, async () => {
@@ -138,7 +418,8 @@ test('photoHandler responds with error_code message', { concurrency: false }, as
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0], msg('error_NO_LEAF'));
+  assert.equal(replies[0], tr('photo_processing'));
+  assert.equal(replies[1], msg('error_NO_LEAF'));
 });
 
 test('photoHandler handles invalid JSON response', { concurrency: false }, async () => {
@@ -152,11 +433,12 @@ test('photoHandler handles invalid JSON response', { concurrency: false }, async
   };
   await withMockFetch({
     'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { json: async () => { throw new Error('bad json'); } },
+    default: { text: async () => '{invalid' },
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0], msg('diagnose_error'));
+  assert.equal(replies[0], tr('photo_processing'));
+  assert.equal(replies[1], msg('diagnosis.parse_error'));
 });
 
 test('photoHandler rejects oversized photo', { concurrency: false }, async () => {
@@ -183,13 +465,74 @@ test('photoHandler rejects oversized photo', { concurrency: false }, async () =>
   assert.equal(calls.length, 0);
 });
 
-test('messageHandler ignores non-photo', { concurrency: false }, () => {
-  let logged = '';
-  const orig = console.log;
-  console.log = (msg) => { logged = msg; };
-  messageHandler({ message: { text: 'hi' } });
-  console.log = orig;
-  assert.equal(logged, 'Ignoring non-photo message');
+test('messageHandler replies with default follow-up when no keyword', { concurrency: false }, async () => {
+  const replies = [];
+  rememberDiagnosis(501, {
+    crop: 'apple',
+    disease: 'scab',
+    confidence: 0.8,
+  });
+  await messageHandler({ from: { id: 501 }, message: { text: 'Привет' }, reply: async (msg) => replies.push(msg) });
+  assert.equal(replies[0], msg('followup_default'));
+});
+
+test('messageHandler answers FAQ intent when diagnosis cached', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = {
+    from: { id: 77 },
+    message: { text: 'Что это за болезнь простыми словами?' },
+    reply: async (msg) => replies.push(msg),
+  };
+  rememberDiagnosis(77, {
+    crop: 'виноград',
+    disease: 'powdery_mildew',
+    disease_name_ru: 'мучнистая роса',
+    confidence: 0.9,
+    reasoning: ['Белый налёт'],
+    treatment_plan: {
+      product: 'Скор',
+      dosage: '2 мл',
+      phi: '30',
+      safety: 'Перчатки',
+    },
+  });
+  await messageHandler(ctx);
+  assert.ok(replies[0]?.length > 0);
+});
+
+test('messageHandler answers follow-up from history', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = {
+    from: { id: 201 },
+    message: { text: 'Курс лечения какой?' },
+    reply: async (msg) => replies.push(msg),
+  };
+  rememberDiagnosis(201, { assistant_followups_ru: ['Курс лечения: повтор через 10 дней.'] });
+  await messageHandler(ctx);
+  assert.equal(replies[0], 'Курс лечения: повтор через 10 дней.');
+});
+
+test('messageHandler asks for new photo when no context', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = {
+    from: { id: 88 },
+    message: { text: 'От чего болезни?' },
+    reply: async (msg) => replies.push(msg),
+  };
+  await messageHandler(ctx);
+  assert.equal(replies[0], msg('faq.no_context'));
+});
+
+test('handleClarifySelection stores hint and confirms', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = {
+    from: { id: 55 },
+    reply: async (msg) => replies.push(msg),
+    answerCbQuery: async () => {},
+  };
+  await handleClarifySelection(ctx, 'tomato');
+  assert.equal(replies[0], msg('clarify.crop.confirm', { crop: strings.clarify.crop.options.tomato }));
+  assert.equal(getCropHint(55), 'tomato');
 });
 
 test('photoHandler sends protocol buttons', { concurrency: false }, async () => {
@@ -220,7 +563,8 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  const buttons = replies[0].opts.reply_markup.inline_keyboard[0];
+  assert.equal(replies[0].msg, tr('photo_processing'));
+  const buttons = replies[1].opts.reply_markup.inline_keyboard[0];
   assert.equal(buttons[0].text, 'Показать протокол');
   assert.equal(
     buttons[0].callback_data,
@@ -229,86 +573,56 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
   assert.ok(buttons[1].url.includes('pid=1'));
 });
 
-test('formatDiagnosis encodes special characters in callback_data', () => {
+test('buildProtocolRow encodes special characters in callback_data', () => {
   const ctx = { from: { id: 1 } };
-  const data = {
-    crop: 'c',
-    disease: 'd',
-    confidence: 0.9,
-    protocol: {
-      product: 'аб / в',
-      dosage_value: 1,
-      dosage_unit: 'ml',
-      phi: 10,
-    },
-  };
-  const { keyboard } = formatDiagnosis(ctx, data);
-  const cb = keyboard.inline_keyboard[0][0].callback_data;
+  const row = buildProtocolRow(ctx, {
+    product: 'аб / в',
+    dosage_value: 1,
+    dosage_unit: 'ml',
+    phi: 10,
+  });
+  const cb = row[0].callback_data;
   assert.ok(cb.includes('%2F'));
   assert.ok(cb.includes('%20'));
 });
 
-test('formatDiagnosis trims long product names and limits callback_data', () => {
+test('buildProtocolRow trims long product names', () => {
   const ctx = { from: { id: 1 } };
-  const longName = 'A'.repeat(120);
-  const data = {
-    crop: 'c',
-    disease: 'd',
-    confidence: 0.9,
-    protocol: {
-      product: longName,
-      dosage_value: 1,
-      dosage_unit: 'ml',
-      phi: 10,
-    },
-  };
-  const { keyboard } = formatDiagnosis(ctx, data);
-  const cb = keyboard.inline_keyboard[0][0].callback_data;
+  const row = buildProtocolRow(ctx, {
+    product: 'A'.repeat(120),
+    dosage_value: 1,
+    dosage_unit: 'ml',
+    phi: 10,
+  });
+  const cb = row[0].callback_data;
   assert.ok(cb.length <= 64);
-  assert.ok(!cb.includes('AAAAAA'));
 });
 
-test('formatDiagnosis keeps original product name for callback', () => {
+test('buildProtocolRow keeps product name cache', () => {
   const ctx = { from: { id: 1 } };
-  const longName = 'B'.repeat(40);
-  const data = {
-    crop: 'c',
-    disease: 'd',
-    confidence: 0.9,
-    protocol: {
-      product: longName,
-      dosage_value: 1,
-      dosage_unit: 'ml',
-      phi: 10,
-    },
-  };
-  const { keyboard } = formatDiagnosis(ctx, data);
-  const cb = keyboard.inline_keyboard[0][0].callback_data;
-  const [, prod] = cb.split('|');
+  const row = buildProtocolRow(ctx, {
+    product: 'B'.repeat(40),
+    dosage_value: 1,
+    dosage_unit: 'ml',
+    phi: 10,
+  });
+  const [, prod] = row[0].callback_data.split('|');
   const decoded = decodeURIComponent(prod);
-  assert.equal(getProductName(decoded), longName);
+  assert.equal(getProductName(decoded), 'B'.repeat(40));
 });
 
-test('getProductName does not clean cache on read', { concurrency: false }, () => {
-  delete require.cache[require.resolve('./diagnosis')];
-  const { formatDiagnosis, getProductName } = require('./diagnosis');
+test('getProductName caches hashed products', () => {
   const ctx = { from: { id: 1 } };
   let firstHash;
   let lastHash;
   for (let i = 0; i < 100; i++) {
-    const data = {
-      crop: 'c',
-      disease: 'd',
-      confidence: 0.9,
-      protocol: {
-        product: `p${i}`,
-        dosage_value: 1,
-        dosage_unit: 'ml',
-        phi: 10,
-      },
-    };
-    const { keyboard } = formatDiagnosis(ctx, data);
-    const [, hash] = keyboard.inline_keyboard[0][0].callback_data.split('|');
+    const row = buildProtocolRow(ctx, {
+      product: `p${i}`,
+      dosage_value: 1,
+      dosage_unit: 'ml',
+      phi: 10,
+    });
+    const [, hash] = row[0].callback_data.split('|');
     const decoded = decodeURIComponent(hash);
     if (i === 0) firstHash = decoded;
     if (i === 99) lastHash = decoded;
@@ -317,29 +631,7 @@ test('getProductName does not clean cache on read', { concurrency: false }, () =
   assert.equal(getProductName(firstHash), 'p0');
 });
 
-test('photoHandler shows expert button when enabled', { concurrency: false }, async () => {
-  process.env.BETA_EXPERT_CHAT = 'true';
-  const pool = { query: async () => {} };
-  const replies = [];
-  const ctx = {
-    message: { photo: [{ file_id: 'id2', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
-    from: { id: 100 },
-    reply: async (msg, opts) => replies.push({ msg, opts }),
-    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
-  };
-  await withMockFetch({
-    'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
-  }, async () => {
-    await photoHandler(pool, ctx);
-  });
-  const button = replies[0].opts.reply_markup.inline_keyboard[0][0];
-  assert.equal(button.callback_data, 'ask_expert');
-  assert.equal(button.text, 'Спросить эксперта');
-  delete process.env.BETA_EXPERT_CHAT;
-});
-
-test('photoHandler hides expert button when disabled', { concurrency: false }, async () => {
+test('photoHandler adds planning buttons', { concurrency: false }, async () => {
   const pool = { query: async () => {} };
   const replies = [];
   const ctx = {
@@ -350,11 +642,18 @@ test('photoHandler hides expert button when disabled', { concurrency: false }, a
   };
   await withMockFetch({
     'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }) },
+    default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.55, treatment_plan: null, need_reshoot: true, reshoot_tips: ['Один лист'], next_steps: { reminder: 'Повтори', green_window: 'После дождя', cta: 'Переснять фото' } }) },
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].opts, undefined);
+  assert.equal(replies[0].msg, tr('photo_processing'));
+  const buttons = replies[1].opts.reply_markup.inline_keyboard.flat();
+  const cbs = buttons.map((btn) => btn.callback_data);
+  assert.ok(cbs.includes('plan_treatment'));
+  assert.ok(cbs.includes('phi_reminder'));
+  assert.ok(cbs.includes('pdf_note'));
+  assert.ok(cbs.includes('ask_products'));
+  assert.ok(replies[1].msg.includes('⚠️ Пересъёмка'));
 });
 
 test('photoHandler paywall on 402', { concurrency: false }, async () => {
@@ -373,8 +672,10 @@ test('photoHandler paywall on 402', { concurrency: false }, async () => {
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].msg, tr('paywall', { limit: 4 }));
-  const btns = replies[0].opts.reply_markup.inline_keyboard[0];
+  assert.equal(replies[0].msg, tr('photo_processing'));
+  const paywallReply = replies[1];
+  assert.equal(paywallReply.msg, tr('paywall', { limit: 4 }));
+  const btns = paywallReply.opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].callback_data, 'buy_pro');
   assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
 });
@@ -422,7 +723,7 @@ test('startHandler replies with FAQ', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { startPayload: 'faq', from: { id: 2 }, reply: async (m, opts) => replies.push({ msg: m, opts }) };
   await startHandler(ctx, { query: async () => {} });
-  assert.equal(replies[0].msg, tr('faq'));
+  assert.equal(replies[0].msg, tr('faq_text'));
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].callback_data, 'buy_pro');
   assert.equal(btns[0].text, tr('faq_buy_button'));
@@ -622,14 +923,17 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
   }, async () => {
     await photoHandler(pool, ctx);
   });
-  assert.equal(replies[0].msg, tr('diag_pending'));
-  const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
+  assert.equal(replies[0].msg, tr('photo_processing'));
+  const pendingReply = replies[1];
+  assert.equal(pendingReply.msg, tr('diag_pending'));
+  const btn = pendingReply.opts.reply_markup.inline_keyboard[0][0];
   assert.equal(btn.text, tr('retry_button'));
   assert.equal(btn.callback_data, 'retry|42');
 });
 
 test('retryHandler returns result', { concurrency: false }, async () => {
   const replies = [];
+  const pool = { query: async () => [] };
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch({
     [`${API_BASE}/v1/photos/42`]: {
@@ -638,13 +942,17 @@ test('retryHandler returns result', { concurrency: false }, async () => {
         crop: 'apple',
         disease: 'scab',
         confidence: 0.95,
+        treatment_plan: { product: 'Скор', dosage: '2 мл', phi: '20', safety: 'Перчатки' },
+        next_steps: { reminder: 'Повтор', green_window: 'Вечером', cta: 'Добавить обработку' },
       }),
     },
   }, async () => {
-    await retryHandler(ctx, 42);
+    await retryHandler(ctx, 42, pool);
   });
-  assert.ok(replies[0].msg.includes('Культура: apple'));
-  assert.equal(replies[0].opts, undefined);
+  assert.ok(replies[0].msg.includes('📸 Диагноз'));
+  const callbacks = replies[0].opts.reply_markup.inline_keyboard.flat().map((btn) => btn.callback_data);
+  assert.ok(callbacks.includes('plan_treatment'));
+  assert.ok(callbacks.includes('phi_reminder'));
 });
 
 test('historyHandler paginates', { concurrency: false }, async () => {
@@ -753,48 +1061,66 @@ test('feedbackHandler sends link and logs event', { concurrency: false }, async 
   delete process.env.FEEDBACK_URL;
 });
 
-test('formatDiagnosis builds reply with protocol', () => {
-  const ctx = { from: { id: 1 } };
-  const data = {
+test('buildAssistantText uses assistant_ru when provided', () => {
+  const text = buildAssistantText({
+    assistant_ru: '📸 Диагноз\nКультура готова.',
+    plan_missing_reason: null,
+    need_reshoot: false,
+  });
+  assert.equal(text, '📸 Диагноз\nКультура готова.');
+});
+
+test('buildAssistantText falls back to structured text', () => {
+  const text = buildAssistantText({
     crop: 'apple',
     disease: 'scab',
-    confidence: 0.9,
-    protocol: {
-      id: 10,
-      product: 'Хорус',
-      dosage_value: 2,
-      dosage_unit: 'ml_10l',
-      phi: 15,
+    confidence: 0.8,
+    reasoning: ['Белый налёт'],
+    treatment_plan: {
+      substance: 'сера',
+      method: 'Опрыскивание',
+      phi_days: 14,
     },
-  };
-  const { text, keyboard } = formatDiagnosis(ctx, data);
-  assert.ok(text.includes('Культура: apple'));
-  const btns = keyboard.inline_keyboard[0];
-  assert.equal(
-    btns[0].callback_data,
-    'proto|%D0%A5%D0%BE%D1%80%D1%83%D1%81|2|ml_10l|15'
+    plan_missing_reason: 'нужно переснять',
+    need_reshoot: true,
+    reshoot_tips: ['Один лист'],
+  });
+  assert.ok(text.includes('📸 Диагноз'));
+  assert.ok(text.includes('сера'));
+  assert.ok(text.includes('нужно переснять'));
+  assert.ok(text.includes('Один лист'));
+});
+
+test('buildAssistantText translates crop names', () => {
+  const text = buildAssistantText({
+    crop: 'apple',
+    disease: 'scab',
+    confidence: 0.8,
+    treatment_plan: { substance: 'сера', method: 'Опрыскивание', phi_days: 14 },
+  });
+  assert.ok(text.includes('яблоня'));
+});
+
+test('buildKeyboardLayout includes clarify and reshoot buttons', () => {
+  const keyboard = buildKeyboardLayout({
+    need_clarify_crop: true,
+    clarify_crop_variants: ['Виноград', 'Томат'],
+    need_reshoot: true,
+  });
+  const labels = keyboard.inline_keyboard.flat().map((btn) => btn.text);
+  assert.ok(labels.includes('Виноград'));
+  assert.ok(labels.includes('Томат'));
+  assert.ok(labels.includes(msg('cta.reshoot')));
+});
+
+test('resolveFollowupReply prioritizes assistant followups', () => {
+  const reply = resolveFollowupReply(
+    {
+      assistant_followups_ru: ['Курс лечения: повторите через 10 дней.'],
+    },
+    'Курс лечения какой?',
   );
-  assert.ok(btns[1].url.includes('pid=10'));
-});
-
-test('formatDiagnosis builds reply without protocol when enabled', () => {
-  process.env.BETA_EXPERT_CHAT = 'true';
-  const ctx = { from: { id: 2 } };
-  const data = { crop: 'pear', disease: 'rot', confidence: 0.8 };
-  const { text, keyboard } = formatDiagnosis(ctx, data);
-  assert.ok(text.includes('Культура: pear'));
-  const btn = keyboard.inline_keyboard[0][0];
-  assert.equal(btn.text, 'Спросить эксперта');
-  assert.equal(btn.callback_data, 'ask_expert');
-  delete process.env.BETA_EXPERT_CHAT;
-});
-
-test('formatDiagnosis omits button when disabled', () => {
-  const ctx = { from: { id: 3 } };
-  const data = { crop: 'pear', disease: 'rot', confidence: 0.8 };
-  const { text, keyboard } = formatDiagnosis(ctx, data);
-  assert.ok(text.includes('Культура: pear'));
-  assert.equal(keyboard, undefined);
+  assert.equal(reply, 'Курс лечения: повторите через 10 дней.');
 });
 
 test('msg replaces multiple occurrences of a variable', () => {

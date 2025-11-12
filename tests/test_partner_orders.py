@@ -1,3 +1,4 @@
+from __future__ import annotations
 from app.config import Settings
 from app.dependencies import compute_signature
 from app.db import SessionLocal

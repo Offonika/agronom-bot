@@ -27,7 +27,7 @@ async function main() {
   const signature = signPayload(secret, payload);
   payload.signature = signature;
 
-  const baseUrl = process.env.API_BASE_URL || 'http://localhost:8000';
+  const baseUrl = process.env.API_BASE_URL || 'http://localhost:8010';
   const resp = await fetch(`${baseUrl}/v1/payments/sbp/webhook`, {
     method: 'POST',
     headers: {

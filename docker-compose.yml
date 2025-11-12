@@ -8,6 +8,8 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
     volumes:
       - ./openapi/openapi.yaml:/app/openapi/openapi.yaml
     depends_on:
@@ -15,7 +17,7 @@ services:
       - redis
       - minio
     ports:
-      - "8010:8000"
+      - "8010:8010"
     networks:
       - agronet
 
@@ -32,6 +34,8 @@ services:
       BOT_DATABASE_URL: ${BOT_DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       S3_ENDPOINT: ${S3_ENDPOINT}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
     depends_on:
       - api
       - db

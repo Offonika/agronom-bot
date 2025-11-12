@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio  # required for async file operations
 import hmac  # required for HMAC signature checks
 import io

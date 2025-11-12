@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pathlib
 
 def test_retry_worker_uses_env_cron():

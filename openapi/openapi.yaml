@@ -57,6 +57,9 @@ components:
         prompt_id:
           type: string
           enum: [v1]
+        crop_hint:
+          type: string
+          description: "Необязательная подсказка культуры (например, 'томат')."
 
     DiagnoseRequestBase64:
       type: object
@@ -68,6 +71,9 @@ components:
         prompt_id:
           type: string
           enum: [v1]
+        crop_hint:
+          type: string
+          description: "Необязательная подсказка культуры (например, 'томат')."
 
     DiagnoseResponse:
       type: object
@@ -76,9 +82,15 @@ components:
         crop:
           type: string
           example: apple
+        crop_ru:
+          type: string
+          example: "яблоня"
         disease:
           type: string
           example: powdery_mildew
+        disease_name_ru:
+          type: string
+          example: "мучнистая роса"
         confidence:
           type: number
           format: float
@@ -87,6 +99,44 @@ components:
           type: number
           format: float
           example: 1.9
+        reasoning:
+          type: array
+          items:
+            type: string
+          example:
+            - "Белый налёт по прожилкам"
+            - "Пятна на верхних листьях"
+        treatment_plan:
+          $ref: '#/components/schemas/TreatmentPlan'
+        next_steps:
+          $ref: '#/components/schemas/NextSteps'
+        plan_missing_reason:
+          type: string
+          description: "Причина отсутствия плана лечения (если модель его не прислала)."
+        need_reshoot:
+          type: boolean
+          description: "true, если модель просит переснять фото."
+        reshoot_tips:
+          type: array
+          description: "Набор советов для пересъёмки."
+          items:
+            type: string
+        need_clarify_crop:
+            type: boolean
+            description: "true, если модель хочет уточнить предполагаемую культуру."
+        clarify_crop_variants:
+            type: array
+            items:
+              type: string
+            description: "Список вариантов культуры на выбор пользователя."
+        assistant_ru:
+          type: string
+          description: "Готовый текстовый ответ на русском для пользователя."
+        assistant_followups_ru:
+          type: array
+          items:
+            type: string
+          description: "Короткие ответы на типовые уточняющие вопросы."
         protocol_status:
           type: string
           example: "Бета"
@@ -136,6 +186,55 @@ components:
               type: string
               format: date-time
               example: "2025-07-20T12:34:56Z"
+
+    TreatmentPlan:
+      type: object
+      properties:
+        product:
+          type: string
+          example: "Топаз"
+        substance:
+          type: string
+          example: "Диазенконозол (триазолы)"
+        dosage_value:
+          type: number
+          format: float
+          example: 2.5
+        dosage_unit:
+          type: string
+          example: "мл/10л"
+        dosage:
+          type: string
+          example: "2 мл на 10 л воды, опрыскивание по листу"
+        method:
+          type: string
+          example: "Опрыскивание по листу"
+        phi:
+          type: string
+          example: "30 дней"
+        phi_days:
+          type: integer
+          example: 30
+        safety:
+          type: string
+          example: "Перчатки, очки, не распылять при ветре"
+        safety_note:
+          type: string
+          example: "Работай в СИЗ, ветер <5 м/с"
+
+    NextSteps:
+      type: object
+      required: [reminder, green_window]
+      properties:
+        reminder:
+          type: string
+          example: "Добавь повтор обработки через 7 дней и отметь PHI."
+        green_window:
+          type: string
+          example: "Выбери вечер без дождя и ветра >5 м/с."
+        cta:
+          type: string
+          example: "Добавить обработку"
 
     PhotoHistoryItem:
       type: object
@@ -788,6 +887,3 @@ tags:
     description: External partner callbacks
   - name: expert
     description: Human expert questions
-
-
-

@@ -1,5 +1,6 @@
 fastapi==0.116.1
 pytest==8.3.5
+pytest-asyncio==0.20.3
 ruff==0.12.7
 pre-commit==4.2.0
 camelot-py[cv]~=0.11
@@ -7,3 +8,5 @@ opencv-python<4.8
 beautifulsoup4~=4.12
 pendulum~=3.0
 PyJWT==2.9.0
+eval-type-backport==0.2.0
+

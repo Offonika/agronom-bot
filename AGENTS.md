@@ -72,6 +72,10 @@ BOT_TOKEN_DEV
 
 Telegram Bot Token (dev)
 
+BOT_METRICS_PORT
+
+порт HTTP-сервера метрик бота (по умолчанию 3000; поменяйте, если порт занят, например Grafana)
+
 OPENAI_API_KEY
 
 GPT‑Vision (sandbox, required)

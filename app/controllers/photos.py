@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import base64
 import binascii
@@ -5,7 +7,11 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+try:  # pragma: no cover - Python < 3.9 fallback
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    from backports.zoneinfo import ZoneInfo
+from typing import Any, List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -96,7 +102,9 @@ class _ProcessImageError(Exception):
         self.response = response
 
 
-async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, float, float]:
+async def _process_image(
+    contents: bytes, user_id: int, crop_hint: str | None = None
+) -> dict[str, Any]:
     if len(contents) > 2 * 1024 * 1024:
         err = ErrorResponse(
             code=ErrorCode.BAD_REQUEST, message="image too large"
@@ -110,10 +118,12 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, 
 
     key = await upload_photo(user_id, contents)
     try:
-        result = await asyncio.to_thread(call_gpt_vision, key)
-        crop = result.get("crop", "")
-        disease = result.get("disease", "")
-        conf = result.get("confidence", 0.0)
+        inference = await asyncio.to_thread(
+            call_gpt_vision, key, contents, crop_hint=crop_hint
+        )
+        crop = inference.get("crop", "")
+        disease = inference.get("disease", "")
+        conf = inference.get("confidence", 0.0)
     except TimeoutError as exc:
         gpt_timeout_total.inc()
         logger.exception("GPT timeout")
@@ -145,12 +155,30 @@ async def _process_image(contents: bytes, user_id: int) -> tuple[str, str, str, 
     roi = calculate_roi(crop, disease) if crop and disease else 0.0
     roi_calc_seconds.observe(time.perf_counter() - roi_start)
 
-    return key, crop, disease, conf, roi
+    return {
+        "file_id": key,
+        "crop": crop,
+        "crop_ru": inference.get("crop_ru"),
+        "disease": disease,
+        "confidence": conf,
+        "roi": roi,
+        "disease_name_ru": inference.get("disease_name_ru"),
+        "reasoning": inference.get("reasoning"),
+        "treatment_plan": inference.get("treatment_plan"),
+        "next_steps": inference.get("next_steps"),
+        "need_reshoot": inference.get("need_reshoot"),
+        "reshoot_tips": inference.get("reshoot_tips"),
+        "assistant_ru": inference.get("assistant_ru"),
+        "assistant_followups_ru": inference.get("assistant_followups_ru"),
+        "need_clarify_crop": inference.get("need_clarify_crop"),
+        "clarify_crop_variants": inference.get("clarify_crop_variants"),
+    }
 
 
 class DiagnoseRequestBase64(BaseModel):
     image_base64: str
     prompt_id: str
+    crop_hint: str | None = None
 
     @field_validator("prompt_id")
     @classmethod
@@ -171,13 +199,44 @@ class ProtocolResponse(BaseModel):
     waiting_days: int | None = None
 
 
+class TreatmentPlan(BaseModel):
+    product: str | None = None
+    substance: str | None = None
+    dosage: str | None = None
+    dosage_value: float | None = None
+    dosage_unit: str | None = None
+    method: str | None = None
+    phi: str | None = None
+    phi_days: int | None = None
+    safety: str | None = None
+    safety_note: str | None = None
+
+
+class NextSteps(BaseModel):
+    reminder: str
+    green_window: str
+    cta: str | None = None
+
+
 class DiagnoseResponse(BaseModel):
     crop: str
+    crop_ru: str | None = None
     disease: str
+    disease_name_ru: str | None = None
     confidence: float
     roi: float
+    reasoning: list[str] | None = None
+    treatment_plan: TreatmentPlan | None = None
+    next_steps: NextSteps | None = None
     protocol: ProtocolResponse | None = None
     protocol_status: str | None = None
+    need_reshoot: bool | None = None
+    reshoot_tips: list[str] | None = None
+    assistant_ru: str | None = None
+    assistant_followups_ru: list[str] | None = None
+    need_clarify_crop: bool | None = None
+    clarify_crop_variants: list[str] | None = None
+    plan_missing_reason: str | None = None
 
 
 class LimitsResponse(BaseModel):
@@ -228,8 +287,10 @@ async def diagnose(
     user_id: int = Depends(rate_limit),
     image: UploadFile | None = OPTIONAL_FILE,
     prompt_id: str | None = Form(None),
+    crop_hint: str | None = Form(None),
 ):
     limit = 2 * 1024 * 1024
+    hint_value: str | None = None
     if image:
         if prompt_id not in (None, "v1"):
             err = ErrorResponse(
@@ -247,6 +308,7 @@ async def diagnose(
                 code=ErrorCode.BAD_REQUEST, message="image too large"
             )
             return JSONResponse(status_code=413, content=err.model_dump())
+        hint_value = (crop_hint or "").strip() or None
     else:
         try:
             json_data = await request.json()
@@ -281,10 +343,16 @@ async def diagnose(
                 code=ErrorCode.BAD_REQUEST, message="image too large"
             )
             return JSONResponse(status_code=413, content=err.model_dump())
+        hint_value = (body.crop_hint or "").strip() or None
     diag_requests_total.inc()
     start_time = time.perf_counter()
     try:
-        file_id, crop, disease, conf, roi = await _process_image(contents, user_id)
+        result = await _process_image(contents, user_id, crop_hint=hint_value)
+        file_id = result["file_id"]
+        crop = result.get("crop", "")
+        disease = result.get("disease", "")
+        conf = float(result.get("confidence", 0.0))
+        roi = float(result.get("roi", 0.0))
     except _ProcessImageError as err:
         diag_latency_seconds.observe(time.perf_counter() - start_time)
         return err.response
@@ -328,12 +396,116 @@ async def diagnose(
         proto_resp = None
         proto_status = "Бета" if crop and disease else "Обратитесь к эксперту"
 
+    plan_payload = result.get("treatment_plan") if status == "ok" else None
+    treatment_plan = None
+    if isinstance(plan_payload, dict):
+        def _to_float_safe(val: Any) -> float | None:
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                return None
+
+        def _to_int_safe(val: Any) -> int | None:
+            try:
+                return int(float(val))
+            except (TypeError, ValueError):
+                return None
+
+        plan_data = {
+            "product": str(plan_payload.get("product", "") or "").strip() or None,
+            "substance": str(plan_payload.get("substance", "") or "").strip() or None,
+            "dosage": str(plan_payload.get("dosage", "") or "").strip() or None,
+            "dosage_value": _to_float_safe(plan_payload.get("dosage_value")),
+            "dosage_unit": str(plan_payload.get("dosage_unit", "") or "").strip() or None,
+            "method": str(plan_payload.get("method", "") or "").strip() or None,
+            "phi": str(plan_payload.get("phi", "") or "").strip() or None,
+            "phi_days": _to_int_safe(plan_payload.get("phi_days")),
+            "safety": str(plan_payload.get("safety", "") or "").strip() or None,
+            "safety_note": str(plan_payload.get("safety_note", "") or "").strip() or None,
+        }
+        if plan_data["safety_note"] is None and plan_data["safety"]:
+            plan_data["safety_note"] = plan_data["safety"]
+        if (
+            plan_data["substance"]
+            or plan_data["method"]
+            or plan_data["phi_days"] is not None
+        ):
+            treatment_plan = TreatmentPlan(**plan_data)
+
+    plan_missing_reason = None
+    if status == "ok" and treatment_plan is None:
+        plan_missing_reason = (
+            "Модель не прислала даже минимальный план: попросите пользователя переснять "
+            "фото по подсказкам или уточнить культуру."
+        )
+
+    next_payload = result.get("next_steps") if status == "ok" else None
+    next_steps = None
+    if isinstance(next_payload, dict):
+        cta_value = str(next_payload.get("cta", "") or "").strip()
+        next_data = {
+            "reminder": str(next_payload.get("reminder", "") or "").strip(),
+            "green_window": str(next_payload.get("green_window", "") or "").strip(),
+            "cta": cta_value or None,
+        }
+        if any(next_data.values()):
+            next_steps = NextSteps(**next_data)
+
+    reasoning: list[str] | None = None
+    if status == "ok":
+        raw_reasoning = result.get("reasoning")
+        if isinstance(raw_reasoning, list):
+            cleaned = [str(item).strip() for item in raw_reasoning if str(item or "").strip()]
+            reasoning = cleaned or None
+        else:
+            text_reasoning = str(raw_reasoning or "").strip()
+            reasoning = [text_reasoning] if text_reasoning else None
+
+    disease_name_ru = str(result.get("disease_name_ru") or "").strip() or None
+    crop_ru = str(result.get("crop_ru") or "").strip() or None
+    need_reshoot = bool(result.get("need_reshoot")) if status == "ok" else None
+    reshoot_tips = None
+    raw_tips = result.get("reshoot_tips")
+    if isinstance(raw_tips, list):
+        cleaned_tips = [str(item).strip() for item in raw_tips if str(item or "").strip()]
+        reshoot_tips = cleaned_tips or None
+    else:
+        text_tip = str(raw_tips or "").strip()
+        if text_tip:
+            reshoot_tips = [text_tip]
+
+    assistant_ru = str(result.get("assistant_ru") or "").strip() or None
+    assistant_followups: list[str] | None = None
+    raw_followups = result.get("assistant_followups_ru")
+    if isinstance(raw_followups, list):
+        cleaned_followups = [str(item).strip() for item in raw_followups if str(item or "").strip()]
+        assistant_followups = cleaned_followups or None
+
+    need_clarify_crop = bool(result.get("need_clarify_crop"))
+    clarify_crop_variants: list[str] | None = None
+    raw_variants = result.get("clarify_crop_variants")
+    if isinstance(raw_variants, list):
+        cleaned_variants = [str(item).strip() for item in raw_variants if str(item or "").strip()]
+        clarify_crop_variants = cleaned_variants or None
+
     return DiagnoseResponse(
         crop=crop,
+        crop_ru=crop_ru,
         disease=disease,
+        disease_name_ru=disease_name_ru,
         confidence=conf,
+        reasoning=reasoning,
+        treatment_plan=treatment_plan,
+        next_steps=next_steps,
         protocol=proto_resp,
         protocol_status=proto_status,
+        need_reshoot=need_reshoot,
+        reshoot_tips=reshoot_tips,
+        assistant_ru=assistant_ru,
+        assistant_followups_ru=assistant_followups,
+        need_clarify_crop=need_clarify_crop if status == "ok" else None,
+        clarify_crop_variants=clarify_crop_variants if need_clarify_crop else None,
+        plan_missing_reason=plan_missing_reason,
         roi=roi,
     )
 
@@ -401,7 +573,7 @@ async def list_photos(
 
 @router.get(
     "/photos/history",
-    response_model=list[PhotoHistoryItem],
+    response_model=List[PhotoHistoryItem],
     responses={401: {"model": ErrorResponse}},
 )
 async def list_photos_history(

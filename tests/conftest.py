@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -90,4 +91,3 @@ def mock_redis(monkeypatch):
     fake = _Redis()
     monkeypatch.setattr(dependencies, "redis_client", fake)
     yield
-

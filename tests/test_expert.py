@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from app.db import SessionLocal
 from app.models import Event

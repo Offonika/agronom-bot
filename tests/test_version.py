@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import yaml
 from app.main import app
@@ -21,4 +22,3 @@ def test_readme_matches_openapi():
 
 def test_app_version_matches_openapi():
     assert app.version == get_openapi_version()
-

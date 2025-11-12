@@ -1,3 +1,4 @@
+from __future__ import annotations
 from app.services.hmac import verify_hmac
 import hmac
 import hashlib
@@ -16,4 +17,3 @@ def test_verify_hmac_fail(secret):
     body = b'{"ok":true}'
     sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     assert not verify_hmac('bad' + sig[3:], body, secret)
-

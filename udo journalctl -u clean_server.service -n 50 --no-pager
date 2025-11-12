@@ -1,0 +1,17 @@
+● clean_server.service - Weekly cleanup of server
+     Loaded: loaded (/etc/systemd/system/clean_server.service; static; vendor preset: enabled)
+     Active: inactive (dead) since Tue 2025-11-11 09:11:07 MSK; 61ms ago
+TriggeredBy: [0;1;32m●[0m clean_server.timer
+    Process: 3705722 ExecStart=/usr/local/bin/clean_server.sh (code=exited, status=0/SUCCESS)
+   Main PID: 3705722 (code=exited, status=0/SUCCESS)
+
+ноя 11 09:11:07 localhost clean_server.sh[3710076]: overlay          40G   24G   16G  61% /var/lib/docker/overlay2/ce88301ffe3e4b5a5f69b0a35b68830cb991329f34c6b4c4d665b1a1fcaa08d0/merged
+ноя 11 09:11:07 localhost clean_server.sh[3710076]: overlay          40G   24G   16G  61% /var/lib/docker/overlay2/8b502b436f5081bf4ebb6b45750deda06d03346887daf29192811667ae28b211/merged
+ноя 11 09:11:07 localhost clean_server.sh[3710076]: overlay          40G   24G   16G  61% /var/lib/docker/overlay2/554c3ea6bf7db3acce99b4f471d4bc3f9b0158e7508d6367e248d242703a5ef1/merged
+ноя 11 09:11:07 localhost clean_server.sh[3710076]: overlay          40G   24G   16G  61% /var/lib/docker/overlay2/229a0d27604117e64078e32bf4abcf1fd78dc57ab81f1cf60f57d401f89a0934/merged
+ноя 11 09:11:07 localhost clean_server.sh[3710076]: overlay          40G   24G   16G  61% /var/lib/docker/overlay2/8146029b4f214a2933ecc619f38e244082847c3768b6f30f1c12cab8d689b3e2/merged
+ноя 11 09:11:07 localhost clean_server.sh[3710076]: overlay          40G   24G   16G  61% /var/lib/docker/overlay2/239e0461c02a6a45132d4906406b2f60e06a4c4b8609fce30cd0c4bbd610340b/merged
+ноя 11 09:11:07 localhost clean_server.sh[3710076]: overlay          40G   24G   16G  61% /var/lib/docker/overlay2/483f62a572a78ed878dd1fee9e7f0fc7d602c7f9153d04ece0bfdbea339edd59/merged
+ноя 11 09:11:07 localhost clean_server.sh[3710078]: [2025-11-11 09:11:07] ✅ Done clean_server.sh
+ноя 11 09:11:07 localhost systemd[1]: clean_server.service: Succeeded.
+ноя 11 09:11:07 localhost systemd[1]: Finished Weekly cleanup of server.

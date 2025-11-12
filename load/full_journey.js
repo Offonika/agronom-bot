@@ -6,7 +6,7 @@ export const options = {
   duration: '60s',
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8000';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8010';
 const API_KEY = __ENV.API_KEY || 'test-api-key';
 const API_VER = __ENV.API_VER || 'v1';
 

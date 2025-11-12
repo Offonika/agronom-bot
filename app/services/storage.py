@@ -1,23 +1,39 @@
+from __future__ import annotations
+
 import logging
 import os
 import imghdr
 from asyncio import Lock
 from datetime import datetime, timezone
 from uuid import uuid4
+from typing import Any
 
 try:  # pragma: no cover - Python < 3.12 fallback
     from typing import AbstractAsyncContextManager  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover
     from contextlib import AbstractAsyncContextManager  # type: ignore
 
-import aioboto3
+try:  # pragma: no cover - optional dependency for S3
+    import aioboto3  # type: ignore
+except ImportError:  # pragma: no cover
+    aioboto3 = None  # type: ignore
 
 try:  # pragma: no cover - aiobotocore fallback
     from botocore.client import AioBaseClient  # type: ignore
 except ImportError:  # pragma: no cover
-    from aiobotocore.client import AioBaseClient  # type: ignore
+    try:
+        from aiobotocore.client import AioBaseClient  # type: ignore
+    except ImportError:
+        AioBaseClient = Any  # type: ignore
 
-from botocore.exceptions import BotoCoreError, ClientError
+try:  # pragma: no cover - optional dependency
+    from botocore.exceptions import BotoCoreError, ClientError
+except ImportError:  # pragma: no cover
+    class _S3DependencyMissing(Exception):
+        """Raised when aioboto3/botocore is not installed."""
+
+    BotoCoreError = ClientError = _S3DependencyMissing  # type: ignore
+
 from fastapi import HTTPException
 
 from app.config import Settings
@@ -35,6 +51,8 @@ _client_lock: Lock = Lock()
 
 
 async def _make_client() -> AioBaseClient:
+    if aioboto3 is None:  # pragma: no cover - optional dependency
+        raise RuntimeError("aioboto3 is required for S3 storage but is not installed")
     endpoint = os.getenv(
         "S3_ENDPOINT",
         _settings.s3_endpoint if _settings is not None else None,

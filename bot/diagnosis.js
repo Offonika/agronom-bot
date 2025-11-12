@@ -1,9 +1,21 @@
 const crypto = require('node:crypto');
 const { msg } = require('./utils');
+const { dict } = require('./i18n');
+const {
+  buildAssistantText,
+  buildKeyboardLayout,
+  detectFaqIntent,
+  formatFaqAnswer,
+  resolveFollowupReply,
+} = require('./messageFormatters/diagnosisMessage');
 const { sendPaywall } = require('./payments');
 
 const PRODUCT_NAMES_MAX = 100;
 const productNames = new Map();
+const MAX_DIAG_HISTORY = 200;
+const lastDiagnoses = new Map();
+const MAX_CROP_HINTS = 500;
+const cropHints = new Map();
 
 function cleanupProductNames() {
   if (productNames.size >= PRODUCT_NAMES_MAX) {
@@ -14,69 +26,144 @@ function cleanupProductNames() {
   }
 }
 
-const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
+function rememberDiagnosis(userId, payload) {
+  if (!userId || !payload) return;
+  if (!lastDiagnoses.has(userId) && lastDiagnoses.size >= MAX_DIAG_HISTORY) {
+    const oldest = lastDiagnoses.keys().next().value;
+    if (oldest !== undefined) {
+      lastDiagnoses.delete(oldest);
+    }
+  }
+  lastDiagnoses.set(userId, { data: payload, ts: Date.now() });
+}
+
+function getLastDiagnosis(userId) {
+  return lastDiagnoses.get(userId)?.data || null;
+}
+
+function setCropHint(userId, hint) {
+  if (!userId || !hint) return;
+  if (!cropHints.has(userId) && cropHints.size >= MAX_CROP_HINTS) {
+    const oldest = cropHints.keys().next().value;
+    if (oldest !== undefined) cropHints.delete(oldest);
+  }
+  cropHints.set(userId, hint);
+}
+
+function getCropHint(userId) {
+  return userId ? cropHints.get(userId) : undefined;
+}
+
+function maskRawBody(body) {
+  if (!body) return '';
+  return String(body).replace(/\d{4,}/g, '[id]');
+}
+
+function buildParseErrorReply() {
+  return {
+    text: msg('diagnosis.parse_error'),
+    reply_markup: {
+      inline_keyboard: [[{ text: msg('cta.reshoot'), callback_data: 'reshoot_photo' }]],
+    },
+  };
+}
+
+function buildProtocolRow(ctx, protocol) {
+  const encode = (v) => encodeURIComponent(String(v ?? ''));
+  const safeSlice = (str, max) => {
+    if (str.length <= max) return str;
+    let s = str.slice(0, max);
+    const pct = s.lastIndexOf('%');
+    if (pct > -1 && pct > s.length - 3) {
+      s = s.slice(0, pct);
+    }
+    return s;
+  };
+  const product = protocol.product || '';
+  let productHash = product;
+  if (productHash.length > 32) {
+    productHash = crypto.createHash('sha256').update(productHash).digest('hex');
+  }
+  const other = [encode(protocol.dosage_value), encode(protocol.dosage_unit), encode(protocol.phi)];
+  const base = ['proto', '', ...other].join('|');
+  const avail = 64 - base.length;
+  const prodEncoded = safeSlice(encode(productHash), Math.max(avail, 0));
+  cleanupProductNames();
+  productNames.set(decodeURIComponent(prodEncoded), product);
+  const callback = ['proto', prodEncoded, ...other].join('|').slice(0, 64);
+  const row = [{ text: 'Показать протокол', callback_data: callback }];
+  if (protocol.id) {
+    const urlBase = process.env.PARTNER_LINK_BASE || 'https://agrostore.example/agronom';
+    const uid = crypto.createHash('sha256').update(String(ctx.from?.id ?? 'anon')).digest('hex');
+    const link = `${urlBase}?pid=${protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
+    row.push({ text: 'Купить препарат', url: link });
+  }
+  return row;
+}
+
+const API_BASE = process.env.API_BASE_URL || 'http://localhost:8010';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
 
-function formatDiagnosis(ctx, data) {
-  let text =
-    `Культура: ${data.crop}\n` +
-    `Диагноз: ${data.disease}\n` +
-    `Уверенность модели: ${(data.confidence * 100).toFixed(1)}%`;
-  if (data.protocol_status) {
-    text += `\n${data.protocol_status}`;
+async function replyFaq(ctx, intentId) {
+  if (!intentId) return false;
+  const stored = getLastDiagnosis(ctx.from?.id);
+  if (!stored) {
+    await ctx.reply(msg('faq.no_context'));
+    return false;
   }
-
-  let keyboard;
-  if (data.protocol) {
-    const encode = (v) => encodeURIComponent(String(v));
-    const safeSlice = (str, max) => {
-      if (str.length <= max) return str;
-      let s = str.slice(0, max);
-      const pct = s.lastIndexOf('%');
-      if (pct > -1 && pct > s.length - 3) {
-        s = s.slice(0, pct);
-      }
-      return s;
-    };
-    const product = data.protocol.product || '';
-    let productHash = product;
-    if (productHash.length > 32) {
-      productHash = crypto.createHash('sha256').update(productHash).digest('hex');
-    }
-    const other = [
-      encode(data.protocol.dosage_value),
-      encode(data.protocol.dosage_unit),
-      encode(data.protocol.phi),
-    ];
-    const base = ['proto', '', ...other].join('|');
-    const avail = 64 - base.length;
-    const prodEncoded = safeSlice(encode(productHash), Math.max(avail, 0));
-    cleanupProductNames();
-    productNames.set(decodeURIComponent(prodEncoded), product);
-    const cb = ['proto', prodEncoded, ...other].join('|').slice(0, 64);
-    const row = [{ text: 'Показать протокол', callback_data: cb }];
-    if (data.protocol.id) {
-      const urlBase = process.env.PARTNER_LINK_BASE ||
-        'https://agrostore.example/agronom';
-      const uid = crypto.createHash('sha256')
-        .update(String(ctx.from.id))
-        .digest('hex');
-      const link = `${urlBase}?pid=${data.protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
-      row.push({ text: 'Купить препарат', url: link });
-    }
-    keyboard = { inline_keyboard: [row] };
-  } else if (process.env.BETA_EXPERT_CHAT === 'true') {
-    keyboard = {
-      inline_keyboard: [[{ text: 'Спросить эксперта', callback_data: 'ask_expert' }]],
-    };
+  const answer = formatFaqAnswer(intentId, stored);
+  if (!answer) {
+    await ctx.reply(msg('faq.no_context'));
+    return false;
   }
-
-  return { text, keyboard };
+  await ctx.reply(answer);
+  return true;
 }
 
-async function photoHandler(pool, ctx) {
+async function handleClarifySelection(ctx, optionId) {
+  if (typeof ctx.answerCbQuery === 'function') {
+    try {
+      await ctx.answerCbQuery();
+    } catch {
+      // ignore answer errors
+    }
+  }
+  const options = dict('clarify.crop.options');
+  const optionLabel = options[optionId];
+  if (!optionLabel) {
+    await ctx.reply(msg('diagnose_error'));
+    return;
+  }
+  if (ctx.from?.id) {
+    setCropHint(ctx.from.id, optionId);
+  }
+  await ctx.reply(msg('clarify.crop.confirm', { crop: optionLabel }));
+}
+
+async function replyFollowupFromHistory(ctx, text) {
+  const normalized = typeof text === 'string' ? text.trim() : '';
+  if (!normalized) return false;
+  const stored = getLastDiagnosis(ctx.from?.id);
+  if (!stored) {
+    const keywordReply = resolveFollowupReply(null, normalized);
+    if (!keywordReply) return false;
+    await ctx.reply(msg('faq.no_context'));
+    return true;
+  }
+  const answer = resolveFollowupReply(stored, normalized);
+  if (!answer) return false;
+  await ctx.reply(answer);
+  return true;
+}
+
+async function photoHandler(depsOrPool, ctx) {
+  const deps = normalizeDeps(depsOrPool);
+  const pool = deps?.pool;
+  if (!pool) {
+    throw new Error('photoHandler requires pool in deps');
+  }
   const photo = ctx.message.photo[ctx.message.photo.length - 1];
   const { file_id, file_unique_id, width, height, file_size } = photo;
   if (file_size > MAX_FILE_SIZE) {
@@ -98,6 +185,10 @@ async function photoHandler(pool, ctx) {
       await ctx.reply(msg('db_error'));
     }
     return;
+  }
+
+  if (typeof ctx.reply === 'function') {
+    await ctx.reply(msg('photo_processing'));
   }
 
   try {
@@ -124,6 +215,11 @@ async function photoHandler(pool, ctx) {
     }
     const blob = new Blob([buffer], { type: 'image/jpeg' });
     form.append('image', blob, 'photo.jpg');
+    const cropHint = getCropHint(userId);
+    if (cropHint) {
+      console.log('Applying crop hint', cropHint);
+      form.append('crop_hint', cropHint);
+    }
 
     console.log('Sending to API', API_BASE + '/v1/ai/diagnose');
     const apiResp = await fetch(API_BASE + '/v1/ai/diagnose', {
@@ -157,13 +253,16 @@ async function photoHandler(pool, ctx) {
       }
       return;
     }
+    const rawBody = await apiResp.text();
+    console.debug('Diagnose raw body', maskRawBody(rawBody).slice(0, 1000));
     let data;
     try {
-      data = await apiResp.json();
+      data = JSON.parse(rawBody);
     } catch (err) {
       console.error('Failed to parse API response', err);
       if (typeof ctx.reply === 'function') {
-        await ctx.reply(msg('diagnose_error'));
+        const parseReply = buildParseErrorReply();
+        await ctx.reply(parseReply.text, { reply_markup: parseReply.reply_markup });
       }
       return;
     }
@@ -179,9 +278,16 @@ async function photoHandler(pool, ctx) {
       return;
     }
 
-    const { text, keyboard } = formatDiagnosis(ctx, data);
-    const opts = keyboard ? { reply_markup: keyboard } : undefined;
-    await ctx.reply(text, opts);
+    rememberDiagnosis(userId, data);
+    const text = buildAssistantText(data);
+    const keyboard = buildKeyboardLayout(data);
+    if (data.protocol) {
+      keyboard.inline_keyboard.unshift(buildProtocolRow(ctx, data.protocol));
+    }
+    await ctx.reply(text, { reply_markup: keyboard });
+    if (deps.planFlow) {
+      await deps.planFlow.start(ctx, data);
+    }
   } catch (err) {
     console.error('diagnose error', err);
     if (typeof ctx.reply === 'function') {
@@ -190,13 +296,37 @@ async function photoHandler(pool, ctx) {
   }
 }
 
-function messageHandler(ctx) {
-  if (!ctx.message.photo) {
-    console.log('Ignoring non-photo message');
+async function messageHandler(ctx) {
+  if (ctx.message?.photo) return;
+  const text = ctx.message?.text;
+  if (!text) {
+    console.log('Ignoring non-text message');
+    return;
   }
+  if (await replyFollowupFromHistory(ctx, text)) {
+    return;
+  }
+  const intent = detectFaqIntent(text);
+  if (intent) {
+    await replyFaq(ctx, intent);
+    return;
+  }
+  console.log('Ignoring message without intent');
 }
 
-async function retryHandler(ctx, photoId) {
+async function retryHandler(arg1, arg2, arg3) {
+  let ctx;
+  let photoId;
+  let deps;
+  if (arg1 && typeof arg1.reply === 'function') {
+    ctx = arg1;
+    photoId = arg2;
+    deps = normalizeDeps(arg3);
+  } else {
+    deps = normalizeDeps(arg1);
+    ctx = arg2;
+    photoId = arg3;
+  }
   try {
     const resp = await fetch(`${API_BASE}/v1/photos/${photoId}`, {
       headers: {
@@ -220,9 +350,13 @@ async function retryHandler(ctx, photoId) {
       return;
     }
 
-    const { text, keyboard } = formatDiagnosis(ctx, data);
-    const opts = keyboard ? { reply_markup: keyboard } : undefined;
-    await ctx.reply(text, opts);
+    rememberDiagnosis(ctx.from?.id, data);
+    const text = buildAssistantText(data);
+    const keyboard = buildKeyboardLayout(data);
+    if (data.protocol) {
+      keyboard.inline_keyboard.unshift(buildProtocolRow(ctx, data.protocol));
+    }
+    await ctx.reply(text, { reply_markup: keyboard });
   } catch (err) {
     console.error('retry error', err);
     await ctx.reply(msg('status_error'));
@@ -233,10 +367,22 @@ function getProductName(hash) {
   return productNames.get(hash);
 }
 
+function normalizeDeps(value) {
+  if (value && typeof value.query === 'function') {
+    return { pool: value };
+  }
+  return value || {};
+}
+
 module.exports = {
-  formatDiagnosis,
   photoHandler,
   messageHandler,
   retryHandler,
   getProductName,
+  replyFaq,
+  handleClarifySelection,
+  rememberDiagnosis,
+  getLastDiagnosis,
+  getCropHint,
+  buildProtocolRow,
 };

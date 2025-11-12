@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import logging
 
@@ -14,7 +15,9 @@ async def test_process_image_timeout(monkeypatch, caplog):
     async def fake_enforce_paywall(user_id: int):
         return None
 
-    def fake_call_gpt_vision(key: str) -> dict:
+    def fake_call_gpt_vision(
+        key: str, _image_bytes: bytes | None = None, *, crop_hint: str | None = None
+    ) -> dict:
         raise TimeoutError
 
     monkeypatch.setattr(photos, "upload_photo", fake_upload_photo)
@@ -42,7 +45,9 @@ async def test_process_image_invalid_response(monkeypatch, caplog):
     async def fake_enforce_paywall(user_id: int):
         return None
 
-    def fake_call_gpt_vision(key: str) -> dict:
+    def fake_call_gpt_vision(
+        key: str, _image_bytes: bytes | None = None, *, crop_hint: str | None = None
+    ) -> dict:
         raise ValueError("oops")
 
     monkeypatch.setattr(photos, "upload_photo", fake_upload_photo)
@@ -60,4 +65,3 @@ async def test_process_image_invalid_response(monkeypatch, caplog):
     assert payload["code"] == "SERVICE_UNAVAILABLE"
     assert payload["message"]
     assert "Invalid GPT response" in caplog.text
-

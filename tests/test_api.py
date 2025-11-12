@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import base64
 import os
@@ -64,8 +65,52 @@ def stub_upload(monkeypatch):
     monkeypatch.setattr("app.services.storage.upload_photo", _stub)
     monkeypatch.setattr("app.controllers.photos.upload_photo", _stub)
     
-    def _gpt_stub(_key: str) -> dict:
-        return {"crop": "apple", "disease": "powdery_mildew", "confidence": 0.92}
+    def _gpt_stub(
+        _key: str, _image_bytes: bytes | None = None, *, crop_hint: str | None = None
+    ) -> dict:
+        return {
+            "crop": "apple",
+            "crop_ru": "яблоня",
+            "disease": "powdery_mildew",
+            "disease_name_ru": "мучнистая роса",
+            "confidence": 0.92,
+            "reasoning": [
+                "Белый налёт на листья",
+                "Пятна по краю",
+            ],
+            "treatment_plan": {
+                "product": "Топаз",
+                "substance": "Пенконазол",
+                "dosage_value": 2,
+                "dosage_unit": "мл/10л",
+                "dosage": "2 мл на 10 л воды, опрыскивание по листу",
+                "phi": "30 дней",
+                "phi_days": 30,
+                "method": "Опрыскивание",
+                "safety_note": "Перчатки и респиратор, не опрыскивать при ветре",
+            },
+            "next_steps": {
+                "reminder": "Повторить обработку через 7 дней и отметить PHI.",
+                "green_window": "Выбирай вечер без дождя и ветра >5 м/с.",
+                "cta": "Добавить обработку",
+            },
+            "need_reshoot": False,
+            "reshoot_tips": [],
+            "need_clarify_crop": False,
+            "clarify_crop_variants": [],
+            "assistant_ru": (
+                "📸 Диагноз\nКультура: яблоня. Диагноз: мучнистая роса.\n"
+                "🧪 Почему так\n• Белый налёт на листья\n• Пятна по краю\n"
+                "🧴 Что делать\nИспользуй серу или стробилурины, опрыскать по листу, PHI 30 дн.\n"
+                "⏰ Что дальше\nМогу подобрать зелёное окно и напомнить про PHI."
+            ),
+            "assistant_followups_ru": [
+                "Курс лечения: повтор через 7–10 дней другим действующим веществом.",
+                "От чего болезнь: любит влажность и загущение — обеспечь проветривание.",
+                "Какие препараты в регионе: подберу зарегистрированные решения, когда назовёшь область.",
+                "Безопасно ли есть: дождись PHI 30 дн. и тщательно вымой урожай.",
+            ],
+        }
 
     monkeypatch.setattr("app.services.gpt.call_gpt_vision", _gpt_stub)
     monkeypatch.setattr("app.controllers.photos.call_gpt_vision", _gpt_stub)
@@ -115,10 +160,16 @@ def test_diagnose_json_success(client):
     assert set(body.keys()) == {
         "crop",
         "disease",
+        "disease_name_ru",
         "confidence",
+        "reasoning",
+        "treatment_plan",
+        "next_steps",
         "protocol_status",
         "protocol",
         "roi",
+        "need_reshoot",
+        "reshoot_tips",
     }
     assert body["roi"] == 1.9
 
@@ -134,10 +185,33 @@ def test_diagnose_multipart_success(client):
 
 def test_diagnose_multipart_uses_process(monkeypatch, client):
     async def fake_process(
-        contents: bytes, user_id: int
-    ) -> tuple[str, str, str, float, float]:
+        contents: bytes, user_id: int, crop_hint: str | None = None
+    ) -> dict:
         assert contents == b"abc"
-        return "k", "wheat", "rust", 0.5, 2.1
+        return {
+            "file_id": "k",
+            "crop": "wheat",
+            "disease": "rust",
+            "confidence": 0.5,
+            "roi": 2.1,
+            "reasoning": ["Края листа рыжие"],
+            "treatment_plan": {
+                "product": "Фунгицид А",
+                "substance": "стробилурины",
+                "dosage": "5 мл/10л",
+                "phi": "20",
+                "phi_days": 20,
+                "method": "Опрыскивание",
+                "safety_note": "Перчатки",
+            },
+            "next_steps": {
+                "reminder": "Повторить через 5 дней",
+                "green_window": "Выбирай сухое утро",
+                "cta": "Выбрать окно",
+            },
+            "need_reshoot": True,
+            "reshoot_tips": ["Снимай один лист"],
+        }
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
 
@@ -160,10 +234,21 @@ def test_diagnose_multipart_uses_process(monkeypatch, client):
 
 def test_diagnose_base64_uses_process(monkeypatch, client):
     async def fake_process(
-        contents: bytes, user_id: int
-    ) -> tuple[str, str, str, float, float]:
+        contents: bytes, user_id: int, crop_hint: str | None = None
+    ) -> dict:
         assert contents == b"xyz"
-        return "k", "corn", "blight", 0.7, 3.3
+        return {
+            "file_id": "k",
+            "crop": "corn",
+            "disease": "blight",
+            "confidence": 0.7,
+            "roi": 3.3,
+            "reasoning": ["Бурые пятна вдоль прожилок"],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
 
@@ -183,6 +268,7 @@ def test_diagnose_base64_uses_process(monkeypatch, client):
     assert data["disease"] == "blight"
     assert data["confidence"] == 0.7
     assert data["roi"] == 3.3
+    assert data["plan_missing_reason"]
 
 
 def test_diagnose_missing_api_version(client):
@@ -252,8 +338,19 @@ def test_diagnose_large_base64(client):
 def test_diagnose_max_size_image_ok(monkeypatch, client):
     limit = 2 * 1024 * 1024
 
-    async def fake_process(contents: bytes, user_id: int):
-        return "k", "crop", "disease", 0.1, 1.0
+    async def fake_process(contents: bytes, user_id: int, crop_hint: str | None = None):
+        return {
+            "file_id": "k",
+            "crop": "crop",
+            "disease": "disease",
+            "confidence": 0.1,
+            "roi": 1.0,
+            "reasoning": [],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
 
@@ -273,8 +370,19 @@ def test_diagnose_max_size_image_ok(monkeypatch, client):
 def test_diagnose_max_size_base64_ok(monkeypatch, client):
     limit = 2 * 1024 * 1024
 
-    async def fake_process(contents: bytes, user_id: int):
-        return "k", "crop", "disease", 0.1, 1.0
+    async def fake_process(contents: bytes, user_id: int, crop_hint: str | None = None):
+        return {
+            "file_id": "k",
+            "crop": "crop",
+            "disease": "disease",
+            "confidence": 0.1,
+            "roi": 1.0,
+            "reasoning": [],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
 
     monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
 
@@ -302,8 +410,22 @@ def test_diagnose_json_returns_stub(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["crop"] == "apple"
+    assert body["crop_ru"] == "яблоня"
     assert body["disease"] == "powdery_mildew"
     assert body["confidence"] == 0.92
+    assert isinstance(body["reasoning"], list)
+    assert body["reasoning"][0].startswith("Белый налёт")
+    assert body["disease_name_ru"] == "мучнистая роса"
+    plan = body["treatment_plan"]
+    assert plan["product"] == "Топаз"
+    assert plan["substance"] == "Пенконазол"
+    assert plan["phi_days"] == 30
+    assert plan["safety_note"].startswith("Перчатки")
+    steps = body["next_steps"]
+    assert "Повторить обработку" in steps["reminder"]
+    assert steps["cta"] == "Добавить обработку"
+    assert body["assistant_ru"].startswith("📸 Диагноз")
+    assert isinstance(body["assistant_followups_ru"], list)
     assert body["roi"] == 1.9
     assert body["protocol_status"] is None
     proto = body["protocol"]
@@ -413,7 +535,7 @@ def test_diagnose_multipart_missing_image(client):
 
 
 def test_diagnose_gpt_timeout(monkeypatch, client):
-    def _fail(_key: str):
+    def _fail(_key: str, _image_bytes: bytes | None = None):
         raise TimeoutError("timeout")
 
     monkeypatch.setattr("app.controllers.photos.call_gpt_vision", _fail)
@@ -543,7 +665,7 @@ def test_photos_history_limit_offset(client):
 
 
 def test_photos_history_forbidden_other_user(client):
-    headers = HEADERS | {"X-User-ID": "2"}
+    headers = {**HEADERS, "X-User-ID": "2"}
     resp = client.get("/v1/photos/history", headers=headers)
     assert resp.status_code == 200
 
@@ -647,7 +769,7 @@ def test_create_payment_valid_json(client):
 def test_create_payment_invalid_json(client):
     resp = client.post(
         "/v1/payments/create",
-        headers=HEADERS | {"Content-Type": "application/json"},
+        headers={**HEADERS, "Content-Type": "application/json"},
         content="{not-valid",
     )
     assert resp.status_code == 400
@@ -701,7 +823,7 @@ def test_payment_status_user_scoped(client):
     assert resp_owner.status_code == 200
 
     # another user should receive 404
-    headers_other = HEADERS | {"X-User-ID": "2"}
+    headers_other = {**HEADERS, "X-User-ID": "2"}
     resp_other = client.get(
         f"/v1/payments/{external_id}", headers=headers_other
     )
@@ -735,7 +857,7 @@ def test_payment_webhook_success(client):
     }
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
-    headers = HEADERS | {"X-Sign": sig}
+    headers = {**HEADERS, "X-Sign": sig}
     resp = client.post(
         "/v1/payments/sbp/webhook",
         headers=headers,
@@ -787,7 +909,7 @@ def test_payment_webhook_updates_pro_expiration(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=HEADERS | {"X-Sign": sig},
+        headers={**HEADERS, "X-Sign": sig},
         json=payload,
     )
     assert resp.status_code == 200
@@ -834,7 +956,7 @@ def test_payment_webhook_cancel(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=HEADERS | {"X-Sign": sig},
+        headers={**HEADERS, "X-Sign": sig},
         json=payload,
     )
     assert resp.status_code == 200
@@ -935,7 +1057,7 @@ def test_payment_webhook_bad_payload(client):
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=HEADERS | {"X-Sign": sig},
+        headers={**HEADERS, "X-Sign": sig},
         json=payload,
     )
     assert resp.status_code in {400, 422}
@@ -968,7 +1090,7 @@ def test_payment_webhook_bad_signature_returns_403(client, monkeypatch, caplog):
     }
     sig = compute_signature("test-hmac-secret", payload)
     payload["signature"] = sig
-    headers = HEADERS | {"X-Sign": "bad"}
+    headers = {**HEADERS, "X-Sign": "bad"}
     with caplog.at_level("WARNING"):
         resp = client.post(
             "/v1/payments/sbp/webhook",

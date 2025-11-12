@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 import time
 
@@ -14,9 +15,20 @@ async def test_process_image_non_blocking(monkeypatch):
     async def fake_enforce_paywall(user_id: int):
         return None
 
-    def fake_call_gpt_vision(key: str) -> dict:
+    def fake_call_gpt_vision(
+        key: str, _image_bytes: bytes | None = None, *, crop_hint: str | None = None
+    ) -> dict:
         time.sleep(0.2)
-        return {"crop": "", "disease": "", "confidence": 0.0}
+        return {
+            "crop": "",
+            "disease": "",
+            "confidence": 0.0,
+            "reasoning": [],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
 
     monkeypatch.setattr(photos, "upload_photo", fake_upload_photo)
     monkeypatch.setattr(photos, "_enforce_paywall", fake_enforce_paywall)

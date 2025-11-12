@@ -1,11 +1,11 @@
-const strings = require('../locales/ru.json');
+const { t } = require('./i18n');
 
 function msg(key, vars = {}) {
-  let text = strings[key] || '';
-  for (const [k, v] of Object.entries(vars)) {
-    text = text.replaceAll(`{${k}}`, v);
+  const value = t(key, vars);
+  if (typeof value === 'string') {
+    return value;
   }
-  return text;
+  return '';
 }
 
 module.exports = { msg };

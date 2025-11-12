@@ -1,3 +1,4 @@
+from __future__ import annotations
 import hmac
 import hashlib
 import json
@@ -70,8 +71,19 @@ def test_autopay_metrics(client, monkeypatch):
 
 
 def test_queue_pending_metric_balance(client, monkeypatch):
-    async def _pending_stub(contents: bytes, user_id: int):
-        return "key", "", "", 0.0, 0.0
+    async def _pending_stub(contents: bytes, user_id: int, crop_hint: str | None = None):
+        return {
+            "file_id": "key",
+            "crop": "",
+            "disease": "",
+            "confidence": 0.0,
+            "roi": 0.0,
+            "reasoning": [],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
 
     monkeypatch.setattr(
         "app.controllers.photos._process_image", _pending_stub

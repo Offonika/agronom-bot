@@ -12,6 +12,8 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname.lower(),
             "message": record.getMessage(),
         }
+        if record.exc_info:
+            data["exc"] = self.formatException(record.exc_info)
         return json.dumps(data)
 
 

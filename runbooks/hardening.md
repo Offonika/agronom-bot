@@ -12,10 +12,10 @@
 # поднимаем окружение для тестов
 $ docker-compose up -d
 # дожидаемся готовности API
-$ until curl -sSf http://localhost:8000/docs; do sleep 2; done
+$ until curl -sSf http://localhost:8010/docs; do sleep 2; done
 # выполняем нагрузочный тест
 $ docker run --network host -v $(pwd)/load:/scripts grafana/k6 run /scripts/full_journey.js \
-    --env BASE_URL=http://localhost:8000 \
+    --env BASE_URL=http://localhost:8010 \
     --env API_KEY=test-api-key \
     --env API_VER=v1
 ```

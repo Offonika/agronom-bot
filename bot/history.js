@@ -1,7 +1,7 @@
 const { msg } = require('./utils');
 const { logEvent } = require('./payments');
 
-const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
+const API_BASE = process.env.API_BASE_URL || 'http://localhost:8010';
 const API_KEY = process.env.API_KEY || 'test-api-key';
 const API_VER = process.env.API_VER || 'v1';
 
