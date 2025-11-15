@@ -60,10 +60,15 @@ async function autopayEnableHandler(ctx, pool) {
   return buyProHandler(ctx, pool, 3000, 60000, true);
 }
 
+async function newDiagnosisHandler(ctx) {
+  await ctx.reply(msg('new_command_hint'));
+}
+
 module.exports = {
   startHandler,
   helpHandler,
   feedbackHandler,
   cancelAutopayHandler,
   autopayEnableHandler,
+  newDiagnosisHandler,
 };

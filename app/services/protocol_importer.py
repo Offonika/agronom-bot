@@ -236,6 +236,14 @@ def find_latest_zip_mcx(html: str, base_url: str) -> Tuple[str, Optional[date]]:
         raise ValueError("No suitable 'каталог' ZIP rows found.")
     return latest_url, latest_dt
 
+def find_latest_zip(html: str, base_url: str) -> str:
+    """
+    Backward-compatible обёртка: прежние скрипты/тесты ждут только URL,
+    поэтому возвращаем первый элемент из пары (url, date).
+    """
+    url, _ = find_latest_zip_mcx(html, base_url)
+    return url
+
 def download_zip(url: str, dest: Path) -> Path:
     try:
         with requests.get(
@@ -877,4 +885,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

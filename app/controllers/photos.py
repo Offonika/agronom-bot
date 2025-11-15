@@ -31,6 +31,10 @@ from app.metrics import (
 )
 from app.models import Event, Photo, ErrorCode
 from app.services.gpt import call_gpt_vision
+from app.services.plan_payload import (
+    PlanPayloadError,
+    normalize_plan_payload,
+)
 from app.services.protocols import async_find_protocol
 from app.services.storage import get_public_url, upload_photo
 from app.services.roi import calculate_roi
@@ -228,6 +232,10 @@ class DiagnoseResponse(BaseModel):
     reasoning: list[str] | None = None
     treatment_plan: TreatmentPlan | None = None
     next_steps: NextSteps | None = None
+    plan_kind: str | None = None
+    plan_machine: dict[str, Any] | None = None
+    plan_hash: str | None = None
+    plan_validation_errors: list[str] | None = None
     protocol: ProtocolResponse | None = None
     protocol_status: str | None = None
     need_reshoot: bool | None = None
@@ -439,6 +447,24 @@ async def diagnose(
             "фото по подсказкам или уточнить культуру."
         )
 
+    plan_kind: str | None = None
+    plan_machine: dict[str, Any] | None = None
+    plan_hash: str | None = None
+    plan_validation_errors: list[str] | None = None
+    if status == "ok":
+        raw_machine_plan = result.get("plan_payload")
+        if isinstance(raw_machine_plan, dict):
+            try:
+                normalized = normalize_plan_payload(raw_machine_plan)
+            except PlanPayloadError as exc:
+                plan_validation_errors = [str(exc)]
+            else:
+                plan_kind = normalized.plan.kind
+                plan_machine = normalized.data
+                plan_hash = normalized.plan_hash
+                if normalized.errors:
+                    plan_validation_errors = normalized.errors
+
     next_payload = result.get("next_steps") if status == "ok" else None
     next_steps = None
     if isinstance(next_payload, dict):
@@ -496,6 +522,10 @@ async def diagnose(
         confidence=conf,
         reasoning=reasoning,
         treatment_plan=treatment_plan,
+        plan_kind=plan_kind,
+        plan_machine=plan_machine,
+        plan_hash=plan_hash,
+        plan_validation_errors=plan_validation_errors,
         next_steps=next_steps,
         protocol=proto_resp,
         protocol_status=proto_status,

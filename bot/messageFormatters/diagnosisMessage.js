@@ -59,6 +59,11 @@ function asPercent(value) {
   return Math.round(Math.max(0, Math.min(1, value)) * 100).toString();
 }
 
+function buildConfidenceLine(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '';
+  return msg('diagnosis.confidence_line', { value: asPercent(value) });
+}
+
 function normalizeReasoning(reasoning) {
   if (Array.isArray(reasoning)) {
     return reasoning.map((item) => cleanText(item)).filter(Boolean);
@@ -137,6 +142,10 @@ function buildAssistantText(data) {
   const assistantText = dedupeParagraphs(cleanText(data.assistant_ru));
   if (assistantText) {
     parts.push(assistantText);
+    const confidenceLine = buildConfidenceLine(data.confidence);
+    if (confidenceLine) {
+      parts.push(confidenceLine);
+    }
   } else {
     parts.push(buildFallbackAssistant(data));
   }
@@ -158,9 +167,9 @@ function buildAssistantText(data) {
 function buildKeyboardLayout(data) {
   const inline = [];
   if (data.need_clarify_crop && Array.isArray(data.clarify_crop_variants) && data.clarify_crop_variants.length) {
-    const clarifyRow = data.clarify_crop_variants.slice(0, 4).map((variant) => ({
+    const clarifyRow = data.clarify_crop_variants.slice(0, 4).map((variant, idx) => ({
       text: variant,
-      callback_data: `clarify_crop|${encodeURIComponent(variant).slice(0, 60)}`,
+      callback_data: `clarify_crop|${idx}`,
     }));
     inline.push(clarifyRow);
   }

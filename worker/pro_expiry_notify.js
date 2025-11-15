@@ -49,7 +49,7 @@ async function notifyExpiringUsers(pool, sendMessage = sendTgMessage) {
 module.exports = { notifyExpiringUsers };
 
 if (require.main === module) {
-  const connection = { connectionString: process.env.REDIS_URL || 'redis://localhost:6379' };
+  const connection = { url: process.env.REDIS_URL || 'redis://localhost:6379' };
   const queueName = 'pro-expiry-notify';
   const queue = new Queue(queueName, { connection });
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });

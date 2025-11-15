@@ -60,7 +60,7 @@ pydantic_core==2.27.2
 pypdf==5.9.0
 Pygments==2.19.2
 pytest==8.3.5
-pytest-asyncio==0.20.3
+pytest-asyncio==0.23.6
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-multipart==0.0.20

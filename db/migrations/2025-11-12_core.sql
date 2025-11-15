@@ -67,6 +67,13 @@ CREATE TABLE IF NOT EXISTS plans (
   object_id  BIGINT NOT NULL REFERENCES objects(id) ON DELETE CASCADE,
   case_id    BIGINT REFERENCES cases(id) ON DELETE SET NULL,
   title      TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'draft',
+  version    INTEGER NOT NULL DEFAULT 1,
+  hash       TEXT,
+  source     TEXT,
+  payload    JSONB,
+  plan_kind  TEXT,
+  plan_errors JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -101,20 +108,76 @@ CREATE TABLE IF NOT EXISTS stage_options (
 
 CREATE INDEX IF NOT EXISTS idx_stage_options_stage ON stage_options(stage_id);
 
+CREATE TABLE IF NOT EXISTS autoplan_runs (
+  id               BIGSERIAL PRIMARY KEY,
+  user_id          BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan_id          BIGINT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+  stage_id         BIGINT NOT NULL REFERENCES plan_stages(id) ON DELETE CASCADE,
+  stage_option_id  BIGINT REFERENCES stage_options(id) ON DELETE SET NULL,
+  status           TEXT NOT NULL DEFAULT 'pending',
+  min_hours_ahead  INTEGER NOT NULL DEFAULT 2,
+  horizon_hours    INTEGER NOT NULL DEFAULT 72,
+  reason           TEXT,
+  error            TEXT,
+  weather_context  JSONB NOT NULL DEFAULT '{}'::JSONB,
+  started_at       TIMESTAMPTZ,
+  finished_at      TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_autoplan_runs_status ON autoplan_runs(status, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS treatment_slots (
+  id               BIGSERIAL PRIMARY KEY,
+  autoplan_run_id  BIGINT REFERENCES autoplan_runs(id) ON DELETE CASCADE,
+  plan_id          BIGINT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+  stage_id         BIGINT NOT NULL REFERENCES plan_stages(id) ON DELETE CASCADE,
+  stage_option_id  BIGINT REFERENCES stage_options(id) ON DELETE SET NULL,
+  slot_start       TIMESTAMPTZ NOT NULL,
+  slot_end         TIMESTAMPTZ NOT NULL,
+  score            NUMERIC,
+  reason           JSONB NOT NULL DEFAULT '[]'::JSONB,
+  status           TEXT NOT NULL DEFAULT 'proposed',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS treatment_slots_unique ON treatment_slots(stage_option_id, slot_start);
+CREATE INDEX IF NOT EXISTS idx_treatment_slots_status ON treatment_slots(status, slot_start);
+
 CREATE TABLE IF NOT EXISTS events (
   id           BIGSERIAL PRIMARY KEY,
   user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   plan_id      BIGINT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
   stage_id     BIGINT REFERENCES plan_stages(id) ON DELETE SET NULL,
+  stage_option_id BIGINT REFERENCES stage_options(id) ON DELETE SET NULL,
+  autoplan_run_id BIGINT REFERENCES autoplan_runs(id) ON DELETE SET NULL,
   type         event_type NOT NULL,
   due_at       TIMESTAMPTZ,
+  slot_end     TIMESTAMPTZ,
   status       event_status NOT NULL DEFAULT 'scheduled',
   completed_at TIMESTAMPTZ,
+  reason       TEXT,
+  source       TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_plan ON events(plan_id);
 CREATE INDEX IF NOT EXISTS idx_events_user_due ON events (user_id, due_at) WHERE status = 'scheduled';
+CREATE INDEX IF NOT EXISTS idx_events_stage_option ON events(stage_option_id);
+
+CREATE TABLE IF NOT EXISTS plan_funnel_events (
+  id         BIGSERIAL PRIMARY KEY,
+  event      TEXT NOT NULL,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  object_id  BIGINT REFERENCES objects(id) ON DELETE SET NULL,
+  plan_id    BIGINT REFERENCES plans(id) ON DELETE SET NULL,
+  data       JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_plan_funnel_event_created ON plan_funnel_events(event, created_at);
+CREATE INDEX IF NOT EXISTS idx_plan_funnel_plan ON plan_funnel_events(plan_id);
 
 CREATE TABLE IF NOT EXISTS reminders (
   id         BIGSERIAL PRIMARY KEY,
@@ -123,6 +186,8 @@ CREATE TABLE IF NOT EXISTS reminders (
   fire_at    TIMESTAMPTZ NOT NULL,
   sent_at    TIMESTAMPTZ,
   message_id BIGINT,
+  channel    TEXT NOT NULL DEFAULT 'telegram',
+  status     TEXT NOT NULL DEFAULT 'pending',
   payload    JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

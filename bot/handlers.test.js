@@ -20,6 +20,7 @@ const {
 } = require('./diagnosis');
 const { createPlanPickHandler } = require('./callbacks/plan_pick');
 const { createPlanTriggerHandler } = require('./callbacks/plan_trigger');
+const { createPlanSlotHandlers } = require('./callbacks/plan_slot');
 const {
   subscribeHandler,
   buyProHandler,
@@ -27,7 +28,7 @@ const {
   cancelAutopay,
   getLimit,
 } = require('./payments');
-const { startHandler, helpHandler, feedbackHandler } = require('./commands');
+const { startHandler, helpHandler, feedbackHandler, newDiagnosisHandler } = require('./commands');
 const { historyHandler } = require('./history');
 const { reminderHandler, reminders } = require('./reminder');
 const { createPlanCommands } = require('./planCommands');
@@ -46,6 +47,59 @@ function tr(key, vars = {}) {
     text = text.replace(`{${k}}`, v);
   }
   return text;
+}
+
+function createSessionDbStubs() {
+  const store = { current: null, seq: 1 };
+  const stubs = {
+    purgeExpiredPlanSessions: async () => {},
+    deletePlanSessionsForUser: async (userId) => {
+      if (store.current?.user_id === userId) {
+        store.current = null;
+      }
+    },
+    createPlanSession: async (payload) => {
+      const session = {
+        id: store.seq++,
+        user_id: payload.userId,
+        token: payload.token,
+        diagnosis_payload: payload.diagnosisPayload,
+        recent_diagnosis_id: payload.recentDiagnosisId || null,
+        object_id: payload.objectId || null,
+        plan_id: payload.planId || null,
+        current_step: payload.currentStep,
+        state: payload.state || {},
+        created_at: new Date(),
+        updated_at: new Date(),
+        expires_at: new Date(Date.now() + 60 * 60 * 1000),
+      };
+      store.current = session;
+      return session;
+    },
+    getPlanSessionByToken: async (token) => (store.current?.token === token ? store.current : null),
+    getLatestPlanSessionForUser: async (userId) => (store.current?.user_id === userId ? store.current : null),
+    deletePlanSession: async (sessionId) => {
+      if (store.current?.id === sessionId) {
+        store.current = null;
+        return true;
+      }
+      return false;
+    },
+    updatePlanSession: async (sessionId, patch = {}) => {
+      if (!store.current || store.current.id !== sessionId) return null;
+      const next = { ...store.current };
+      if (patch.currentStep) next.current_step = patch.currentStep;
+      if (patch.objectId !== undefined) next.object_id = patch.objectId;
+      if (patch.planId !== undefined) next.plan_id = patch.planId;
+      if (patch.recentDiagnosisId !== undefined) next.recent_diagnosis_id = patch.recentDiagnosisId;
+      if (patch.diagnosisPayload) next.diagnosis_payload = patch.diagnosisPayload;
+      if (patch.state) next.state = patch.state;
+      store.current = next;
+      return store.current;
+    },
+  };
+  stubs.__sessionStore = store;
+  return stubs;
 }
 
 async function withMockFetch(responses, fn, calls) {
@@ -101,6 +155,49 @@ async function withMockFetch(responses, fn, calls) {
   }
 }
 
+function buildSlotContext(overrides = {}) {
+  const slotStart = overrides.slot_start || new Date('2025-11-20T15:00:00.000Z');
+  const slot = {
+    id: overrides.id || 5,
+    plan_id: overrides.plan_id || 2,
+    stage_id: overrides.stage_id || 3,
+    stage_option_id: overrides.stage_option_id || 7,
+    slot_start: slotStart,
+    slot_end: overrides.slot_end || new Date(slotStart.getTime() + 60 * 60 * 1000),
+    status: overrides.status || 'proposed',
+    reason: overrides.reason || ['☔ без дождя', '🌡 14 °C'],
+    autoplan_run_id: overrides.autoplan_run_id ?? 11,
+  };
+  return {
+    slot,
+    plan: { id: slot.plan_id, user_id: overrides.plan_user_id || 1 },
+    user: { id: overrides.user_id || 1, tg_id: overrides.tg_id || 123 },
+    stage: {
+      id: slot.stage_id,
+      plan_id: slot.plan_id,
+      kind: 'season',
+      phi_days: 0,
+      title: overrides.stage_title || 'Обработка',
+    },
+    stageOption: null,
+    object: { id: overrides.object_id || 15, name: 'Ежевика' },
+    autoplanRun: overrides.autoplanRun || { id: slot.autoplan_run_id, min_hours_ahead: 2, horizon_hours: 72 },
+  };
+}
+
+function createCallbackCtx(data, telegramId = 123) {
+  const replies = [];
+  const answers = [];
+  return {
+    from: { id: telegramId },
+    callbackQuery: { data },
+    reply: async (text) => replies.push(text),
+    answerCbQuery: async (text, opts) => answers.push({ text, opts }),
+    __replies: replies,
+    __answers: answers,
+  };
+}
+
 test('photoHandler stores info and replies', { concurrency: false }, async () => {
   const calls = [];
   const planFlowCalls = [];
@@ -139,7 +236,7 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
     await photoHandler(deps, ctx);
   });
   assert.equal(calls.length, 1);
-  assert.equal(planFlowCalls.length, 1);
+  assert.equal(planFlowCalls.length, 0);
   assert.equal(replies[0].msg, tr('photo_processing'));
   const diagnosisReply = replies[1];
   assert.ok(diagnosisReply.msg.includes('📸 Диагноз'));
@@ -149,10 +246,41 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
   assert.ok(callbacks.includes('phi_reminder'));
 });
 
-test('planPickHandler schedules treatment and phi reminders', async () => {
+test('planPickHandler enqueues autoplan job when queue available', async () => {
+  const answers = [];
+  const jobs = [];
+  const planStatusUpdates = [];
+  const handler = createPlanPickHandler({
+    db: {
+      ensureUser: async () => ({ id: 5 }),
+      selectStageOption: async () => ({
+        stage: { id: 12, plan_id: 77, kind: 'season', phi_days: 7 },
+        option: { id: 3 },
+      }),
+      createAutoplanRun: async () => ({ id: 99 }),
+      updatePlanStatus: async (payload) => planStatusUpdates.push(payload),
+    },
+    reminderScheduler: { scheduleMany: () => {} },
+    autoplanQueue: { add: async (...args) => jobs.push(args) },
+  });
+  await handler({
+    from: { id: 42 },
+    callbackQuery: { data: 'pick_opt|77|12|3' },
+    answerCbQuery: async (text) => answers.push(text),
+  });
+  assert.equal(jobs.length, 1);
+  assert.equal(answers[0], msg('plan_autoplan_lookup'));
+  assert.deepEqual(planStatusUpdates, [
+    { planId: 77, userId: 5, status: 'accepted' },
+  ]);
+});
+
+test('planPickHandler schedules treatment and phi reminders when autoplan unavailable', async () => {
   const answers = [];
   const remindersCaptured = [];
   const eventsCaptured = [];
+  const scheduled = [];
+  const planStatusUpdates = [];
   const handler = createPlanPickHandler({
     db: {
       ensureUser: async () => ({ id: 5 }),
@@ -164,8 +292,14 @@ test('planPickHandler schedules treatment and phi reminders', async () => {
         eventsCaptured.push(...events);
         return events.map((event, idx) => ({ ...event, id: idx + 1 }));
       },
-      createReminders: async (rem) => remindersCaptured.push(...rem),
+      createReminders: async (reminders) => {
+        remindersCaptured.push(...reminders);
+        return reminders.map((reminder, idx) => ({ ...reminder, id: idx + 1 }));
+      },
+      updatePlanStatus: async (payload) => planStatusUpdates.push(payload),
     },
+    reminderScheduler: { scheduleMany: (rem) => scheduled.push(...rem) },
+    autoplanQueue: null,
   });
   const realNow = Date.now;
   Date.now = () => new Date('2025-01-01T00:00:00Z').getTime();
@@ -180,11 +314,50 @@ test('planPickHandler schedules treatment and phi reminders', async () => {
   }
   assert.equal(eventsCaptured.length, 2);
   assert.equal(remindersCaptured.length, 2);
+  assert.equal(scheduled.length, 2);
   assert.equal(answers[0], msg('plan_saved_toast'));
+  assert.deepEqual(planStatusUpdates, [
+    { planId: 77, userId: 5, status: 'scheduled' },
+  ]);
+});
+
+test('planPickHandler prompts manual selection when autoplan unavailable', async () => {
+  const answers = [];
+  const planStatusUpdates = [];
+  const manualCalls = [];
+  const handler = createPlanPickHandler({
+    db: {
+      ensureUser: async () => ({ id: 5 }),
+      selectStageOption: async () => ({
+        stage: { id: 12, plan_id: 77, kind: 'season', phi_days: 0 },
+        option: { id: 3 },
+      }),
+      updatePlanStatus: async (payload) => planStatusUpdates.push(payload),
+      getPlanSessionByPlan: async () => ({ id: 42, state: {} }),
+      updatePlanSession: async () => manualCalls.push('session'),
+    },
+    manualSlots: {
+      prompt: async () => {
+        manualCalls.push('prompt');
+        return true;
+      },
+    },
+  });
+  await handler({
+    from: { id: 42 },
+    callbackQuery: { data: 'pick_opt|77|12|3' },
+    answerCbQuery: async (text) => answers.push(text),
+  });
+  assert.ok(manualCalls.includes('prompt'));
+  assert.equal(answers[0], msg('plan_manual_prompt_toast'));
+  assert.deepEqual(planStatusUpdates, [
+    { planId: 77, userId: 5, status: 'accepted' },
+  ]);
 });
 
 test('planPickHandler skips scheduling for trigger stages', async () => {
   const answers = [];
+  const planStatusUpdates = [];
   const handler = createPlanPickHandler({
     db: {
       ensureUser: async () => ({ id: 5 }),
@@ -198,6 +371,7 @@ test('planPickHandler skips scheduling for trigger stages', async () => {
       createReminders: async () => {
         throw new Error('should not be called');
       },
+      updatePlanStatus: async (payload) => planStatusUpdates.push(payload),
     },
   });
   await handler({
@@ -206,22 +380,31 @@ test('planPickHandler skips scheduling for trigger stages', async () => {
     answerCbQuery: async (text) => answers.push(text),
   });
   assert.equal(answers[0], msg('plan_saved_wait_trigger'));
+  assert.deepEqual(planStatusUpdates, [
+    { planId: 77, userId: 5, status: 'accepted' },
+  ]);
 });
 
 test('planFlow start prompts for object selection', async () => {
   const replies = [];
+  const sessionStubs = createSessionDbStubs();
   const planFlow = createPlanFlow({
     db: {
+      ...sessionStubs,
       ensureUser: async () => ({ id: 9, last_object_id: null }),
-      listObjects: async () => [],
-      createObject: async () => ({ id: 1, name: 'Авто объект' }),
+      listObjects: async () => [
+        { id: 1, name: 'Авто объект', user_id: 9 },
+        { id: 2, name: 'Запас', user_id: 9 },
+      ],
       updateUserLastObject: async () => {},
     },
     catalog: {
       suggestStages: async () => [],
       suggestOptions: async () => [],
     },
-    planWizard: { showPlanTable: async () => {} },
+    planWizard: {
+      showPlanTable: async () => {},
+    },
   });
   await planFlow.start(
     {
@@ -231,29 +414,224 @@ test('planFlow start prompts for object selection', async () => {
     },
     { crop: 'apple', confidence: 0.9 },
   );
-  assert.ok(replies[0].msg.includes('объекта'));
-  assert.ok(replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data.startsWith('plan_obj_confirm'));
+  assert.ok(replies[0].msg.includes(msg('plan_step_choose_object')));
+  assert.ok(replies[0].opts.reply_markup.inline_keyboard.length >= 1);
+});
+
+test('planFlow pick shows continue prompt', async () => {
+  const replies = [];
+  const answers = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 33, last_object_id: null }),
+      listObjects: async () => [
+        { id: 1, name: 'Первый', user_id: 33 },
+        { id: 2, name: 'Второй', user_id: 33 },
+      ],
+      updateUserLastObject: async () => {},
+      getObjectById: async (id) => ({ id, name: id === 1 ? 'Первый' : 'Второй', user_id: 33 }),
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: {
+      showPlanTable: async () => {},
+    },
+  });
+  await planFlow.start(
+    {
+      from: { id: 33 },
+      chat: { id: 900 },
+      reply: async () => {},
+    },
+    { crop: 'apple', confidence: 0.95 },
+  );
+  const token = sessionStubs.__sessionStore.current?.token;
+  await planFlow.pick(
+    {
+      from: { id: 33 },
+      reply: async (msg, opts) => replies.push({ msg, opts }),
+      answerCbQuery: async () => answers.push('ok'),
+    },
+    2,
+    token,
+  );
+  assert.ok(replies[0].msg.includes('Шаг 1/3'));
+  const buttons = replies[0].opts.reply_markup.inline_keyboard;
+  assert.ok(buttons[0][0].callback_data.startsWith('plan_obj_confirm|2'));
+  assert.ok(buttons[1][0].callback_data.startsWith('plan_obj_choose'));
+  assert.equal(answers.length, 1);
+});
+
+test('planFlow auto builds plan when single object', async () => {
+  const wizardCalls = [];
+  const planPayloads = [];
+  const planFlow = createPlanFlow({
+    db: {
+      ensureUser: async () => ({ id: 21, last_object_id: null }),
+      listObjects: async () => [{ id: 5, name: 'Единственный', user_id: 21 }],
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 5, name: 'Единственный', user_id: 21, location_tag: null }),
+      createCase: async () => ({ id: 501 }),
+      createPlan: async (payload) => {
+        planPayloads.push(payload);
+        return { id: 601 };
+      },
+      createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+    },
+    catalog: {
+      suggestStages: async () => [{ title: 'Этап', kind: 'season', note: null, phi_days: 5, meta: {} }],
+      suggestOptions: async () => [{ product: 'Препарат', dose_value: 10, dose_unit: 'г/10л', meta: {} }],
+    },
+    planWizard: {
+      showPlanTable: async (chatId, planId, options) => wizardCalls.push({ chatId, planId, options }),
+    },
+  });
+  await planFlow.start(
+    {
+      from: { id: 21 },
+      chat: { id: 777 },
+      reply: async () => {},
+    },
+    { crop: 'apple', disease: 'scab', confidence: 0.95 },
+  );
+  assert.equal(planPayloads.length, 1);
+  assert.equal(wizardCalls[0].planId, 601);
+  assert.equal(wizardCalls[0].options.userId, 21);
+});
+
+test('planCommands handleEventAction marks done', async () => {
+  const replies = [];
+  const updates = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 42 }),
+      getEventByIdForUser: async () => ({
+        id: 7,
+        plan_id: 3,
+        plan_title: 'План',
+        stage_title: 'Этап',
+      }),
+      updateEventStatus: async (...args) => updates.push(args),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleEventAction(
+    { from: { id: 42 }, reply: async (msg) => replies.push(msg) },
+    'done',
+    '7',
+  );
+  assert.ok(updates.length === 1);
+  assert.ok(replies[0].includes('Этап'));
+});
+
+test('planCommands handleEventAction reschedules', async () => {
+  const replies = [];
+  const updates = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 42 }),
+      getEventByIdForUser: async () => ({
+        id: 8,
+        plan_id: 3,
+        plan_title: 'План',
+        stage_title: 'Этап',
+        due_at: new Date('2025-01-01T12:00:00Z'),
+      }),
+      updateEventStatus: async (...args) => updates.push(args),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleEventAction(
+    { from: { id: 42 }, reply: async (msg) => replies.push(msg) },
+    'reschedule',
+    '8',
+  );
+  assert.ok(updates[0][0] === 8);
+  assert.ok(replies[0].includes('Перенёс'));
+});
+
+test('planCommands handleEventAction cancels', async () => {
+  const replies = [];
+  const updates = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 42 }),
+      getEventByIdForUser: async () => ({
+        id: 9,
+        plan_id: 3,
+        plan_title: 'План',
+        stage_title: 'Этап',
+      }),
+      updateEventStatus: async (...args) => updates.push(args),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleEventAction(
+    { from: { id: 42 }, reply: async (msg) => replies.push(msg) },
+    'cancel',
+    '9',
+  );
+  assert.ok(updates[0][1] === 'cancelled');
+  assert.ok(replies[0].includes('отменён'));
+});
+
+test('planCommands handleEventAction opens plan', async () => {
+  const replies = [];
+  const wizardCalls = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 42 }),
+      getPlanForUser: async () => ({ id: 5, title: 'План' }),
+    },
+    planWizard: {
+      showPlanTable: async (chatId, planId) => wizardCalls.push({ chatId, planId }),
+    },
+  });
+  await planCommands.handleEventAction(
+    { from: { id: 42 }, chat: { id: 99 }, reply: async (msg) => replies.push(msg) },
+    'open',
+    '5',
+  );
+  assert.ok(wizardCalls[0].planId === 5);
+  assert.ok(replies[0].includes('План'));
 });
 
 test('planFlow confirm creates plan and renders table', async () => {
   const wizardCalls = [];
+  const planPayloads = [];
+  const sessionStubs = createSessionDbStubs();
   const planFlow = createPlanFlow({
     db: {
+      ...sessionStubs,
       ensureUser: async () => ({ id: 12, last_object_id: null }),
-      listObjects: async () => [{ id: 3, name: 'Грядка', user_id: 12 }],
+      listObjects: async () => [
+        { id: 3, name: 'Грядка', user_id: 12 },
+        { id: 4, name: 'Запас', user_id: 12 },
+      ],
       createObject: async () => ({ id: 3, name: 'Грядка', user_id: 12 }),
       updateUserLastObject: async () => {},
       getObjectById: async () => ({ id: 3, name: 'Грядка', user_id: 12, location_tag: null }),
       createCase: async () => ({ id: 21 }),
-      createPlan: async () => ({ id: 31 }),
+      createPlan: async (payload) => {
+        planPayloads.push(payload);
+        return { id: 31 };
+      },
       createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
     },
     catalog: {
       suggestStages: async () => [{ title: 'До цветения', kind: 'season', phi_days: 7, note: 'note', meta: {} }],
       suggestOptions: async () => [{ product: 'ХОМ', dose_value: 40, dose_unit: 'г/10л', meta: {} }],
     },
     planWizard: {
-      showPlanTable: async (chatId, planId) => wizardCalls.push({ chatId, planId }),
+      showPlanTable: async (chatId, planId, options) => wizardCalls.push({ chatId, planId, options }),
     },
   });
   await planFlow.start(
@@ -274,31 +652,464 @@ test('planFlow confirm creates plan and renders table', async () => {
     3,
   );
   assert.equal(wizardCalls[0].planId, 31);
+  assert.equal(wizardCalls[0].options.userId, 12);
+  assert.equal(wizardCalls[0].options.diffAgainst, null);
+  assert.equal(planPayloads[0].source, 'catalog');
+  assert.equal(planPayloads[0].hash, null);
+  assert.deepEqual(planPayloads[0].payload, null);
+  assert.equal(planPayloads[0].status, 'proposed');
+  assert.equal(planPayloads[0].version, 1);
+  assert.equal(planPayloads[0].plan_kind, 'PLAN_NEW');
+});
+
+test('planFlow confirm handles expired session gracefully', async () => {
+  const answers = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 99, last_object_id: null }),
+      listObjects: async () => [
+        { id: 5, name: 'Грядка', user_id: 99 },
+        { id: 6, name: 'Запас', user_id: 99 },
+      ],
+      createObject: async () => ({ id: 5, name: 'Грядка', user_id: 99 }),
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 5, name: 'Грядка', user_id: 99 }),
+      createCase: async () => ({ id: 501 }),
+      createPlan: async () => ({ id: 601 }),
+      createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 99 },
+      chat: { id: 500 },
+      reply: async () => {},
+    },
+    { crop: 'apple', confidence: 0.9 },
+  );
+  if (sessionStubs.__sessionStore.current) {
+    sessionStubs.__sessionStore.current.expires_at = new Date(Date.now() - 1000);
+  }
+  await planFlow.confirm(
+    {
+      from: { id: 99 },
+      chat: { id: 500 },
+      answerCbQuery: async (text) => answers.push(text),
+      reply: async () => {},
+    },
+    5,
+  );
+  assert.equal(answers[0], msg('plan_session_expired'));
+});
+
+test('planFlow uses machine plan when provided', async () => {
+  const createdDefs = [];
+  const planPayloads = [];
+  const wizardCalls = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 15, last_object_id: null }),
+      listObjects: async () => [
+        { id: 7, name: 'Грядка', user_id: 15 },
+        { id: 8, name: 'Запас', user_id: 15 },
+      ],
+      createObject: async () => ({ id: 7, name: 'Грядка', user_id: 15 }),
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 7, name: 'Грядка', user_id: 15, location_tag: null }),
+      createCase: async () => ({ id: 41 }),
+      createPlan: async (payload) => {
+        planPayloads.push(payload);
+        return { id: 51 };
+      },
+      createStagesWithOptions: async (_planId, defs) => {
+        createdDefs.push(...defs);
+      },
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+    },
+    catalog: {
+      suggestStages: async () => {
+        throw new Error('catalog should not be called when plan_machine present');
+      },
+      suggestOptions: async () => [],
+    },
+    planWizard: {
+      showPlanTable: async (chatId, planId, options) => wizardCalls.push({ chatId, planId, options }),
+    },
+  });
+  const diagnosis = {
+    crop: 'tomato',
+    disease: 'blight',
+    confidence: 0.9,
+    plan_hash: 'abc123',
+    plan_kind: 'PLAN_NEW',
+    plan_machine: {
+      stages: [
+        {
+          name: 'После осадков',
+          trigger: 'после дождя >10 мм',
+          options: [
+            {
+              product_name: 'Фунгицид',
+              dose_value: 5,
+              dose_unit: 'мл/10л',
+              method: 'опрыскивание',
+              phi_days: 10,
+              needs_review: false,
+            },
+          ],
+        },
+      ],
+    },
+  };
+  await planFlow.start(
+    {
+      from: { id: 15 },
+      chat: { id: 77 },
+      reply: async () => {},
+    },
+    diagnosis,
+  );
+  await planFlow.confirm(
+    {
+      from: { id: 15 },
+      chat: { id: 77 },
+      answerCbQuery: async () => {},
+      reply: async () => {},
+    },
+    7,
+  );
+  assert.equal(createdDefs.length, 1);
+  assert.equal(createdDefs[0].title, 'После осадков');
+  assert.equal(createdDefs[0].options[0].product, 'Фунгицид');
+  assert.equal(createdDefs[0].meta.source, 'ai');
+  assert.equal(planPayloads[0].source, 'ai');
+  assert.deepEqual(planPayloads[0].payload, diagnosis.plan_machine);
+  assert.equal(planPayloads[0].hash, 'abc123');
+  assert.equal(planPayloads[0].plan_kind, 'PLAN_NEW');
+  assert.equal(planPayloads[0].status, 'proposed');
+  assert.equal(planPayloads[0].version, 1);
+  assert.equal(wizardCalls[0].options.userId, 15);
+});
+
+test('planFlow ignores QNA responses', async () => {
+  let prompted = false;
+  const planFlow = createPlanFlow({
+    db: {
+      ensureUser: async () => ({ id: 44, last_object_id: null }),
+      listObjects: async () => [],
+      createObject: async () => ({ id: 1, name: 'Auto' }),
+      updateUserLastObject: async () => {},
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 44 },
+      reply: async () => {
+        prompted = true;
+      },
+    },
+    { plan_kind: 'QNA', confidence: 0.95 },
+  );
+  assert.equal(prompted, false);
+});
+
+test('planFlow skips duplicate plans by hash', async () => {
+  const wizardCalls = [];
+  const answers = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 55, last_object_id: null }),
+      listObjects: async () => [
+        { id: 9, name: 'Грядка', user_id: 55 },
+        { id: 10, name: 'Запас', user_id: 55 },
+      ],
+      createObject: async () => ({ id: 9, name: 'Грядка', user_id: 55 }),
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 9, name: 'Грядка', user_id: 55, location_tag: null }),
+      createCase: async () => ({ id: 91 }),
+      createPlan: async () => {
+        throw new Error('plan should not be created for duplicates');
+      },
+      createStagesWithOptions: async () => {
+        throw new Error('stages should not be created for duplicates');
+      },
+      findPlanByHash: async () => ({ id: 777 }),
+      findLatestPlanByObject: async () => null,
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: {
+      showPlanTable: async (chatId, planId, options) => wizardCalls.push({ chatId, planId, options }),
+    },
+  });
+  const diagnosis = {
+    crop: 'apple',
+    disease: 'scab',
+    confidence: 0.9,
+    plan_kind: 'PLAN_NEW',
+    plan_hash: 'dup123',
+    plan_machine: {
+      stages: [
+        {
+          name: 'Этап 1',
+          options: [{ product_name: 'Фунгицид', needs_review: false }],
+        },
+      ],
+    },
+  };
+  await planFlow.start(
+    {
+      from: { id: 55 },
+      chat: { id: 21 },
+      reply: async () => {},
+    },
+    diagnosis,
+  );
+  await planFlow.confirm(
+    {
+      from: { id: 55 },
+      chat: { id: 21 },
+      answerCbQuery: async (text) => answers.push(text),
+      reply: async () => {},
+    },
+    9,
+  );
+  assert.equal(wizardCalls[0].planId, 777);
+  assert.equal(wizardCalls[0].options.userId, 55);
+  assert.equal(answers[0], msg('plan_object_duplicate'));
+});
+
+test('planFlow increments version for PLAN_UPDATE', async () => {
+  const planPayloads = [];
+  const wizardCalls = [];
+  const answers = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 66, last_object_id: null }),
+      listObjects: async () => [
+        { id: 11, name: 'Грядка', user_id: 66 },
+        { id: 12, name: 'Запас', user_id: 66 },
+      ],
+      createObject: async () => ({ id: 11, name: 'Грядка', user_id: 66 }),
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 11, name: 'Грядка', user_id: 66, location_tag: null }),
+      createCase: async () => ({ id: 101 }),
+      createPlan: async (payload) => {
+        planPayloads.push(payload);
+        return { id: 888 };
+      },
+      createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => ({ id: 777, version: 2, status: 'accepted' }),
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: {
+      showPlanTable: async (chatId, planId, options) => {
+        wizardCalls.push({ planId, options });
+      },
+    },
+  });
+  const diagnosis = {
+    crop: 'tomato',
+    disease: 'blight',
+    confidence: 0.92,
+    plan_kind: 'PLAN_UPDATE',
+    plan_hash: 'upd-hash',
+    plan_machine: {
+      stages: [
+        {
+          name: 'Этап 2',
+          options: [{ product_name: 'Раек', needs_review: true }],
+        },
+      ],
+    },
+  };
+  await planFlow.start(
+    {
+      from: { id: 66 },
+      chat: { id: 31 },
+      reply: async () => {},
+    },
+    diagnosis,
+  );
+  await planFlow.confirm(
+    {
+      from: { id: 66 },
+      chat: { id: 31 },
+      answerCbQuery: async (text) => answers.push(text),
+      reply: async () => {},
+    },
+    11,
+  );
+  assert.equal(planPayloads[0].version, 3);
+  assert.equal(planPayloads[0].plan_kind, 'PLAN_UPDATE');
+  assert.equal(planPayloads[0].status, 'proposed');
+  assert.equal(answers[0], msg('plan_object_saved_update'));
+  assert.equal(wizardCalls[0].options.userId, 66);
+  assert.equal(wizardCalls[0].options.diffAgainst, 'accepted');
+});
+
+test('planCommands handlePlans lists upcoming events', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 1 }),
+      listUpcomingEventsByUser: async () => [
+        {
+          id: 10,
+          plan_id: 2,
+          plan_title: 'План A',
+          stage_title: 'Опрыскивание',
+          due_at: new Date('2025-01-01T12:00:00Z'),
+        },
+      ],
+      listObjects: async () => [],
+      getObjectById: async () => null,
+      updateUserLastObject: async () => {},
+    },
+    planWizard: { showPlanTable: async () => {} },
+    objectChips: { send: async () => {} },
+  });
+  await planCommands.handlePlans({
+    from: { id: 1 },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  });
+  assert.ok(replies[0].text.includes('Планы ближайших'));
+  const buttons = replies[1].opts.reply_markup.inline_keyboard;
+  assert.ok(buttons[0][0].callback_data === 'plan_event|done|10');
+  assert.ok(buttons[1][1].callback_data === 'plan_event|open|2');
+});
+
+test('planCommands handleStats prints data', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      getTopCrops: async () => [
+        { name: 'томаты', cnt: 4 },
+        { name: 'огурцы', cnt: 2 },
+      ],
+      getTopDiseases: async () => [
+        { name: 'фитофтора', cnt: 3 },
+        { name: 'мучнистая роса', cnt: 1 },
+      ],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleStats({
+    reply: async (text) => replies.push(text),
+  });
+  assert.ok(replies[0].includes('томаты'));
+  assert.ok(replies[0].includes('фитофтора'));
 });
 
 test('planTriggerHandler schedules events for trigger stage', async () => {
   const remindersSaved = [];
+  const scheduled = [];
+  const planStatusUpdates = [];
   const handler = createPlanTriggerHandler({
     db: {
       ensureUser: async () => ({ id: 6 }),
-      getStageById: async () => ({ id: 8, plan_id: 2, user_id: 6, kind: 'trigger', phi_days: 2 }),
+      getStageById: async () => ({
+        id: 8,
+        plan_id: 2,
+        user_id: 6,
+        kind: 'trigger',
+        phi_days: 2,
+        title: 'После дождя',
+      }),
       createEvents: async (events) => events.map((event, idx) => ({ ...event, id: idx + 1 })),
-      createReminders: async (rem) => remindersSaved.push(...rem),
+      createReminders: async (reminders) => {
+        remindersSaved.push(...reminders);
+        return reminders.map((reminder, idx) => ({ ...reminder, id: idx + 1 }));
+      },
+      updatePlanStatus: async (payload) => planStatusUpdates.push(payload),
     },
+    reminderScheduler: { scheduleMany: (rem) => scheduled.push(...rem) },
   });
-  const answers = [];
-  await handler({
+  const promptReplies = [];
+  await handler.prompt({
     from: { id: 6 },
     callbackQuery: { data: 'plan_trigger|2|8' },
-    answerCbQuery: async (text) => answers.push(text),
+    answerCbQuery: async () => promptReplies.push('ack'),
+    reply: async (text) => promptReplies.push(text),
+  });
+  assert.ok(promptReplies.some((text) => typeof text === 'string' && text.includes('После дождя')));
+  const confirmAnswers = [];
+  await handler.confirm({
+    from: { id: 6 },
+    callbackQuery: { data: 'plan_trigger_at|2|8|0' },
+    answerCbQuery: async (text) => confirmAnswers.push(text),
   });
   assert.ok(remindersSaved.length >= 1);
-  assert.equal(answers[0], msg('plan_trigger_scheduled'));
+  assert.equal(scheduled.length, remindersSaved.length);
+  assert.equal(confirmAnswers[0], msg('plan_trigger_scheduled'));
+  assert.deepEqual(planStatusUpdates, [
+    { planId: 2, userId: 6, status: 'scheduled' },
+  ]);
+});
+
+test('planTriggerHandler accepts bigint ids returned as strings', async () => {
+  const handler = createPlanTriggerHandler({
+    db: {
+      ensureUser: async () => ({ id: 7 }),
+      getStageById: async () => ({
+        id: 9,
+        plan_id: '12',
+        user_id: '7',
+        kind: 'trigger',
+        phi_days: 0,
+        title: 'После дождя',
+      }),
+      createEvents: async (events) => events.map((event, idx) => ({ ...event, id: idx + 1 })),
+      createReminders: async (reminders) => reminders,
+    },
+  });
+  const promptReplies = [];
+  await handler.prompt({
+    from: { id: 7 },
+    callbackQuery: { data: 'plan_trigger|12|9' },
+    answerCbQuery: async () => promptReplies.push('ack'),
+    reply: async (text) => promptReplies.push(text),
+  });
+  assert.ok(promptReplies.some((text) => typeof text === 'string' && text.includes('После дождя')));
+  const confirmReplies = [];
+  await handler.confirm({
+    from: { id: 7 },
+    callbackQuery: { data: 'plan_trigger_at|12|9|6' },
+    answerCbQuery: async (text) => confirmReplies.push(text),
+  });
+  assert.equal(confirmReplies[0], msg('plan_trigger_scheduled'));
 });
 
 test('planCommands handlePlan uses wizard', async () => {
   const replies = [];
-  let wizardCalled = false;
+  const wizardCalls = [];
   const planCommands = createPlanCommands({
     db: {
       ensureUser: async () => ({ id: 1, last_object_id: null }),
@@ -309,10 +1120,11 @@ test('planCommands handlePlan uses wizard', async () => {
       getPlanForUser: async () => ({ id: 5, title: 'План' }),
     },
     planWizard: {
-      showPlanTable: async () => {
-        wizardCalled = true;
+      showPlanTable: async (chatId, planId, options) => {
+        wizardCalls.push({ chatId, planId, options });
       },
     },
+    objectChips: { send: async () => {} },
   });
   await planCommands.handlePlan({
     from: { id: 42 },
@@ -320,7 +1132,9 @@ test('planCommands handlePlan uses wizard', async () => {
     message: { text: '/plan 5' },
     reply: async (text) => replies.push(text),
   });
-  assert.ok(wizardCalled);
+  assert.equal(wizardCalls[0].planId, 5);
+  assert.equal(wizardCalls[0].options.userId, 1);
+  assert.equal(wizardCalls[0].options.diffAgainst, 'accepted');
   assert.ok(replies[0].includes('Показываю план'));
 });
 
@@ -339,6 +1153,7 @@ test('planCommands handleDone updates next event', async () => {
       },
     },
     planWizard: { showPlanTable: async () => {} },
+    objectChips: { send: async () => {} },
   });
   await planCommands.handleDone({
     from: { id: 42 },
@@ -530,9 +1345,10 @@ test('handleClarifySelection stores hint and confirms', { concurrency: false }, 
     reply: async (msg) => replies.push(msg),
     answerCbQuery: async () => {},
   };
-  await handleClarifySelection(ctx, 'tomato');
-  assert.equal(replies[0], msg('clarify.crop.confirm', { crop: strings.clarify.crop.options.tomato }));
-  assert.equal(getCropHint(55), 'tomato');
+  rememberDiagnosis(55, { clarify_crop_variants: ['Виноград', 'Томат'] });
+  await handleClarifySelection(ctx, '1');
+  assert.equal(replies[0], msg('clarify.crop.confirm', { crop: 'Томат' }));
+  assert.equal(getCropHint(55), 'Томат');
 });
 
 test('photoHandler sends protocol buttons', { concurrency: false }, async () => {
@@ -717,6 +1533,13 @@ test('startHandler replies with onboarding text', { concurrency: false }, async 
   const ctx = { reply: async (m) => { msg = m; }, startPayload: undefined, from: { id: 1 } };
   await startHandler(ctx, { query: async () => {} });
   assert.equal(msg, tr('start'));
+});
+
+test('newDiagnosisHandler replies with hint', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { reply: async (m) => replies.push(m) };
+  await newDiagnosisHandler(ctx);
+  assert.equal(replies[0], tr('new_command_hint'));
 });
 
 test('startHandler replies with FAQ', { concurrency: false }, async () => {
@@ -1218,4 +2041,104 @@ test('reminderHandler cancels reminder', { concurrency: false }, async () => {
   assert.equal(replies[0], msg('reminder_cancelled'));
   assert.equal(reminders.get(8).length, 0);
   reminders.clear();
+});
+
+test('plan_slot accept schedules events and reminders', { concurrency: false }, async () => {
+  const context = buildSlotContext();
+  const eventCalls = [];
+  const reminderCalls = [];
+  const slotUpdates = [];
+  const runUpdates = [];
+  const planUpdates = [];
+  const reminderScheduler = {
+    scheduled: [],
+    scheduleMany(remindersList) {
+      this.scheduled.push(remindersList);
+    },
+  };
+  const db = {
+    getTreatmentSlotContext: async () => context,
+    createEvents: async (events) => {
+      eventCalls.push(events);
+      return events.map((event, idx) => ({ ...event, id: idx + 1 }));
+    },
+    createReminders: async (remindersPayload) => {
+      reminderCalls.push(remindersPayload);
+      return remindersPayload.map((item, idx) => ({ ...item, id: idx + 1 }));
+    },
+    updateTreatmentSlot: async (id, patch) => slotUpdates.push({ id, patch }),
+    updateAutoplanRun: async (id, patch) => runUpdates.push({ id, patch }),
+    updatePlanStatus: async (payload) => planUpdates.push(payload),
+  };
+  const handlers = createPlanSlotHandlers({ db, reminderScheduler, autoplanQueue: null });
+  const ctx = createCallbackCtx('plan_slot_accept|5');
+  await handlers.accept(ctx);
+  assert.equal(eventCalls.length, 1);
+  assert.equal(reminderCalls.length, 1);
+  assert.equal(reminderScheduler.scheduled.length, 1);
+  assert.deepEqual(slotUpdates[0], { id: context.slot.id, patch: { status: 'accepted' } });
+  assert.deepEqual(runUpdates[0], { id: context.slot.autoplan_run_id, patch: { status: 'accepted' } });
+  assert.deepEqual(planUpdates[0], { planId: context.plan.id, userId: context.user.id, status: 'scheduled' });
+  const expectedDate = new Intl.DateTimeFormat('ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: process.env.AUTOPLAN_TIMEZONE || 'Europe/Moscow',
+  }).format(context.slot.slot_start);
+  const expectedTime = new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: process.env.AUTOPLAN_TIMEZONE || 'Europe/Moscow',
+  }).format(context.slot.slot_start);
+  assert.equal(ctx.__answers[0].text, msg('plan_slot_confirmed_toast'));
+  assert.equal(ctx.__replies[0], msg('plan_slot_confirmed', { date: expectedDate, time: expectedTime }));
+});
+
+test('plan_slot reschedule requeues autoplan', { concurrency: false }, async () => {
+  const context = buildSlotContext();
+  const slotUpdates = [];
+  const runUpdates = [];
+  const createdRuns = [];
+  const autoplanAdds = [];
+  const db = {
+    getTreatmentSlotContext: async () => context,
+    updateTreatmentSlot: async (id, patch) => slotUpdates.push({ id, patch }),
+    updateAutoplanRun: async (id, patch) => runUpdates.push({ id, patch }),
+    createAutoplanRun: async (payload) => {
+      createdRuns.push(payload);
+      return { id: 77 };
+    },
+  };
+  const autoplanQueue = {
+    add: async (name, payload, opts) => {
+      autoplanAdds.push({ name, payload, opts });
+    },
+  };
+  const handlers = createPlanSlotHandlers({ db, reminderScheduler: null, autoplanQueue });
+  const ctx = createCallbackCtx('plan_slot_reschedule|5');
+  await handlers.reschedule(ctx);
+  assert.deepEqual(slotUpdates[0], { id: context.slot.id, patch: { status: 'rejected' } });
+  assert.deepEqual(runUpdates[0], { id: context.slot.autoplan_run_id, patch: { status: 'rejected' } });
+  assert.equal(createdRuns[0].stage_option_id, context.slot.stage_option_id);
+  assert.equal(autoplanAdds[0].payload.runId, 77);
+  assert.equal(ctx.__answers[0].text, msg('plan_slot_retry_toast'));
+  assert.equal(ctx.__replies[0], msg('plan_slot_retry'));
+});
+
+test('plan_slot cancel stops pending slot', { concurrency: false }, async () => {
+  const context = buildSlotContext();
+  const slotUpdates = [];
+  const runUpdates = [];
+  const db = {
+    getTreatmentSlotContext: async () => context,
+    updateTreatmentSlot: async (id, patch) => slotUpdates.push({ id, patch }),
+    updateAutoplanRun: async (id, patch) => runUpdates.push({ id, patch }),
+  };
+  const handlers = createPlanSlotHandlers({ db, reminderScheduler: null, autoplanQueue: null });
+  const ctx = createCallbackCtx('plan_slot_cancel|5');
+  await handlers.cancel(ctx);
+  assert.deepEqual(slotUpdates[0], { id: context.slot.id, patch: { status: 'cancelled' } });
+  assert.deepEqual(runUpdates[0], { id: context.slot.autoplan_run_id, patch: { status: 'cancelled' } });
+  assert.equal(ctx.__answers[0].text, msg('plan_slot_cancelled_toast'));
+  assert.equal(ctx.__replies[0], msg('plan_slot_cancelled'));
 });

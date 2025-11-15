@@ -70,7 +70,7 @@ async def partner_orders(
         )
         raise HTTPException(status_code=400, detail=err.model_dump()) from exc
 
-    def _db_call() -> tuple[str, bool]:
+    def _db_call():
         with db_module.SessionLocal() as db:
             existing = (
                 db.query(PartnerOrder)

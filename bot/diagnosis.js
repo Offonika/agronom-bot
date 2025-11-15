@@ -8,6 +8,7 @@ const {
   formatFaqAnswer,
   resolveFollowupReply,
 } = require('./messageFormatters/diagnosisMessage');
+const { logFunnelEvent } = require('./funnel');
 const { sendPaywall } = require('./payments');
 
 const PRODUCT_NAMES_MAX = 100;
@@ -35,6 +36,26 @@ function rememberDiagnosis(userId, payload) {
     }
   }
   lastDiagnoses.set(userId, { data: payload, ts: Date.now() });
+}
+
+async function persistRecentDiagnosis(deps, userId, payload, existingUser = null) {
+  if (!deps?.db?.saveRecentDiagnosis || !userId || !payload) return null;
+  try {
+    const user = existingUser || (await deps.db.ensureUser(userId));
+    const objectId = user?.last_object_id || null;
+    const record = await deps.db.saveRecentDiagnosis({
+      userId: user.id,
+      objectId,
+      payload,
+    });
+    if (record?.id) {
+      payload.recent_diagnosis_id = record.id;
+    }
+    return record;
+  } catch (err) {
+    console.error('recent_diagnosis save failed', err);
+    return null;
+  }
 }
 
 function getLastDiagnosis(userId) {
@@ -130,14 +151,24 @@ async function handleClarifySelection(ctx, optionId) {
       // ignore answer errors
     }
   }
-  const options = dict('clarify.crop.options');
-  const optionLabel = options[optionId];
+  const stored = getLastDiagnosis(ctx.from?.id);
+  let optionLabel;
+  let hintValue;
+  if (stored?.clarify_crop_variants && Number.isInteger(Number(optionId))) {
+    optionLabel = stored.clarify_crop_variants[Number(optionId)];
+    hintValue = optionLabel;
+  }
+  if (!optionLabel) {
+    const options = dict('clarify.crop.options');
+    optionLabel = options[optionId];
+    hintValue = optionId;
+  }
   if (!optionLabel) {
     await ctx.reply(msg('diagnose_error'));
     return;
   }
   if (ctx.from?.id) {
-    setCropHint(ctx.from.id, optionId);
+    setCropHint(ctx.from.id, hintValue);
   }
   await ctx.reply(msg('clarify.crop.confirm', { crop: optionLabel }));
 }
@@ -173,6 +204,27 @@ async function photoHandler(depsOrPool, ctx) {
     return;
   }
   const userId = ctx.from.id;
+  const dbClient = deps?.db;
+  let dbUser = null;
+  if (dbClient?.ensureUser) {
+    try {
+      dbUser = await dbClient.ensureUser(userId);
+    } catch (err) {
+      console.error('ensureUser failed', err);
+    }
+  }
+  if (dbUser) {
+    await logFunnelEvent(dbClient, {
+      event: 'photo_received',
+      userId: dbUser.id,
+      objectId: dbUser.last_object_id || null,
+      data: {
+        file_size,
+        width,
+        height,
+      },
+    });
+  }
   try {
     await pool.query(
       `INSERT INTO photos (user_id, file_id, file_unique_id, width, height, file_size, status)` +
@@ -279,14 +331,30 @@ async function photoHandler(depsOrPool, ctx) {
     }
 
     rememberDiagnosis(userId, data);
+    const recentRecord = await persistRecentDiagnosis(deps, userId, data, dbUser);
     const text = buildAssistantText(data);
     const keyboard = buildKeyboardLayout(data);
     if (data.protocol) {
       keyboard.inline_keyboard.unshift(buildProtocolRow(ctx, data.protocol));
     }
     await ctx.reply(text, { reply_markup: keyboard });
-    if (deps.planFlow) {
-      await deps.planFlow.start(ctx, data);
+    if (dbUser) {
+      await logFunnelEvent(dbClient, {
+        event: 'diagnosis_shown',
+        userId: dbUser.id,
+        objectId: recentRecord?.object_id || dbUser.last_object_id || null,
+        data: {
+          crop: data.crop || null,
+          confidence: data.confidence ?? null,
+        },
+      });
+    }
+    if (deps.objectChips) {
+      try {
+        await deps.objectChips.send(ctx);
+      } catch (err) {
+        console.error('objectChips send error', err);
+      }
     }
   } catch (err) {
     console.error('diagnose error', err);
@@ -327,6 +395,15 @@ async function retryHandler(arg1, arg2, arg3) {
     ctx = arg2;
     photoId = arg3;
   }
+  const dbClient = deps?.db;
+  let dbUser = null;
+  if (dbClient?.ensureUser && ctx.from?.id) {
+    try {
+      dbUser = await dbClient.ensureUser(ctx.from.id);
+    } catch (err) {
+      console.error('ensureUser failed', err);
+    }
+  }
   try {
     const resp = await fetch(`${API_BASE}/v1/photos/${photoId}`, {
       headers: {
@@ -350,13 +427,27 @@ async function retryHandler(arg1, arg2, arg3) {
       return;
     }
 
-    rememberDiagnosis(ctx.from?.id, data);
+    const userId = ctx.from?.id;
+    rememberDiagnosis(userId, data);
+    const recentRecord = await persistRecentDiagnosis(deps, userId, data, dbUser);
     const text = buildAssistantText(data);
     const keyboard = buildKeyboardLayout(data);
     if (data.protocol) {
       keyboard.inline_keyboard.unshift(buildProtocolRow(ctx, data.protocol));
     }
     await ctx.reply(text, { reply_markup: keyboard });
+    if (dbUser) {
+      await logFunnelEvent(dbClient, {
+        event: 'diagnosis_shown',
+        userId: dbUser.id,
+        objectId: recentRecord?.object_id || dbUser.last_object_id || null,
+        data: {
+          crop: data.crop || null,
+          confidence: data.confidence ?? null,
+          source: 'retry',
+        },
+      });
+    }
   } catch (err) {
     console.error('retry error', err);
     await ctx.reply(msg('status_error'));

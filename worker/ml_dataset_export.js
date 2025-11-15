@@ -3,7 +3,7 @@ const { Queue, Worker } = require('bullmq');
 const { Pool } = require('pg');
 const { S3Client, CopyObjectCommand } = require('@aws-sdk/client-s3');
 
-const connection = { connectionString: process.env.REDIS_URL || 'redis://localhost:6379' };
+const connection = { url: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = 'ml-dataset-export';
 
 const s3Config = {

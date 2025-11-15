@@ -12,43 +12,86 @@ function formatReminder(reminder) {
 
 function createReminderScheduler({ bot, db, intervalMs }) {
   if (!bot || !db) throw new Error('reminders scheduler requires bot and db');
-  const tickInterval = Number(intervalMs || process.env.REMINDER_TICK_MS || 60000);
-  let timer = null;
+  const tickInterval = Number(intervalMs || process.env.REMINDER_TICK_MS || 3600000);
+  let sweepTimer = null;
   let running = false;
+  const timers = new Map();
+
+  async function deliver(reminder) {
+    try {
+      const text = formatReminder(reminder);
+      await bot.telegram.sendMessage(reminder.user_tg_id, text);
+      await db.markReminderSent(reminder.id);
+    } catch (err) {
+      console.error('reminder send error', err);
+    }
+  }
+
+  function scheduleReminder(reminder) {
+    if (!reminder || !reminder.id || reminder.sent_at) return;
+    if (timers.has(reminder.id)) return;
+    const fireAt = new Date(reminder.fire_at).getTime();
+    const delay = Math.max(fireAt - Date.now(), 0);
+    const timeout = setTimeout(async () => {
+      timers.delete(reminder.id);
+      await deliver(reminder);
+    }, delay);
+    if (typeof timeout.unref === 'function') timeout.unref();
+    timers.set(reminder.id, timeout);
+  }
+
+  async function hydrate() {
+    try {
+      const pending = await db.pendingReminders(new Date());
+      pending.forEach(scheduleReminder);
+    } catch (err) {
+      console.error('reminder hydrate error', err);
+    }
+  }
 
   async function tick() {
     try {
       const due = await db.dueReminders(new Date());
       for (const reminder of due) {
-        try {
-          const text = formatReminder(reminder);
-          await bot.telegram.sendMessage(reminder.user_tg_id, text);
-          await db.markReminderSent(reminder.id);
-        } catch (err) {
-          console.error('reminder send error', err);
+        const existing = timers.get(reminder.id);
+        if (existing) {
+          clearTimeout(existing);
+          timers.delete(reminder.id);
         }
+        await deliver(reminder);
       }
     } catch (err) {
       console.error('reminder tick error', err);
     }
   }
 
-  function start() {
+  async function start() {
     if (running) return;
     running = true;
-    timer = setInterval(tick, tickInterval);
-    if (typeof timer.unref === 'function') {
-      timer.unref();
-    }
+    await hydrate();
+    await tick();
+    sweepTimer = setInterval(async () => {
+      await tick();
+      await hydrate();
+    }, tickInterval);
+    if (typeof sweepTimer.unref === 'function') sweepTimer.unref();
   }
 
   function stop() {
-    if (timer) clearInterval(timer);
-    timer = null;
+    if (sweepTimer) clearInterval(sweepTimer);
+    sweepTimer = null;
     running = false;
+    for (const timeout of timers.values()) {
+      clearTimeout(timeout);
+    }
+    timers.clear();
   }
 
-  return { start, stop, tick };
+  function scheduleMany(reminders = []) {
+    reminders.forEach(scheduleReminder);
+  }
+
+  return { start, stop, tick, scheduleMany };
 }
 
 module.exports = { createReminderScheduler };

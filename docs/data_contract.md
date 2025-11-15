@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.11 — 5 August 2025(v1.10 → v1.11: добавлены таблицы catalogs/catalog_items и ER‑диаграмма)
+Version 1.12 — 13 November 2025(v1.11 → v1.12: добавлен Google Sheets Runs, shift_status enum, логика Variant 2)
 
 0 · Scope
 
@@ -16,6 +16,8 @@ ML‑датасет (ml-dataset/) — копия снимков status=ok > 90
 
 Платёжные данные храним 5 лет (ФЗ‑402).
 
+Журнал смен Runs живёт в Google Sheets (`Runs!A:H`). Хранение бессрочное на период пилота; ежедневный snapshot выгружается в S3/backup. Доступ к листу ограничен сервисным аккаунтом и менеджерами магазинов, правки фиксируются в audit log Google Drive.
+
 2 · Logical Schema (ER‑text)
 
 users 1—n photos
@@ -24,6 +26,7 @@ users 1—n partner_orders
 users 1—n events
 photos 1—1 protocols
 catalogs 1—n catalog_items
+shops (external) 1—1 runs(run_date) — executor привязан по Telegram tg_id (username опционален)
 
 ```mermaid
 erDiagram
@@ -365,12 +368,87 @@ phi
 
 INT
 
+3.10 runs_sheet (Google Sheets)
+
+Column
+
+Type
+
+Notes
+
+run_date
+
+DATE
+
+Календарная дата; часть PK
+
+shop_id
+
+TEXT
+
+Уникальный идентификатор магазина; часть PK
+
+shop_name
+
+TEXT
+
+Человекочитаемое название
+
+manager_handle
+
+TEXT
+
+Telegram менеджера
+
+status
+
+shift_status
+
+waiting/in_progress/done
+
+executor_username
+
+TEXT
+
+Опционально, если есть username
+
+executor_tg_id
+
+BIGINT
+
+Required, fallback на случай отсутствия username
+
+started_at
+
+TIMESTAMP
+
+Когда первый сотрудник нажал «Начать смену»
+
+updated_at
+
+TIMESTAMP
+
+Последнее изменение строки Runs
+
+updated_by
+
+TEXT
+
+`bot` или `@manager`, кто внёс правку/сброс
+
+checklist_state
+
+TEXT
+
+`open` / `done`; синхронизируется при закрытии чек-листа
+
 4 · Enum Definitions
 
 CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');
 CREATE TYPE photo_status   AS ENUM ('pending','ok','retrying','failed');
 CREATE TYPE order_status   AS ENUM ('new','processed','cancelled');
 CREATE TYPE error_code     AS ENUM ('NO_LEAF','LIMIT_EXCEEDED','GPT_TIMEOUT','BAD_REQUEST','UNAUTHORIZED','UPGRADE_REQUIRED','TOO_MANY_REQUESTS','SERVICE_UNAVAILABLE','FORBIDDEN');
+CREATE TYPE shift_status   AS ENUM ('waiting','in_progress','done');
 
 5 · Data Lifecycle
 
@@ -387,6 +465,8 @@ DB: deleted=true → 30 дней → hard delete.
 ML‑dataset: Opt‑In → TTL 2 года.
 
 Quota (photo_usage) ресет 1‑го числа месяца (cron).
+
+Runs (Google Sheets): одна строка на магазин и дату. `status` меняется на `done` после чек-листа или на `waiting` после `/reset`. История правок доступна через audit log Google Drive.
 
 6 · API ↔ DB Mapping
 

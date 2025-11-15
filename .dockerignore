@@ -4,6 +4,14 @@
 .gitignore
 docker-compose.yml
 node_modules/
+bot/node_modules/
+bot/.turbo/
+bot/.next/
+bot/dist/
+bot/coverage/
+bot/tmp/
+bot/.cache/
+bot/.eslintcache
 tests/
 docs/
 # bot/
@@ -11,4 +19,18 @@ monitoring/
 k8s/
 runbooks/
 scripts/
-
+venv/
+.venv/
+env/
+.env.local
+.env.test
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+*.py[cod]
+*.db
+*.sqlite3
+last_protocol*.pdf
+debug_protocols/
+load/
+udo journalctl -u clean_server.service -n 50 --no-pager

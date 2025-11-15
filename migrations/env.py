@@ -16,6 +16,21 @@ from app.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
 
+SKIP_PLAN_META = os.getenv("SKIP_PLAN_METADATA_MIGRATION", "0") == "1"
+PLAN_META_REVISION = "20251113_add_plan_metadata"
+
+
+def _process_revision_directives(context, revision, directives):
+    print("process_revision_directives called, skip:", SKIP_PLAN_META)
+    if not SKIP_PLAN_META:
+        return
+    filtered = []
+    for directive in directives:
+        if getattr(directive, "revision", None) == PLAN_META_REVISION:
+            continue
+        filtered.append(directive)
+    directives[:] = filtered
+
 # 3. URL из env
 url = (
     os.getenv("DATABASE_URL")
@@ -34,6 +49,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
+        process_revision_directives=_process_revision_directives,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -46,6 +62,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
+            process_revision_directives=_process_revision_directives,
         )
         with context.begin_transaction():
             context.run_migrations()

@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 const { callGptVisionStub } = require('./gpt_stub');
 const prom = require('prom-client');
 
-const connection = { connectionString: process.env.REDIS_URL || 'redis://localhost:6379' };
+const connection = { url: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = 'retry-diagnosis';
 
 const queue = new Queue(queueName, { connection });

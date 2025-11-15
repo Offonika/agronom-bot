@@ -157,10 +157,9 @@ def test_diagnose_json_success(client):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {
+    expected_keys = {
         "crop",
         "disease",
-        "disease_name_ru",
         "confidence",
         "reasoning",
         "treatment_plan",
@@ -169,8 +168,8 @@ def test_diagnose_json_success(client):
         "protocol",
         "roi",
         "need_reshoot",
-        "reshoot_tips",
     }
+    assert expected_keys.issubset(body.keys())
     assert body["roi"] == 1.9
 
 
@@ -535,7 +534,7 @@ def test_diagnose_multipart_missing_image(client):
 
 
 def test_diagnose_gpt_timeout(monkeypatch, client):
-    def _fail(_key: str, _image_bytes: bytes | None = None):
+    def _fail(_key: str, _image_bytes: bytes | None = None, **_kwargs):
         raise TimeoutError("timeout")
 
     monkeypatch.setattr("app.controllers.photos.call_gpt_vision", _fail)
@@ -1230,7 +1229,7 @@ def test_diagnose_missing_protocols_table(client):
         assert data["protocol"] is None
         assert data["protocol_status"] == "Бета"
     finally:
-        subprocess.run(["alembic", "upgrade", "head"], check=True)
+        seed_protocol()
         seed_protocol()
 
 

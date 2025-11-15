@@ -2,7 +2,7 @@ System Requirements Specification (SRS)
 
 Проект: Telegram‑бот «Карманный агроном» (MVP)
 
-Версия: 1.9 — 5 августа 2025 г.(v1.8 → v1.9: ProtocolResponse расширен категориями)
+Версия: 1.10 — 13 ноября 2025 г.(v1.9 → v1.10: добавлен пилот Variant 2 «Кто первый начал смену» и лист Runs)
 
 1 · Scope
 
@@ -30,7 +30,7 @@ System Requirements Specification (SRS)
 
 ML‑датасет: фото старше 90 дней копируются в обезличенный бакет ml-dataset только при согласии пользователя.
 
-Out‑of‑scope (MVP): нативные приложения, on‑device CV, карта полей, white‑label SDK.
+Out-of-scope (MVP): нативные приложения, on-device CV, карта полей, white-label SDK.
 
 2 · Glossary
 
@@ -142,6 +142,44 @@ FR‑T‑12
 
 Medium
 
+### 3.1 Управление сменой (Variant 2 «Кто первый начал»)
+
+ID
+
+Description
+
+Priority
+
+FR‑R‑01
+
+Кнопка «Начать смену» создаёт/обновляет строку в Google Sheets `Runs` (ключ: shop_id + дата); первый сотрудник получает `status=in_progress` и записывается как executor.
+
+High
+
+FR‑R‑02
+
+Менеджеру доступна кнопка «Передать смену»; выбор нового сотрудника обновляет executor/executor_tg_id и `updated_by=manager`.
+
+Medium
+
+FR‑R‑04
+
+Команда `/reset <shop_id>` (только у менеджеров) переводит смену в `status=waiting`, очищает executor и фиксирует время сброса.
+
+Medium
+
+FR‑R‑05
+
+После закрытия чек-листа бот автоматически ставит `status=done` в строке Runs.
+
+Medium
+
+FR‑R‑06
+
+Если у сотрудника нет username, бот сохраняет Telegram ID и использует его в таблице/уведомлениях, чтобы менеджер видел исполнителя.
+
+Medium
+
 Copy / Tone requirements:
 
 - GPT-ответ формируется дружелюбным голосом ассистента («Давай», «Советую», «Обрати внимание»), без Markdown-кодовых блоков.
@@ -163,7 +201,14 @@ POST /v1/payments/sbp/autopay/webhook — Тинькофф (регулярн
 
 POST /v1/partner/orders
 
-4.2 Schemas (excerpt)
+4.2 Telegram-команды и кнопки
+
+- `Начать смену` — inline‑кнопка в карточке магазина; при первом нажатии создаёт строку Runs, при повторных показывает отказ (см. FR‑R‑01/02).
+- `Передать смену` — доступна только менеджеру магазина; обновляет executor/executor_tg_id и фиксирует `updated_by=manager`.
+- `/reset <shop_id>` — текстовая команда менеджера, переводит смену в `waiting` и очищает исполнителя.
+- Отказ при занятой смене: «Смена уже начата сотрудником @olga_cashier. Если вы заменяете коллегу — обратитесь к менеджеру.»
+
+4.3 Schemas (excerpt)
 
 DiagnosisResponse:
   crop: string
@@ -189,7 +234,7 @@ PaymentWebhook:
   status: enum {SUCCESS, FAIL, CANCEL}
   signature: string # HMAC‑SHA256
 
-4.3 Errors
+4.4 Errors
 
 HTTP
 
@@ -220,6 +265,47 @@ LIMIT_EXCEEDED
 GPT_TIMEOUT
 
 GPT не ответил за 10 с
+
+4.5 План памяти и автопланирование
+
+#### 4.5.1 Машинный пакет ответа ИИ
+
+- Контроллер диагноза всегда получает JSON-блок `plan_payload`.
+- Поля верхнего уровня: `kind` (PLAN_NEW, PLAN_UPDATE, QNA, FAQ), `object_hint`, `diagnosis` { `crop`, `disease`, `confidence` }, `case_id` (опционально), `stages`.
+- Каждый `stage` описывает `name`, `trigger` («до цветения», «после дождя >10 мм», «при симптомах»), `notes`, `options`.
+- `options` (до 3): `{ product_code?, product_name, ai, dose: { value, unit }, method, phi_days, notes }`.
+- Тип `kind` управляет поведением: PLAN_* → создаём/обновляем черновик, QNA/FAQ → просто ответ в чат без изменения плана.
+
+#### 4.5.2 Валидация и нормализация
+
+- Дозировки переводятся в стандартизированные единицы (л/га, г/л, мл/10л), `phi_days` приводится к числу, пустые значения → `null`.
+- `product_code` маппится на `product_rules` по культуре/региону; если не найдено — `needs_review` и опция не предлагается до подтверждения.
+- Этапы сортируются по фиксированному порядку (весна → до цветения → после дождя → при симптомах), внутри этапа опции сортируются по приоритету каталога.
+- Считаем SHA-1 канонического JSON. Совпадение → обновление игнорируется (анти-дребезг).
+
+#### 4.5.3 Жизненный цикл и версии
+
+- **draft** — черновик после PLAN_NEW/PLAN_UPDATE, хранится до показа пользователю.
+- **proposed** — пользователь увидел таблицу этапов и карточку автоплана; доступны действия «Принять», «Оставить как есть», «Принять частично».
+- **accepted** — пользователь подтвердил хотя бы один вариант или нажал «Принять план».
+- **scheduled** — созданы события/напоминания (обработка, PHI, контроль погоды).
+- **superseded** — появилась новая accepted/scheduled версия того же object_id + case_id.
+- **rejected** — пользователь отклонил апдейт.
+- Истина для UI: последний accepted/scheduled по object_id + case_id. PLAN_UPDATE не перезаписывает активный план без согласия.
+
+#### 4.5.4 Дифф и конфликты
+
+- Draft сравнивается с активным планом: diff по этапам (новые, удалённые, изменённые опции, PHI, дозы).
+- Если изменения затрагивают уже запланированное событие, пользователь получает выбор: «Принять изменения» (перенести события), «Оставить как есть», «Принять частично» (только будущие этапы).
+- Косметические правки (описания без смены доз/PHI/ДВ) применяются автоматически; критические (рост дозы, PHI, смена действующего вещества) всегда требуют подтверждения.
+
+#### 4.5.5 Автоплан и слоты
+
+- `POST /treatments/{id}/autoplan` создаёт `autoplan_run` и ставит задачу воркеру.
+- Воркер проверяет прогноз 72 ч вперёд (шаг 30 мин). Правила — в `docs/ALGORITHMS/auto_planner.md`.
+- Если подходящих окон нет, план помечается `awaiting_window`; попытка повторяется после обновления прогноза или команды оператора.
+- События/напоминания содержат `plan_stage_id` и `stage_option_id`, что позволяет пересоздавать их при частичных принятиях.
+- Для идемпотентности хранится `slot_signature = treatment_id + slot_start`; дубликаты игнорируются.
 
 5 · Data Model (PostgreSQL)
 
@@ -275,7 +361,20 @@ photo_usage(
   PRIMARY KEY (user_id, month)
 );
 
-Индексы: photos_user_ts_idx(user_id, ts DESC); счётчики сбрасывает CRON 5 0 1 * * (Europe/Moscow).
+runs (Google Sheets · лист Runs)
+  run_date DATE,
+  shop_id TEXT,
+  shop_name TEXT,
+  manager_handle TEXT,
+  status TEXT,              -- waiting | in_progress | done
+  executor_username TEXT,
+  executor_tg_id BIGINT,
+  started_at TIMESTAMP,
+  updated_at TIMESTAMP,
+  updated_by TEXT           -- bot | manager_handle
+;
+
+Индексы: photos_user_ts_idx(user_id, ts DESC); счётчики сбрасывает CRON 5 0 1 * * (Europe/Moscow). Лист Runs синхронизируется через сервисный Google‑аккаунт; уникальность обеспечивает пара (shop_id, run_date), что фиксирует «первого нажал — первый стал исполнителем».
 
 6 · Sequence Diagrams
 
@@ -347,6 +446,10 @@ Free‑user > 5 фото → 402 PAYWALL
 PAYMENT_FAIL
 
 Webhook status=FAIL → grace 3 дня, повтор оплаты
+
+SHIFT_OCCUPIED
+
+Вторая и последующие попытки «Начать смену» возвращают текст «Смена уже начата сотрудником @executor… Если вы заменяете коллегу — обратитесь к менеджеру» и не меняют строку Runs.
 
 8 · Non‑Functional Requirements
 
@@ -441,6 +544,10 @@ GPT_TIMEOUT
 PAYMENT_FAIL
 
 «Платёж не прошёл. Попробуйте другую карту или отмените автоплатёж.»
+
+SHIFT_OCCUPIED
+
+«Смена уже начата сотрудником @olga_cashier. Если вы заменяете коллегу — обратитесь к менеджеру.»
 
 15 · Open Questions (закрыто в v1.7)
 
