@@ -4,27 +4,35 @@ import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 from app.services.protocols import find_protocol, _cache_protocol
 from app.db import SessionLocal, init_db
 from app.config import Settings
-from app.models import Catalog, CatalogItem
+from app.models import Base, Catalog, CatalogItem
 
 
 @contextmanager
 def tmp_db(tmp_path: Path):
     old_url = os.environ.get("DATABASE_URL", "sqlite:///./app.db")
     os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path}/protocols.db"
-    subprocess.run(["alembic", "upgrade", "head"], check=True)
+    _prepare_db(os.environ["DATABASE_URL"])
     init_db(Settings())
     try:
         yield
     finally:
         os.environ["DATABASE_URL"] = old_url
-        subprocess.run(["alembic", "upgrade", "head"], check=True)
         init_db(Settings())
         _cache_protocol.cache_clear()
+
+
+def _prepare_db(url: str) -> None:
+    if not url.startswith("sqlite"):
+        subprocess.run(["alembic", "upgrade", "head"], check=True)
+        return
+    engine = create_engine(url)
+    Base.metadata.create_all(engine)
+    engine.dispose()
 
 
 def seed_protocol():

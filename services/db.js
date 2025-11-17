@@ -124,6 +124,34 @@ function createDb(poolInstance) {
     return rows[0] || null;
   }
 
+  function mergeMeta(base = {}, patch = {}) {
+    const result = { ...(base || {}) };
+    if (!patch || typeof patch !== 'object') return result;
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) {
+        delete result[key];
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  async function updateObjectMeta(objectId, patch = {}) {
+    if (!objectId || !patch || typeof patch !== 'object') return null;
+    const current = await getObjectById(objectId);
+    if (!current) return null;
+    const merged = mergeMeta(current.meta || {}, patch);
+    const sql = `
+      UPDATE objects
+      SET meta = $2
+      WHERE id = $1
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, [objectId, json(merged)]);
+    return rows[0] || null;
+  }
+
   async function createCase(data) {
     const sql = `
       INSERT INTO cases (user_id, object_id, crop, disease, confidence, raw_ai)
@@ -210,7 +238,22 @@ function createDb(poolInstance) {
     return rows;
   }
 
-  async function listUpcomingEventsByUser(userId, limit = 5) {
+  async function listUpcomingEventsByUser(userId, limit = 5, objectId = null, cursor = null) {
+    const params = [userId];
+    let idx = 2;
+    let filterClause = '';
+    if (objectId) {
+      filterClause = ` AND p.object_id = $${idx}`;
+      params.push(objectId);
+      idx += 1;
+    }
+    if (cursor?.dueAt && cursor?.eventId) {
+      filterClause += ` AND (e.due_at > $${idx} OR (e.due_at = $${idx} AND e.id > $${idx + 1}))`;
+      params.push(cursor.dueAt);
+      params.push(cursor.eventId);
+      idx += 2;
+    }
+    params.push(limit);
     const sql = `
       SELECT
         e.*,
@@ -221,10 +264,62 @@ function createDb(poolInstance) {
       JOIN objects o ON o.id = p.object_id
       WHERE e.user_id = $1
         AND e.status = 'scheduled'
+        ${filterClause}
       ORDER BY e.due_at ASC NULLS LAST, e.id ASC
+      LIMIT $${idx};
+    `;
+    const { rows } = await exec(sql, params);
+    return rows;
+  }
+
+  async function listOverdueEventsByUser(userId, limit = 3, objectId = null) {
+    const params = [userId];
+    let idx = 2;
+    let filterClause = '';
+    if (objectId) {
+      filterClause = ` AND p.object_id = $${idx}`;
+      params.push(objectId);
+      idx += 1;
+    }
+    params.push(limit);
+    const sql = `
+      SELECT
+        e.*,
+        p.title    AS plan_title,
+        o.name     AS object_name
+      FROM events e
+      JOIN plans p ON p.id = e.plan_id
+      JOIN objects o ON o.id = p.object_id
+      WHERE e.user_id = $1
+        AND e.status = 'scheduled'
+        AND e.due_at IS NOT NULL
+        AND e.due_at < NOW()
+        ${filterClause}
+      ORDER BY e.due_at ASC, e.id ASC
+      LIMIT $${idx};
+    `;
+    const { rows } = await exec(sql, params);
+    return rows;
+  }
+
+  async function listOverdueUsersSummary(thresholdMinutes = 60, limit = 100) {
+    const sql = `
+      SELECT
+        u.id       AS user_id,
+        u.tg_id    AS user_tg_id,
+        COUNT(*)   AS overdue_count,
+        MIN(e.due_at) AS oldest_due
+      FROM events e
+      JOIN plans p ON p.id = e.plan_id
+      JOIN users u ON u.id = p.user_id
+      WHERE e.status = 'scheduled'
+        AND e.due_at IS NOT NULL
+        AND e.due_at < NOW() - ($1 * INTERVAL '1 minute')
+      GROUP BY u.id, u.tg_id
+      ORDER BY oldest_due ASC
       LIMIT $2;
     `;
-    const { rows } = await exec(sql, [userId, limit]);
+    const { rows } = await exec(sql, [thresholdMinutes, limit]);
     return rows;
   }
 
@@ -1259,6 +1354,7 @@ function createDb(poolInstance) {
     listObjects,
     createObject,
     getObjectById,
+    updateObjectMeta,
     createCase,
     createPlan,
     getPlanById,
@@ -1290,6 +1386,8 @@ function createDb(poolInstance) {
     deletePlanSessionsForUser,
     deletePlanSessionsByPlan,
     listUpcomingEventsByUser,
+    listOverdueEventsByUser,
+    listOverdueUsersSummary,
     createEvents,
     createReminders,
     dueReminders,

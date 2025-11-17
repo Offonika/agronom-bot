@@ -2,15 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app import db as db_module
 from app.dependencies import ErrorResponse, rate_limit
-from app.models import ErrorCode
+from app.models import ErrorCode, PlanSession
+from app.services.plan_session import (
+    delete_plan_session,
+    get_latest_plan_session,
+    get_plan_session_by_plan,
+    get_plan_session_by_token,
+    update_plan_session_fields,
+    upsert_plan_session,
+)
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -83,6 +91,108 @@ class PlanRejectResponse(BaseModel):
 
 class SelectOptionRequest(BaseModel):
     stage_option_id: int
+
+
+class PlanSessionUpsertRequest(BaseModel):
+    token: str
+    diagnosis: dict[str, Any]
+    current_step: str = "choose_object"
+    state: dict[str, Any] = Field(default_factory=dict)
+    recent_diagnosis_id: int | None = None
+    object_id: int | None = None
+    plan_id: int | None = None
+    ttl_hours: int | None = None
+
+
+class PlanSessionRecord(BaseModel):
+    id: int
+    user_id: int
+    token: str
+    created_at: datetime
+    updated_at: datetime
+    expires_at: datetime
+    expired: bool
+    current_step: str
+    state: dict[str, Any]
+    diagnosis: dict[str, Any]
+    recent_diagnosis_id: int | None = None
+    object_id: int | None = None
+    plan_id: int | None = None
+
+
+class PlanSessionPatchRequest(BaseModel):
+    diagnosis: dict[str, Any] | None = None
+    current_step: str | None = None
+    state: dict[str, Any] | None = None
+    recent_diagnosis_id: int | None = None
+    object_id: int | None = None
+    plan_id: int | None = None
+    ttl_hours: int | None = None
+
+
+@router.post("/sessions", response_model=PlanSessionRecord)
+async def upsert_plan_session_endpoint(
+    body: PlanSessionUpsertRequest,
+    user_id: int = Depends(rate_limit),
+):
+    record = await asyncio.to_thread(
+        _upsert_plan_session,
+        user_id,
+        body,
+    )
+    return _build_plan_session_record(record)
+
+
+@router.get("/sessions", response_model=PlanSessionRecord)
+async def get_plan_session_endpoint(
+    token: str | None = None,
+    include_expired: bool = False,
+    plan_id: int | None = None,
+    user_id: int = Depends(rate_limit),
+):
+    record = await asyncio.to_thread(
+        _fetch_plan_session,
+        user_id,
+        token,
+        plan_id,
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="PLAN_SESSION_NOT_FOUND")
+    if not include_expired and _is_session_expired(record):
+        raise HTTPException(status_code=410, detail="PLAN_SESSION_EXPIRED")
+    return _build_plan_session_record(record)
+
+
+@router.patch("/sessions/{session_id}", response_model=PlanSessionRecord)
+async def patch_plan_session_endpoint(
+    session_id: int,
+    body: PlanSessionPatchRequest,
+    user_id: int = Depends(rate_limit),
+):
+    record = await asyncio.to_thread(
+        _patch_plan_session,
+        user_id,
+        session_id,
+        body,
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="PLAN_SESSION_NOT_FOUND")
+    return _build_plan_session_record(record)
+
+
+@router.delete("/sessions", status_code=204)
+async def delete_plan_session_endpoint(
+    token: str | None = None,
+    plan_id: int | None = None,
+    user_id: int = Depends(rate_limit),
+):
+    await asyncio.to_thread(
+        _delete_plan_session,
+        user_id,
+        token,
+        plan_id,
+    )
+    return Response(status_code=204)
 
 
 @router.get("/{plan_id}", response_model=PlanResponse)
@@ -346,6 +456,83 @@ def _ensure_list(value: Any) -> list[str] | None:
     if isinstance(data, list):
         return data
     return None
+
+
+def _upsert_plan_session(user_id: int, body: PlanSessionUpsertRequest) -> PlanSession:
+    with db_module.SessionLocal() as session:
+        return upsert_plan_session(
+            session,
+            user_id=user_id,
+            token=body.token,
+            diagnosis_payload=body.diagnosis,
+            current_step=body.current_step,
+            state=body.state or {},
+            recent_diagnosis_id=body.recent_diagnosis_id,
+            object_id=body.object_id,
+            plan_id=body.plan_id,
+            ttl_hours=body.ttl_hours,
+        )
+
+
+def _fetch_plan_session(user_id: int, token: str | None, plan_id: int | None) -> PlanSession | None:
+    with db_module.SessionLocal() as session:
+        if token and plan_id:
+            raise HTTPException(status_code=400, detail="PLAN_SESSION_LOOKUP_CONFLICT")
+        if token:
+            return get_plan_session_by_token(session, user_id=user_id, token=token)
+        if plan_id:
+            return get_plan_session_by_plan(session, user_id=user_id, plan_id=plan_id)
+        return get_latest_plan_session(session, user_id=user_id)
+
+
+def _patch_plan_session(user_id: int, session_id: int, body: PlanSessionPatchRequest) -> PlanSession | None:
+    payload = body.diagnosis
+    with db_module.SessionLocal() as session:
+        return update_plan_session_fields(
+            session,
+            user_id=user_id,
+            session_id=session_id,
+            diagnosis_payload=payload,
+            current_step=body.current_step,
+            state=body.state,
+            recent_diagnosis_id=body.recent_diagnosis_id,
+            object_id=body.object_id,
+            plan_id=body.plan_id,
+            ttl_hours=body.ttl_hours,
+        )
+
+
+def _delete_plan_session(user_id: int, token: str | None, plan_id: int | None) -> None:
+    with db_module.SessionLocal() as session:
+        delete_plan_session(session, user_id=user_id, token=token, plan_id=plan_id)
+
+
+def _ensure_aware(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _is_session_expired(record: PlanSession) -> bool:
+    return _ensure_aware(record.expires_at) <= datetime.now(timezone.utc)
+
+
+def _build_plan_session_record(record: PlanSession) -> PlanSessionRecord:
+    return PlanSessionRecord(
+        id=record.id,
+        user_id=record.user_id,
+        token=record.token,
+        created_at=_ensure_aware(record.created_at),
+        updated_at=_ensure_aware(record.updated_at),
+        expires_at=_ensure_aware(record.expires_at),
+        expired=_is_session_expired(record),
+        current_step=record.current_step,
+        state=record.state or {},
+        diagnosis=record.diagnosis_payload,
+        recent_diagnosis_id=record.recent_diagnosis_id,
+        object_id=record.object_id,
+        plan_id=record.plan_id,
+    )
 
 
 def _raise_not_found(message: str) -> None:

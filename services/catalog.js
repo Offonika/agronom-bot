@@ -2,6 +2,15 @@
 
 const { Pool } = require('pg');
 
+function parseBoolean(value, defaultValue = false) {
+  if (value === undefined || value === null) return defaultValue;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return defaultValue;
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return defaultValue;
+}
+
 const DEFAULT_STAGE_TEMPLATES = [
   {
     title: 'До цветения',
@@ -32,8 +41,10 @@ function ensurePool(pool) {
 }
 
 function createCatalog(poolInstance) {
-  const pool = ensurePool(poolInstance);
-  const exec = (text, params = []) => pool.query(text, params);
+  const useProductRules = parseBoolean(process.env.PLAN_USE_PRODUCT_RULES, false);
+  const pool = useProductRules ? ensurePool(poolInstance) : null;
+  const exec =
+    pool && useProductRules ? (text, params = []) => pool.query(text, params) : null;
 
   async function suggestStages({ crop, disease } = {}) {
     // На MVP используем шаблон, но оставляем возможность донастройки в meta JSON.
@@ -50,6 +61,9 @@ function createCatalog(poolInstance) {
   }
 
   async function suggestOptions({ crop, disease, region = null, stageKind = null, limit = 3 } = {}) {
+    if (!useProductRules || !exec) {
+      return [];
+    }
     const sql = `
       SELECT
         pr.*,
@@ -91,7 +105,7 @@ function createCatalog(poolInstance) {
     }));
   }
 
-  return { suggestStages, suggestOptions };
+  return { suggestStages, suggestOptions, productRulesEnabled: useProductRules };
 }
 
 module.exports = { createCatalog, DEFAULT_STAGE_TEMPLATES };

@@ -46,6 +46,43 @@ function createPlanManualSlotHandlers({ db, reminderScheduler }) {
     return true;
   }
 
+  async function start(ctx) {
+    const parsed = parseStartPayload(ctx.callbackQuery?.data);
+    if (!parsed) {
+      await invalid(ctx);
+      return;
+    }
+    try {
+      const user = await db.ensureUser(ctx.from?.id);
+      if (!user) {
+        await invalid(ctx);
+        return;
+      }
+      const stage = await db.getStageById(parsed.stageId);
+      if (!stage || stage.plan_id !== parsed.planId || stage.user_id !== user.id) {
+        await invalid(ctx);
+        return;
+      }
+      const handled = await prompt(ctx, { stage, optionId: parsed.optionId });
+      if (!handled) {
+        await invalid(ctx);
+        return;
+      }
+      await updateTimeSessionState(db, stage.plan_id, {
+        step: 'time_manual_prompt',
+        state: {
+          planId: stage.plan_id,
+          stageId: stage.id,
+          stageOptionId: parsed.optionId || null,
+        },
+      });
+      await safeAnswer(ctx, 'plan_manual_prompt_toast');
+    } catch (err) {
+      console.error('plan_manual.start error', err);
+      await invalid(ctx);
+    }
+  }
+
   async function pick(ctx) {
     const parsed = parsePickPayload(ctx.callbackQuery?.data);
     if (!parsed) {
@@ -122,9 +159,16 @@ function createPlanManualSlotHandlers({ db, reminderScheduler }) {
         userId: user.id,
         status: 'scheduled',
       });
-      if (typeof db.deletePlanSessionsByPlan === 'function') {
-        await db.deletePlanSessionsByPlan(parsed.planId);
-      }
+      await updateTimeSessionState(db, parsed.planId, {
+        step: 'time_scheduled',
+        state: {
+          planId: parsed.planId,
+          stageId: stage.id,
+          stageOptionId: parsed.optionId || null,
+          manualTimestamp: dueAt.toISOString(),
+        },
+      });
+      await clearTimeSession(db, parsed.planId);
       await safeAnswer(ctx, 'plan_slot_confirmed_toast');
       await ctx.reply(
         msg('plan_slot_confirmed', {
@@ -153,7 +197,7 @@ function createPlanManualSlotHandlers({ db, reminderScheduler }) {
     await replyUserError(ctx, 'PLAN_NOT_FOUND');
   }
 
-  return { prompt, pick, confirm };
+  return { prompt, pick, confirm, start };
 }
 
 function buildQuickButtons(planId, stageId, optionId) {
@@ -226,6 +270,16 @@ function zonedTimeToUtc({ year, month, day, hour, minute }) {
   const invDate = new Date(utcDate.toLocaleString('en-US', { timeZone: TIMEZONE }));
   const diff = utcDate.getTime() - invDate.getTime();
   return new Date(utcDate.getTime() + diff);
+}
+
+function parseStartPayload(data) {
+  if (!data?.startsWith('plan_manual_start|')) return null;
+  const [, plan, stage, option] = data.split('|');
+  const planId = Number(plan);
+  const stageId = Number(stage);
+  const optionId = Number(option) || null;
+  if (!planId || !stageId) return null;
+  return { planId, stageId, optionId };
 }
 
 function parseSlotPayload(data) {
@@ -325,6 +379,31 @@ async function updatePlanStatusSafe(db, payload) {
     await db.updatePlanStatus(payload);
   } catch (err) {
     console.error('plan status update failed', err);
+  }
+}
+
+async function updateTimeSessionState(db, planId, payload) {
+  if (!db?.getPlanSessionByPlan || !db?.updatePlanSession || !planId) return;
+  const session = await db.getPlanSessionByPlan(planId);
+  if (!session) return;
+  const nextState = { ...(session.state || {}), ...(payload.state || {}) };
+  try {
+    await db.updatePlanSession(session.id, {
+      currentStep: payload.step,
+      state: nextState,
+      ttlHours: payload.ttlHours || 72,
+    });
+  } catch (err) {
+    console.error('plan_manual session update failed', err);
+  }
+}
+
+async function clearTimeSession(db, planId) {
+  if (!db?.deletePlanSessionsByPlan || !planId) return;
+  try {
+    await db.deletePlanSessionsByPlan(planId);
+  } catch (err) {
+    console.error('plan_manual session clear failed', err);
   }
 }
 

@@ -70,6 +70,10 @@ class Settings(BaseSettings):
         alias="CATALOG_CA_BUNDLE",
         description="Path to a custom CA bundle for catalog requests",
     )
+    recent_diag_ttl_h: int = Field(24, alias="RECENT_DIAG_TTL_H")
+    recent_diag_max_age_h: int = Field(72, alias="RECENT_DIAG_MAX_AGE_H")
+    plan_session_ttl_h: int = Field(6, alias="PLAN_SESSION_TTL_H")
+    plan_session_max_age_h: int = Field(24, alias="PLAN_SESSION_MAX_AGE_H")
 
     model_config = ConfigDict(
         extra="ignore",

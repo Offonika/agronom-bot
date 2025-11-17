@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { Queue } = require('bullmq');
+const Redis = require('ioredis');
 const { Pool } = require('pg');
 const {
   photoHandler,
@@ -30,17 +31,21 @@ const { createCatalog } = require('../services/catalog');
 const { createPlanWizard } = require('./flow/plan_wizard');
 const { createPlanPickHandler } = require('./callbacks/plan_pick');
 const { createPlanTriggerHandler } = require('./callbacks/plan_trigger');
+const { createPlanLocationHandler } = require('./callbacks/plan_location');
 const { createPlanManualSlotHandlers } = require('./callbacks/plan_manual_slot');
 const { createPlanSlotHandlers } = require('./callbacks/plan_slot');
 const { createReminderScheduler } = require('./reminders');
+const { createOverdueNotifier } = require('./overdueNotifier');
 const { createPlanCommands } = require('./planCommands');
 const { createPlanFlow } = require('./planFlow');
+const { createPlanSessionsApi } = require('./planSessionsApi');
 const { createObjectChips } = require('./objectChips');
 const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessage');
 const { replyUserError } = require('./userErrors');
 const { logFunnelEvent } = require('./funnel');
 
 const { formatSlotCard, buildSlotKeyboard } = require('../services/slot_card');
+const { createGeocoder } = require('../services/geocoder');
 
 const HOUR_IN_MS = 60 * 60 * 1000;
 
@@ -57,6 +62,10 @@ const pool = new Pool({
   connectionString: dbUrl,
 });
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redis = new Redis(redisUrl);
+redis.on('error', (err) => {
+  console.error('Redis error', err);
+});
 const autoplanQueue = new Queue('autoplan', {
   connection: { url: redisUrl },
 });
@@ -74,7 +83,9 @@ bot.catch((err, ctx) => {
 const db = createDb(pool);
 const catalog = createCatalog(pool);
 const reminderScheduler = createReminderScheduler({ bot, db });
+const overdueNotifier = createOverdueNotifier({ bot, db });
 const planWizard = createPlanWizard({ bot, db });
+const geocoder = createGeocoder({ redis });
 const planManualHandlers = createPlanManualSlotHandlers({ db, reminderScheduler });
 const planPickHandler = createPlanPickHandler({
   db,
@@ -83,12 +94,30 @@ const planPickHandler = createPlanPickHandler({
   manualSlots: planManualHandlers,
 });
 const planTriggerHandler = createPlanTriggerHandler({ db, reminderScheduler });
-const planFlow = createPlanFlow({ db, catalog, planWizard });
+const planSessionsApi = createPlanSessionsApi();
+const planFlow = createPlanFlow({ db, catalog, planWizard, geocoder, planSessions: planSessionsApi });
 const objectChips = createObjectChips({ bot, db, planFlow });
-const planCommands = createPlanCommands({ db, planWizard, objectChips });
+if (typeof planFlow.attachObjectChips === 'function') {
+  planFlow.attachObjectChips(objectChips);
+}
+planFlow.watch(async (event) => {
+  if (event?.type !== 'plan_created' || !event.chatId) return;
+  try {
+    await bot.telegram.sendMessage(event.chatId, msg('plans_manage_hint'), {
+      reply_markup: {
+        inline_keyboard: [[{ text: msg('plans_manage_button'), callback_data: 'plan_my_plans' }]],
+      },
+    });
+  } catch (err) {
+    console.error('plan_my_plans notify failed', err);
+  }
+});
+const planCommands = createPlanCommands({ db, planWizard, objectChips, geocoder, planFlow });
 const planSlotHandlers = createPlanSlotHandlers({ db, reminderScheduler, autoplanQueue });
+const planLocationHandler = createPlanLocationHandler({ db });
 const deps = { pool, db, catalog, planWizard, planFlow, objectChips };
 const planOnboardingShown = new Set();
+const planShortHintShown = new Map();
 
 function toDate(value) {
   if (!value) return null;
@@ -189,9 +218,31 @@ function maybeSendPlanOnboarding(ctx) {
   planOnboardingShown.add(userId);
   ctx.reply(msg('plan_onboarding_steps'), {
     reply_markup: {
-      inline_keyboard: [[{ text: msg('plan_onboarding_demo_button'), callback_data: 'plan_demo' }]],
+      inline_keyboard: [
+        [{ text: msg('plan_onboarding_demo_button'), callback_data: 'plan_demo' }],
+        [{ text: msg('plan_onboarding_example_button'), callback_data: 'plan_demo_public' }],
+      ],
     },
   });
+}
+
+async function maybeSendShortPathHint(ctx, diagnosis, record, dbUser) {
+  const userId = ctx.from?.id;
+  if (!userId || !diagnosis || !dbUser?.id) return;
+  const diagId = diagnosis.recent_diagnosis_id || record?.id || null;
+  if (diagId && planShortHintShown.get(dbUser.id) === diagId) return;
+  if ((diagnosis.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD) return;
+  if (typeof db.listObjects !== 'function') return;
+  try {
+    const objects = await db.listObjects(dbUser.id);
+    if (!Array.isArray(objects) || objects.length !== 1) return;
+    if (diagId) {
+      planShortHintShown.set(dbUser.id, diagId);
+    }
+    await ctx.reply(msg('plan_short_path_hint'));
+  } catch (err) {
+    console.error('plan_short_hint error', err);
+  }
 }
 
 async function handlePlanTreatment(ctx, opts = {}) {
@@ -255,10 +306,12 @@ async function handlePlanTreatment(ctx, opts = {}) {
     }
   }
   if (dbUser) {
+    await maybeSendShortPathHint(ctx, diagnosis, record, dbUser);
+    const objectId = record?.object_id ?? dbUser.last_object_id ?? null;
     await logFunnelEvent(db, {
       event: 'plan_treatment_clicked',
       userId: dbUser.id,
-      objectId: dbUser.last_object_id || null,
+      objectId,
       planId: record?.plan_id || null,
       data: {
         recentId: record?.id || null,
@@ -381,6 +434,7 @@ async function init() {
       { command: 'new', description: '📷 Новый диагноз' },
       { command: 'plans', description: '📋 Мои планы' },
       { command: 'objects', description: '🌱 Мои растения' },
+      { command: 'location', description: '📍 Обновить координаты' },
     ]);
 
     bot.start(async (ctx) => {
@@ -406,12 +460,14 @@ async function init() {
 
     bot.command('history', async (ctx) => historyHandler(ctx, '', pool));
     bot.command('objects', (ctx) => planCommands.handleObjects(ctx));
+    bot.command('location', (ctx) => planCommands.handleLocation(ctx));
     bot.command('use', (ctx) => planCommands.handleUse(ctx));
     bot.command('plans', (ctx) => planCommands.handlePlans(ctx));
     bot.command('plan', (ctx) => planCommands.handlePlan(ctx));
     bot.command('done', (ctx) => planCommands.handleDone(ctx));
     bot.command('skip', (ctx) => planCommands.handleSkip(ctx));
     bot.command('stats', (ctx) => planCommands.handleStats(ctx));
+    bot.on('location', (ctx) => planCommands.handleLocationShare(ctx));
     bot.command('demo', async (ctx) => {
       await ctx.reply(msg('plan_demo_public_intro'));
       await ctx.reply(msg('plan_demo_public_table'));
@@ -424,14 +480,11 @@ async function init() {
 
     bot.command('feedback', (ctx) => feedbackHandler(ctx, pool));
 
-    bot.on('photo', (ctx) => photoHandler(deps, ctx));
-
-    bot.on('message', messageHandler);
-
     bot.action(/^pick_opt\|/, planPickHandler);
     bot.action(/^plan_slot_accept\|/, planSlotHandlers.accept);
     bot.action(/^plan_slot_cancel\|/, planSlotHandlers.cancel);
     bot.action(/^plan_slot_reschedule\|/, planSlotHandlers.reschedule);
+    bot.action(/^plan_manual_start\|/, planManualHandlers.start);
     bot.action(/^plan_manual_slot\|/, planManualHandlers.confirm);
     bot.action(/^plan_manual_pick\|/, planManualHandlers.pick);
     bot.action(/^plan_obj_confirm\|/, async (ctx) => {
@@ -452,6 +505,11 @@ async function init() {
     });
     bot.action(/^plan_trigger\|/, planTriggerHandler.prompt);
     bot.action(/^plan_trigger_at\|/, planTriggerHandler.confirm);
+    bot.action(/^plan_location_confirm\|/, planLocationHandler.confirm);
+    bot.action(/^plan_location_change\|/, planLocationHandler.change);
+    bot.action(/^plan_location_geo\|/, planLocationHandler.requestGeo);
+    bot.action(/^plan_location_address\|/, planLocationHandler.requestAddress);
+    bot.action(/^plan_location_cancel\|/, planLocationHandler.cancel);
     bot.action(/^obj_switch\|/, async (ctx) => {
       const [, objectId] = ctx.callbackQuery.data.split('|');
       await objectChips.handleSwitch(ctx, objectId);
@@ -497,6 +555,17 @@ async function init() {
       await ctx.answerCbQuery();
       return retryHandler(ctx, id, pool);
     });
+
+    bot.on('text', async (ctx, next) => {
+      const handled = await planCommands.handleLocationText(ctx);
+      if (!handled && typeof next === 'function') {
+        return next();
+      }
+      return undefined;
+    });
+    bot.on('photo', (ctx) => photoHandler(deps, ctx));
+
+    bot.on('message', messageHandler);
 
     bot.action('plan_treatment', async (ctx) => {
       await ctx.answerCbQuery();
@@ -573,6 +642,28 @@ async function init() {
       await ctx.answerCbQuery();
       await planCommands.handleEventAction(ctx, action, value);
     });
+    bot.action(/^plan_plans_filter\|/, async (ctx) => {
+      const [, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const filter = objectIdRaw === 'all' ? null : objectIdRaw;
+      await planCommands.handlePlans(ctx, { objectId: filter });
+    });
+    bot.action(/^plan_plans_more\|/, async (ctx) => {
+      const [, cursor, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const filter = objectIdRaw === 'all' ? null : objectIdRaw;
+      await planCommands.handlePlans(ctx, { objectId: filter, cursor });
+    });
+    bot.action(/^plan_plan_open\|/, async (ctx) => {
+      const [, planIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      await planCommands.handleEventAction(ctx, 'open', planIdRaw);
+    });
+    bot.action(/^plan_overdue_bulk\|/, async (ctx) => {
+      const [, action, ids] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      await planCommands.handleOverdueBulk(ctx, action, ids);
+    });
 
     bot.action('plan_demo', async (ctx) => {
       await ctx.answerCbQuery();
@@ -594,22 +685,30 @@ async function init() {
       });
     });
 
+    bot.action('plan_demo_public', async (ctx) => {
+      await ctx.answerCbQuery();
+      for (const block of [msg('plan_demo_public_intro'), msg('plan_demo_public_table'), msg('plan_demo_public_note')]) {
+        if (block) {
+          await ctx.reply(block);
+        }
+      }
+    });
+
     bot.action('plan_demo_close', async (ctx) => {
       await ctx.answerCbQuery(msg('plan_demo_close_toast'));
+    });
+    bot.action('plan_my_plans', async (ctx) => {
+      await ctx.answerCbQuery();
+      await planCommands.handlePlans(ctx);
     });
 
     bot.action(/^plan_step_cancel\|/, async (ctx) => {
       const [, token] = ctx.callbackQuery.data.split('|');
       await ctx.answerCbQuery();
-      if (token && typeof db.getPlanSessionByToken === 'function' && typeof db.deletePlanSession === 'function') {
-        try {
-          const session = await db.getPlanSessionByToken(token);
-          if (session) {
-            await db.deletePlanSession(session.id);
-          }
-        } catch (err) {
-          console.error('plan_step_cancel cleanup failed', err);
-        }
+      const ok = await planFlow.cancelSession(ctx.from?.id, token);
+      if (!ok) {
+        await replyUserError(ctx, 'BUTTON_EXPIRED');
+        return;
       }
       await ctx.reply(msg('plan_step_cancelled'));
     });
@@ -617,22 +716,8 @@ async function init() {
     bot.action(/^plan_step_back\|/, async (ctx) => {
       const [, token] = ctx.callbackQuery.data.split('|');
       await ctx.answerCbQuery();
-      if (!token || typeof db.getPlanSessionByToken !== 'function') {
-        await replyUserError(ctx, 'BUTTON_EXPIRED');
-        return;
-      }
-      try {
-        const session = await db.getPlanSessionByToken(token);
-        if (!session) {
-          await replyUserError(ctx, 'BUTTON_EXPIRED');
-          return;
-        }
-        if (typeof db.deletePlanSession === 'function') {
-          await db.deletePlanSession(session.id);
-        }
-        await planFlow.start(ctx, session.diagnosis_payload);
-      } catch (err) {
-        console.error('plan_step_back error', err);
+      const restarted = await planFlow.restartSession(ctx, token);
+      if (!restarted) {
         await replyUserError(ctx, 'BUTTON_EXPIRED');
       }
     });
@@ -689,8 +774,14 @@ async function init() {
       await buyProHandler(ctx, pool);
     });
 
+    await bot.telegram.setMyCommands([
+      { command: 'new', description: msg('command_new_desc') || 'Новый диагноз' },
+      { command: 'plans', description: msg('command_plans_desc') || 'Мои планы' },
+      { command: 'objects', description: msg('command_objects_desc') || 'Мои растения' },
+    ]);
     await bot.launch();
     await reminderScheduler.start();
+    await overdueNotifier.start();
     console.log('Bot started');
   } catch (err) {
     console.error('Bot initialization failed', err);
@@ -706,6 +797,7 @@ init();
 let metricsServer;
 async function shutdown() {
   reminderScheduler.stop();
+  overdueNotifier.stop();
   await bot.stop();
   if (metricsServer) {
     try {
@@ -720,6 +812,11 @@ async function shutdown() {
     await pool.end();
   } catch (err) {
     console.error('DB pool close failed', err);
+  }
+  try {
+    await redis.quit();
+  } catch (err) {
+    console.error('Redis close failed', err);
   }
   try {
     await autoplanQueue.close();

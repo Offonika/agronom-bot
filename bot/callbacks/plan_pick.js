@@ -8,11 +8,13 @@ const {
   buildTreatmentEvents,
   buildReminderPayloads,
 } = require('../../services/plan_events');
+const { formatSlotCard, buildSlotKeyboard } = require('../../services/slot_card');
 
 const DEFAULT_SEASON_DELAY_H = Number(process.env.REMINDER_DEFAULT_DELAY_H || '24');
 const DEFAULT_ADHOC_DELAY_H = Number(process.env.REMINDER_ADHOC_DELAY_H || '4');
 const DEFAULT_AUTOPLAN_MIN_H = Number(process.env.AUTOPLAN_MIN_HOURS_AHEAD || '2');
 const DEFAULT_AUTOPLAN_HORIZON_H = Number(process.env.AUTOPLAN_HORIZON_H || '72');
+const DEFAULT_SLOT_DURATION_H = Number(process.env.AUTOPLAN_SLOT_DURATION_H || '1');
 
 function hoursToMs(hours) {
   const value = Number.isFinite(hours) ? hours : 0;
@@ -141,26 +143,15 @@ function createPlanPickHandler({ db, reminderScheduler, autoplanQueue, manualSlo
         return;
       }
 
-      await scheduleFallback(db, reminderScheduler, {
-        userId: user.id,
+      await sendFallbackSlotCard({
+        ctx,
+        db,
+        user,
         stage,
         optionId: parsed.optionId,
-      });
-      await updatePlanStatusSafe(db, {
         planId: parsed.planId,
-        userId: user.id,
-        status: 'scheduled',
+        session,
       });
-      await updateSessionState(db, session, parsed.planId, {
-        step: 'time_scheduled',
-        state: {
-          planId: parsed.planId,
-          stageId: parsed.stageId,
-          stageOptionId: parsed.optionId,
-          fallback: true,
-        },
-      });
-      await ctx.answerCbQuery(msg('plan_saved_toast'), { show_alert: false });
     } catch (err) {
       console.error('plan_pick error', {
         message: err?.message,
@@ -174,33 +165,61 @@ function createPlanPickHandler({ db, reminderScheduler, autoplanQueue, manualSlo
   };
 }
 
-async function scheduleFallback(db, reminderScheduler, payload) {
-  const dueAt = computeDueAt(payload.stage);
-  if (!dueAt) return;
-  const eventsToCreate = buildTreatmentEvents({
-    userId: payload.userId,
-    stage: payload.stage,
-    dueAt,
-    stageOptionId: payload.optionId,
-  });
-  if (!eventsToCreate.length) return;
-  const createdEvents = await db.createEvents(eventsToCreate);
-  const reminders = buildReminderPayloads(createdEvents);
-  if (!reminders.length) return;
-  const createdReminders = await db.createReminders(reminders);
-  if (reminderScheduler) {
-    reminderScheduler.scheduleMany(createdReminders);
+async function sendFallbackSlotCard({ ctx, db, user, stage, optionId, planId, session }) {
+  const dueAt = computeDueAt(stage);
+  if (!dueAt) {
+    await ctx.answerCbQuery(msg('plan_slot_error'), { show_alert: true });
+    return;
   }
-  await logFunnelEvent(db, {
-    event: 'slot_confirmed',
-    userId: payload.userId,
-    planId: payload.stage?.plan_id || null,
-    objectId: payload.stage?.object_id || null,
-    data: {
-      mode: 'fallback',
-      optionId: payload.optionId || null,
+  const slotEnd = new Date(dueAt.getTime() + hoursToMs(DEFAULT_SLOT_DURATION_H));
+  const reasons = [msg('plan_slot_reason_default')];
+  let slotRow = null;
+  if (typeof db.upsertTreatmentSlot === 'function') {
+    slotRow = await db.upsertTreatmentSlot({
+      autoplan_run_id: null,
+      plan_id: planId,
+      stage_id: stage.id,
+      stage_option_id: optionId,
+      slot_start: dueAt,
+      slot_end: slotEnd,
+      score: null,
+      reason: reasons,
+      status: 'proposed',
+    });
+  }
+  const slotId = slotRow?.id || null;
+  await updatePlanStatusSafe(db, {
+    planId,
+    userId: user.id,
+    status: 'accepted',
+  });
+  await updateSessionState(db, session, planId, {
+    step: 'time_autoplan_slot',
+    state: {
+      planId,
+      stageId: stage.id,
+      stageOptionId: optionId,
+      slotId,
     },
   });
+  await ctx.answerCbQuery(msg('plan_autoplan_ready'), { show_alert: false });
+  const object = stage.object_id && typeof db.getObjectById === 'function'
+    ? await db.getObjectById(stage.object_id)
+    : null;
+  const translate = (key, vars) => msg(key, vars);
+  const slot = {
+    start: ensureDate(slotRow?.slot_start) || dueAt,
+    end: ensureDate(slotRow?.slot_end) || slotEnd,
+    reason: Array.isArray(slotRow?.reason) ? slotRow.reason : reasons,
+  };
+  const text = formatSlotCard({
+    slot,
+    stageName: stage.title,
+    objectName: object?.name,
+    translate,
+  });
+  const keyboard = buildSlotKeyboard(slotId || 0, translate);
+  await ctx.reply(text, { reply_markup: keyboard });
 }
 
 async function maybeScheduleAutoplan({ autoplanQueue, db, user, stage, optionId }) {
@@ -271,6 +290,13 @@ async function updateSessionState(db, session, planId, payload) {
 function normalizeStageKind(kind) {
   if (!kind) return '';
   return String(kind).trim().toLowerCase();
+}
+
+function ensureDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 module.exports = { createPlanPickHandler };

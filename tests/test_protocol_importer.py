@@ -5,10 +5,11 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 from app.config import Settings
 from app.db import SessionLocal, init_db
+from app.models import Base
 from app.services.protocol_importer import find_latest_zip, bulk_insert_items
 
 
@@ -16,14 +17,22 @@ from app.services.protocol_importer import find_latest_zip, bulk_insert_items
 def tmp_db(tmp_path: Path):
     old_url = os.environ.get("DATABASE_URL", "sqlite:///./app.db")
     os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path}/protocols.db"
-    subprocess.run(["alembic", "upgrade", "head"], check=True)
+    _prepare_sqlite_db(os.environ["DATABASE_URL"])
     init_db(Settings())
     try:
         yield
     finally:
         os.environ["DATABASE_URL"] = old_url
-        subprocess.run(["alembic", "upgrade", "head"], check=True)
         init_db(Settings())
+
+
+def _prepare_sqlite_db(url: str) -> None:
+    if not url.startswith("sqlite"):
+        subprocess.run(["alembic", "upgrade", "head"], check=True)
+        return
+    engine = create_engine(url)
+    Base.metadata.create_all(engine)
+    engine.dispose()
 
 
 def create_protocols_view() -> None:

@@ -31,14 +31,29 @@ def test_run_import_inserts_data(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(protocol_importer, "download_zip", fake_download_zip)
 
-    def fake_pdf_to_csv(pdf_path: Path, csv_path: Path) -> Path:
-        csv_path.write_text(
-            "crop,disease,product,dosage_value,dosage_unit,phi\n"
-            "apple,scab,Хорус 75 ВДГ,3,g_per_l,28\n"
-        )
-        return csv_path
+    pdf_file = tmp_path / "protocol.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF")
 
-    monkeypatch.setattr(protocol_importer, "pdf_to_csv", fake_pdf_to_csv)
+    monkeypatch.setattr(
+        protocol_importer,
+        "pick_best_pdf_from_zip",
+        lambda *_args, **_kwargs: pdf_file,
+    )
+
+    monkeypatch.setattr(
+        protocol_importer,
+        "extract_protocol_rows",
+        lambda *args, **kwargs: [
+            {
+                "crop": "apple",
+                "disease": "scab",
+                "product": "Хорус 75 ВДГ",
+                "dosage_value": 3,
+                "dosage_unit": "g_per_l",
+                "phi": 28,
+            }
+        ],
+    )
 
     with tmp_db(tmp_path):
         protocol_importer.run_import("main")

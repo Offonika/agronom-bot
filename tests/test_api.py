@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 import base64
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -11,7 +11,7 @@ from sqlalchemy import text
 from app.dependencies import compute_signature, verify_hmac
 from app.config import Settings
 from app.db import SessionLocal
-from app.models import Catalog, CatalogItem, ErrorCode
+from app.models import Catalog, CatalogItem, ErrorCode, RecentDiagnosis, PlanSession
 
 
 def seed_protocol():
@@ -173,6 +173,36 @@ def test_diagnose_json_success(client):
     assert body["roi"] == 1.9
 
 
+def test_recent_diagnosis_endpoint(client):
+    with SessionLocal() as session:
+        session.query(RecentDiagnosis).delete()
+        session.commit()
+
+    resp = client.get("/v1/diagnoses/recent", headers=HEADERS)
+    assert resp.status_code == 404
+
+    diagnose_resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert diagnose_resp.status_code == 200
+
+    recent_resp = client.get("/v1/diagnoses/recent", headers=HEADERS)
+    assert recent_resp.status_code == 200
+    body = recent_resp.json()
+    assert body["diagnosis"]["crop"] == "apple"
+    assert body["expires_at"]
+    diag_id = body["id"]
+
+    by_id_resp = client.get(f"/v1/diagnoses/recent/{diag_id}", headers=HEADERS)
+    assert by_id_resp.status_code == 200
+    assert by_id_resp.json()["id"] == diag_id
+
+    missing_resp = client.get("/v1/diagnoses/recent/9999", headers=HEADERS)
+    assert missing_resp.status_code == 404
+
+
 def test_diagnose_multipart_success(client):
     resp = client.post(
         "/v1/ai/diagnose",
@@ -180,6 +210,67 @@ def test_diagnose_multipart_success(client):
         files={"image": ("leaf.jpg", b"x" * 10, "image/jpeg")},
     )
     assert resp.status_code == 200
+
+
+def test_plan_session_crud(client):
+    payload = {
+        "token": "abc",
+        "diagnosis": {"crop": "apple", "disease": "scab"},
+        "current_step": "choose_object",
+        "state": {"step": 1},
+        "plan_id": 55,
+    }
+    create_resp = client.post(
+        "/v1/plans/sessions",
+        headers=HEADERS,
+        json=payload,
+    )
+    assert create_resp.status_code == 200
+    data = create_resp.json()
+    assert data["token"] == "abc"
+    session_id = data["id"]
+
+    latest_resp = client.get("/v1/plans/sessions", headers=HEADERS)
+    assert latest_resp.status_code == 200
+    assert latest_resp.json()["id"] == session_id
+
+    token_resp = client.get("/v1/plans/sessions?token=abc", headers=HEADERS)
+    assert token_resp.status_code == 200
+
+    patch_resp = client.patch(
+        f"/v1/plans/sessions/{session_id}",
+        headers=HEADERS,
+        json={"current_step": "time_picker", "state": {"step": 2}},
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["current_step"] == "time_picker"
+
+    plan_fetch = client.get("/v1/plans/sessions?plan_id=55", headers=HEADERS)
+    assert plan_fetch.status_code == 200
+    assert plan_fetch.json()["plan_id"] == 55
+
+    with SessionLocal() as session:
+        session.execute(
+            text("UPDATE plan_sessions SET expires_at = :ts WHERE id = :sid"),
+            {"ts": (datetime.now(timezone.utc) - timedelta(hours=1)), "sid": session_id},
+        )
+        session.commit()
+
+    expired_resp = client.get("/v1/plans/sessions", headers=HEADERS)
+    assert expired_resp.status_code == 410
+
+    include_resp = client.get(
+        "/v1/plans/sessions?include_expired=true",
+        headers=HEADERS,
+    )
+    assert include_resp.status_code == 200
+    assert include_resp.json()["expired"] is True
+
+    del_resp = client.delete("/v1/plans/sessions?plan_id=55", headers=HEADERS)
+    assert del_resp.status_code == 204
+
+    missing = client.get("/v1/plans/sessions", headers=HEADERS)
+    assert missing.status_code == 404
 
 
 def test_diagnose_multipart_uses_process(monkeypatch, client):

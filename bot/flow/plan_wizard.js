@@ -32,6 +32,9 @@ function renderStageText(stage) {
   if (stage.phi_days) {
     parts.push(msg('phi_hint', { days: stage.phi_days }));
   }
+  if ((stage.kind || '').toLowerCase() === 'trigger') {
+    parts.push(msg('plan_trigger_hint'));
+  }
   if (stage.diff_summary) {
     parts.push(stage.diff_summary);
   }

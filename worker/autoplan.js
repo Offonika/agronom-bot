@@ -9,20 +9,22 @@ const { createWeatherService } = require('../services/weather');
 const { createAutoPlanner } = require('../services/auto_planner');
 const strings = require('../locales/ru.json');
 const { formatSlotCard, buildSlotKeyboard } = require('../services/slot_card');
+const { resolveObjectLocation } = require('./location_utils');
 
 const connection = { url: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = process.env.AUTOPLAN_QUEUE || 'autoplan';
 const BOT_TOKEN = process.env.BOT_TOKEN_DEV;
 const DEFAULT_TZ = process.env.AUTOPLAN_TIMEZONE || 'Europe/Moscow';
+const DB_URL = process.env.BOT_DATABASE_URL || process.env.DATABASE_URL;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL not set for autoplan worker');
+if (!DB_URL) {
+  throw new Error('BOT_DATABASE_URL or DATABASE_URL not set for autoplan worker');
 }
 if (!BOT_TOKEN) {
   throw new Error('BOT_TOKEN_DEV not set for autoplan worker');
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({ connectionString: DB_URL });
 const db = createDb(pool);
 const weatherService = createWeatherService({ provider: process.env.WEATHER_PROVIDER || 'openmeteo' });
 const planner = createAutoPlanner({ weatherService, timezone: DEFAULT_TZ });
@@ -57,12 +59,22 @@ async function processAutoplan(runId) {
     return;
   }
   const location = resolveLocation(context);
+  await trackLocationSource(context, location);
+  console.info('autoplan.location', {
+    runId,
+    planId: context.plan?.id || null,
+    objectId: context.plan?.object_id || context.object?.id || null,
+    source: location.source || 'unknown',
+  });
   const stageRules = (context.stage?.meta && context.stage.meta.weather) || {};
   try {
     await db.updateAutoplanRun(runId, {
       status: 'in_progress',
       started_at: new Date(),
     });
+    if (location.source === 'default') {
+      await maybeNotifyDefaultLocation(context, location);
+    }
     const slot = await planner.findWindow({
       latitude: location.lat,
       longitude: location.lon,
@@ -119,9 +131,7 @@ async function processAutoplan(runId) {
 
 function resolveLocation(context) {
   const meta = (context.object && context.object.meta) || {};
-  const lat = Number(meta.lat ?? process.env.WEATHER_LAT ?? 55.751244);
-  const lon = Number(meta.lon ?? process.env.WEATHER_LON ?? 37.618423);
-  return { lat, lon };
+  return resolveObjectLocation(meta, process.env.WEATHER_LAT, process.env.WEATHER_LON);
 }
 
 async function sendSlotCard(context, slotRow) {
@@ -143,13 +153,49 @@ async function notifyNoWindow(context) {
   const text = format(strings.plan_autoplan_none, {
     stage: context.stage?.title || 'этап',
   });
-  await sendTelegramMessage(context.user.tg_id, text);
+  const keyboard = buildManualFallbackKeyboard(context);
+  await sendTelegramMessage(context.user.tg_id, text, keyboard ? { reply_markup: keyboard } : {});
 }
 
 async function notifyFailure(context) {
   if (!context.user?.tg_id) return;
   const text = strings.plan_autoplan_failed || 'Не удалось автоматически подобрать окно. Попробуйте вручную.';
   await sendTelegramMessage(context.user.tg_id, text);
+}
+
+async function notifyDefaultLocation(context) {
+  if (!context.user?.tg_id) return;
+  const text = strings.plan_autoplan_default_location || 'Использую стандартные координаты. Отправьте /location, чтобы сделать прогноз точнее.';
+  await sendTelegramMessage(context.user.tg_id, text);
+}
+
+async function maybeNotifyDefaultLocation(context, location) {
+  if (!context.user?.tg_id || !context?.object?.id || location.warned) return;
+  await notifyDefaultLocation(context);
+  if (typeof db.updateObjectMeta === 'function') {
+    try {
+      await db.updateObjectMeta(context.object.id, { location_default_warned: true });
+    } catch (err) {
+      console.error('autoplan default location meta update failed', err);
+    }
+  }
+}
+
+async function trackLocationSource(context, location) {
+  if (typeof db.logFunnelEvent !== 'function') return;
+  try {
+    await db.logFunnelEvent({
+      event: 'autoplan_location',
+      userId: context.user?.id || context.run?.user_id || null,
+      planId: context.plan?.id || null,
+      objectId: context.plan?.object_id || context.object?.id || null,
+      data: {
+        source: location.source || 'unknown',
+      },
+    });
+  } catch (err) {
+    console.error('autoplan location metric failed', err);
+  }
 }
 
 function normalizeSlotRow(row) {
@@ -197,6 +243,24 @@ async function sendTelegramMessage(chatId, text, options = {}) {
   } catch (err) {
     console.error('Telegram send error', err);
   }
+}
+
+function buildManualFallbackKeyboard(context) {
+  const planId = context?.plan?.id;
+  const stageId = context?.stage?.id;
+  if (!planId || !stageId) return null;
+  const optionId = context?.run?.stage_option_id || 0;
+  const label = strings.plan_manual_start_button || 'Подобрать время вручную';
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: label,
+          callback_data: `plan_manual_start|${planId}|${stageId}|${optionId}`,
+        },
+      ],
+    ],
+  };
 }
 
 async function gracefulShutdown() {

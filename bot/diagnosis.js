@@ -349,13 +349,6 @@ async function photoHandler(depsOrPool, ctx) {
         },
       });
     }
-    if (deps.objectChips) {
-      try {
-        await deps.objectChips.send(ctx);
-      } catch (err) {
-        console.error('objectChips send error', err);
-      }
-    }
   } catch (err) {
     console.error('diagnose error', err);
     if (typeof ctx.reply === 'function') {

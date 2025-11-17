@@ -9,10 +9,47 @@ const PLAN_KIND_DEFAULT = 'PLAN_NEW';
 const ROW_SIZE = 3;
 const PLAN_KIND_SKIP = new Set(['QNA', 'FAQ']);
 const PLAN_KIND_ALLOWED = new Set(['PLAN_NEW', 'PLAN_UPDATE']);
+const LOCATION_PROMPT_TTL_MS = 24 * 60 * 60 * 1000;
 
-function createPlanFlow({ db, catalog, planWizard }) {
+function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions = null }) {
   if (!db || !catalog || !planWizard) {
     throw new Error('planFlow requires db, catalog and planWizard');
+  }
+  const sessionStore = createSessionStore({ db, planSessions });
+  const watchers = new Set();
+  let chipsHelper = null;
+
+  async function cancelSession(userId, token) {
+    if (!userId || !token) return false;
+    const session = await sessionStore.fetchByToken(userId, token);
+    if (!session) return false;
+    await sessionStore.deleteSession(session);
+    return true;
+  }
+
+  async function restartSession(ctx, token) {
+    const userId = ctx?.from?.id;
+    if (!userId || !token) return false;
+    const session = await sessionStore.fetchByToken(userId, token);
+    if (!session) return false;
+    await sessionStore.deleteSession(session);
+    await start(ctx, session.diagnosis_payload, { skipAutoFinalize: true });
+    return true;
+  }
+
+  function notifyWatchers(event) {
+    if (!watchers.size || !event) return;
+    watchers.forEach((fn) => {
+      try {
+        fn(event);
+      } catch (err) {
+        console.error('plan_flow.watcher_error', err);
+      }
+    });
+  }
+
+  function attachObjectChips(helper) {
+    chipsHelper = helper;
   }
 
   function buildPromptKeyboard(objectId, token) {
@@ -60,23 +97,8 @@ function createPlanFlow({ db, catalog, planWizard }) {
 
   async function createPlanSessionRecord(user, diagnosis, token, initialStep = 'choose_object') {
     if (!token || !user?.id || !diagnosis) return null;
-    if (typeof db.purgeExpiredPlanSessions === 'function') {
-      try {
-        await db.purgeExpiredPlanSessions();
-      } catch (err) {
-        console.error('plan_flow session purge failed', err);
-      }
-    }
-    if (typeof db.deletePlanSessionsForUser === 'function') {
-      try {
-        await db.deletePlanSessionsForUser(user.id);
-      } catch (err) {
-        console.error('plan_flow session cleanup failed', err);
-      }
-    }
-    if (typeof db.createPlanSession !== 'function') return null;
-    return db.createPlanSession({
-      userId: user.id,
+    await sessionStore.deleteForUser(user.id);
+    return sessionStore.upsert(user, {
       token,
       diagnosisPayload: diagnosis,
       recentDiagnosisId: diagnosis.recent_diagnosis_id || null,
@@ -92,10 +114,10 @@ function createPlanFlow({ db, catalog, planWizard }) {
     const user = await db.ensureUser(tgId);
     if (!user) return { diagnosis: null, session: null, user: null, expired: false };
     let session = null;
-    if (token && typeof db.getPlanSessionByToken === 'function') {
-      session = await db.getPlanSessionByToken(token);
-    } else if (typeof db.getLatestPlanSessionForUser === 'function') {
-      session = await db.getLatestPlanSessionForUser(user.id);
+    if (token) {
+      session = await sessionStore.fetchByToken(user.id, token);
+    } else {
+      session = await sessionStore.fetchLatest(user.id);
     }
     const userKey = normalizeUserKey(user.id);
     const sessionUserKey = normalizeUserKey(session?.user_id);
@@ -113,9 +135,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
     }
     if (isSessionExpired(session)) {
       console.info('plan_flow.session_expired', { userId: user.id, token: session.token });
-      if (typeof db.deletePlanSession === 'function') {
-        await db.deletePlanSession(session.id);
-      }
+      await sessionStore.deleteSession(session);
       return { diagnosis: null, session: null, user, expired: true };
     }
     const payload = session.diagnosis_payload || {};
@@ -124,10 +144,10 @@ function createPlanFlow({ db, catalog, planWizard }) {
       recent_diagnosis_id:
         payload.recent_diagnosis_id ?? session.recent_diagnosis_id ?? null,
     };
-    if (opts.consume && typeof db.deletePlanSession === 'function') {
-      await db.deletePlanSession(session.id);
-    } else if (typeof db.updatePlanSession === 'function') {
-      await db.updatePlanSession(session.id, { currentStep: opts.step || session.current_step });
+    if (opts.consume) {
+      await sessionStore.deleteSession(session);
+    } else {
+      await sessionStore.updateSession(session, { currentStep: opts.step || session.current_step });
     }
     return { diagnosis, session, user, expired: false };
   }
@@ -145,7 +165,114 @@ function createPlanFlow({ db, catalog, planWizard }) {
       objects = [primary];
     }
     await db.updateUserLastObject(user.id, primary.id);
+    const enriched = await maybeAutodetectLocation(primary, diagnosis);
+    if (enriched && enriched !== primary) {
+      primary = enriched;
+      objects = objects.map((obj) => (obj.id === primary.id ? primary : obj));
+    }
     return { primary, objects };
+  }
+
+  function hasCoordinates(meta = {}) {
+    const lat = Number(meta.lat);
+    const lon = Number(meta.lon);
+    return Number.isFinite(lat) && Number.isFinite(lon);
+  }
+
+  function needsManualLocation(meta = {}) {
+    if (hasCoordinates(meta)) return false;
+    const promptedAt = meta.location_prompted_at ? new Date(meta.location_prompted_at) : null;
+    if (!promptedAt || Number.isNaN(promptedAt.getTime())) return true;
+    return Date.now() - promptedAt.getTime() > LOCATION_PROMPT_TTL_MS;
+  }
+
+  function pickLocationQuery(diagnosis, object) {
+    if (diagnosis?.region && typeof diagnosis.region === 'string') {
+      const trimmed = diagnosis.region.trim();
+      if (trimmed) return trimmed;
+    }
+    if (object?.location_tag && typeof object.location_tag === 'string') {
+      const trimmed = object.location_tag.trim();
+      if (trimmed) return trimmed;
+    }
+    return null;
+  }
+
+  async function maybeAutodetectLocation(object, diagnosis) {
+    if (!geocoder || !object?.id) return object;
+    if (typeof db.updateObjectMeta !== 'function') return object;
+    if (hasCoordinates(object.meta)) return object;
+    const query = pickLocationQuery(diagnosis, object);
+    if (!query) return object;
+    try {
+      const geo = await geocoder.lookup(query, { language: 'ru' });
+      if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lon)) return object;
+      const updated = await db.updateObjectMeta(object.id, {
+        lat: geo.lat,
+        lon: geo.lon,
+        geo_label: geo.label || query,
+        geo_confidence: geo.confidence ?? null,
+        location_source: 'geo_auto',
+        location_updated_at: new Date().toISOString(),
+      });
+      if (updated) return updated;
+    } catch (err) {
+      console.error('plan_flow.geocode_failed', {
+        objectId: object.id,
+        query,
+        message: err?.message,
+      });
+    }
+    return object;
+  }
+
+  async function promptManualLocation(ctx, object) {
+    if (!ctx?.reply || !object?.id) return;
+    try {
+      await ctx.reply(msg('location_manual_prompt', { name: object.name }), {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: msg('location_geo_button'), callback_data: `plan_location_geo|${object.id}` },
+              { text: msg('location_address_button'), callback_data: `plan_location_address|${object.id}` },
+            ],
+            [{ text: msg('location_cancel_button'), callback_data: `plan_location_cancel|${object.id}` }],
+          ],
+        },
+      });
+      if (typeof db.updateObjectMeta === 'function') {
+        await db.updateObjectMeta(object.id, {
+          location_prompted: true,
+          location_prompted_at: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error('plan_flow.location_prompt_failed', err);
+    }
+  }
+
+  async function maybePromptLocationConfirmation(ctx, object) {
+    if (!ctx?.reply || !object?.id) return;
+    const meta = object.meta || {};
+    if (meta.location_confirmed || meta.location_prompted) return;
+    if (meta.location_source !== 'geo_auto') return;
+    const label = meta.geo_label || object.location_tag || msg('location_guess_fallback');
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: msg('location_confirm_button'), callback_data: `plan_location_confirm|${object.id}` },
+          { text: msg('location_change_button'), callback_data: `plan_location_change|${object.id}` },
+        ],
+      ],
+    };
+    await ctx.reply(msg('location_guess_prompt', { label }), { reply_markup: keyboard });
+    if (typeof db.updateObjectMeta === 'function') {
+      try {
+        await db.updateObjectMeta(object.id, { location_prompted: true, location_prompted_at: new Date().toISOString() });
+      } catch (err) {
+        console.error('plan_flow.location_prompt_mark_failed', err);
+      }
+    }
   }
 
   async function start(ctx, diagnosis, opts = {}) {
@@ -158,14 +285,20 @@ function createPlanFlow({ db, catalog, planWizard }) {
       return;
     }
     const planKind = normalizePlanKind(diagnosis.plan_kind);
+    const tgUserId = ctx.from.id;
     if (PLAN_KIND_SKIP.has(planKind) || !PLAN_KIND_ALLOWED.has(planKind)) {
-      console.info('plan_flow.start.skipped_kind', { userId: ctx.from.id, planKind });
+      console.info('plan_flow.start.skipped_kind', { userId: tgUserId, planKind });
       return;
     }
     const payload = { ...diagnosis, plan_kind: planKind };
     try {
-      const user = await db.ensureUser(ctx.from.id);
+      const user = await db.ensureUser(tgUserId);
       const { primary, objects } = await ensurePrimaryObject(user, payload);
+      if (needsManualLocation(primary.meta || {})) {
+        await promptManualLocation(ctx, primary);
+      } else {
+        await maybePromptLocationConfirmation(ctx, primary);
+      }
       if (Array.isArray(objects) && objects.length === 1) {
         if (opts.skipAutoFinalize) {
           const token = generateToken();
@@ -193,7 +326,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
               ],
             },
           });
-          await finalizePlan(ctx, user.id, primary.id, payload);
+          await finalizePlan(ctx, ctx.from.id, primary.id, payload);
         }
         return;
       }
@@ -202,19 +335,32 @@ function createPlanFlow({ db, catalog, planWizard }) {
       if (!session) return;
       console.info('plan_flow.start', {
         userId: user.id,
+        tgUserId,
         planKind,
         objectId: primary.id,
         token,
         diagnosisHash: payload.plan_hash || null,
       });
-      const chips = buildChipsInlineKeyboard(objects, user.last_object_id || primary.id, token);
-      if (chips) {
-        console.info('plan_flow.chips_prompt', {
+      if (chipsHelper?.send) {
+        try {
+          await chipsHelper.send(ctx);
+        } catch (err) {
+          console.error('plan_flow.chips_send_failed', err);
+        }
+        const nav = buildStepControls(token);
+        await ctx.reply(formatStepPrompt('plan_step_choose_object', msg('plan_step_choose_chips')), {
+          reply_markup: nav.length ? { inline_keyboard: nav } : undefined,
+        });
+        return;
+      }
+      const inline = buildChipsInlineKeyboard(objects, user.last_object_id || primary.id, token);
+      if (inline) {
+        console.info('plan_flow.chips_prompt_inline', {
           userId: user.id,
           token,
           objectCount: objects.length,
         });
-        await ctx.reply(msg('plan_step_choose_object'), { reply_markup: chips });
+        await ctx.reply(msg('plan_step_choose_object'), { reply_markup: inline });
         return;
       }
       await ctx.reply(formatStepPrompt('plan_step_choose_object', msg('plan_object_prompt', { name: primary.name })), {
@@ -226,9 +372,10 @@ function createPlanFlow({ db, catalog, planWizard }) {
   }
 
   async function confirm(ctx, objectId, token = null) {
-    const userId = ctx.from?.id;
-    if (!userId || !objectId) {
+    const tgUserId = ctx.from?.id;
+    if (!tgUserId || !objectId) {
       await safeAnswer(ctx, 'plan_object_no_context', true);
+      await replyUserError(ctx, deriveMissingContextCode(token));
       return;
     }
     const { diagnosis, expired } = await resolvePlanSession(ctx, token, {
@@ -236,19 +383,20 @@ function createPlanFlow({ db, catalog, planWizard }) {
       step: 'finalize',
     });
     if (!diagnosis) {
-      console.warn('plan_flow.confirm.missing_diagnosis', { userId, objectId, token });
+      console.warn('plan_flow.confirm.missing_diagnosis', { userId: tgUserId, objectId, token });
       await safeAnswer(ctx, expired ? 'plan_session_expired' : 'plan_object_no_context', true);
       await replyUserError(ctx, expired ? 'SESSION_EXPIRED' : token ? 'BUTTON_EXPIRED' : 'NO_RECENT_DIAGNOSIS');
       return;
     }
-    console.info('plan_flow.confirm', { userId, objectId, token });
-    await finalizePlan(ctx, userId, objectId, diagnosis);
+    console.info('plan_flow.confirm', { userId: tgUserId, objectId, token });
+    await finalizePlan(ctx, tgUserId, objectId, diagnosis);
   }
 
   async function choose(ctx, token = null) {
-    const userId = ctx.from?.id;
-    if (!userId) {
+    const tgUserId = ctx.from?.id;
+    if (!tgUserId) {
       await safeAnswer(ctx, 'plan_object_no_context', true);
+      await replyUserError(ctx, deriveMissingContextCode(token));
       return;
     }
     const { diagnosis, session, expired } = await resolvePlanSession(ctx, token, {
@@ -256,7 +404,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
     });
     if (!diagnosis || !session) {
       console.warn('plan_flow.choose.missing_session', {
-        userId,
+        userId: tgUserId,
         token,
         expired,
         hasDiagnosis: Boolean(diagnosis),
@@ -267,8 +415,12 @@ function createPlanFlow({ db, catalog, planWizard }) {
       return;
     }
     try {
-      console.info('plan_flow.choose', { userId, token: session.token, hasDiagnosis: true });
-      const user = await db.ensureUser(userId);
+      console.info('plan_flow.choose', {
+        userId: tgUserId,
+        token: session.token,
+        hasDiagnosis: true,
+      });
+      const user = await db.ensureUser(tgUserId);
       const { objects } = await ensurePrimaryObject(user, diagnosis);
       const keyboard = buildChooseKeyboard(objects, session.token);
       if (!keyboard.length) {
@@ -286,9 +438,10 @@ function createPlanFlow({ db, catalog, planWizard }) {
   }
 
   async function pick(ctx, objectId, token = null) {
-    const userId = ctx.from?.id;
-    if (!userId || !objectId) {
+    const tgUserId = ctx.from?.id;
+    if (!tgUserId || !objectId) {
       await safeAnswer(ctx, 'plan_object_no_context', true);
+      await replyUserError(ctx, deriveMissingContextCode(token));
       return;
     }
     const { diagnosis, session, expired } = await resolvePlanSession(ctx, token, {
@@ -296,7 +449,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
     });
     if (!diagnosis || !session) {
       console.warn('plan_flow.pick.missing_session', {
-        userId,
+        userId: tgUserId,
         objectId,
         token,
         expired,
@@ -308,19 +461,19 @@ function createPlanFlow({ db, catalog, planWizard }) {
       return;
     }
     console.info('plan_flow.pick', {
-      userId,
+      userId: tgUserId,
       objectId,
       token,
       sessionId: session.id,
     });
     try {
-      const user = await db.ensureUser(userId);
+      const user = await db.ensureUser(tgUserId);
       const object = await db.getObjectById(objectId);
       const requesterKey = normalizeUserKey(user?.id);
       const ownerKey = normalizeUserKey(object?.user_id);
       if (!object || !requesterKey || requesterKey !== ownerKey) {
         console.warn('plan_flow.pick.object_mismatch', {
-          userId,
+          userId: tgUserId,
           objectId,
           requesterKey,
           ownerKey,
@@ -361,7 +514,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
         },
       });
       console.info('plan_flow.pick.prompt_sent', {
-        userId,
+        userId: tgUserId,
         objectId: object.id,
         token: session.token,
         messageId: prompt?.message_id ?? null,
@@ -374,9 +527,10 @@ function createPlanFlow({ db, catalog, planWizard }) {
   }
 
   async function create(ctx, token = null) {
-    const userId = ctx.from?.id;
-    if (!userId) {
+    const tgUserId = ctx.from?.id;
+    if (!tgUserId) {
       await safeAnswer(ctx, 'plan_object_no_context', true);
+      await replyUserError(ctx, deriveMissingContextCode(token));
       return;
     }
     const { diagnosis, expired } = await resolvePlanSession(ctx, token, {
@@ -384,14 +538,14 @@ function createPlanFlow({ db, catalog, planWizard }) {
       step: 'create_object',
     });
     if (!diagnosis) {
-      console.warn('plan_flow.create.missing_diagnosis', { userId, token });
+      console.warn('plan_flow.create.missing_diagnosis', { userId: tgUserId, token });
       await safeAnswer(ctx, expired ? 'plan_session_expired' : 'plan_object_no_context', true);
       await replyUserError(ctx, expired ? 'SESSION_EXPIRED' : 'BUTTON_EXPIRED');
       return;
     }
     try {
-      console.info('plan_flow.create', { userId, token });
-      const user = await db.ensureUser(userId);
+      console.info('plan_flow.create', { userId: tgUserId, token });
+      const user = await db.ensureUser(tgUserId);
       const name = `${deriveObjectName(diagnosis)} #${Math.floor(Date.now() / 1000)}`;
       const object = await db.createObject(user.id, {
         name,
@@ -400,7 +554,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
         meta: { source: 'button' },
       });
       await db.updateUserLastObject(user.id, object.id);
-      await finalizePlan(ctx, userId, object.id, diagnosis);
+      await finalizePlan(ctx, tgUserId, object.id, diagnosis);
     } catch (err) {
       console.error('plan_flow create error', err);
       await ctx.reply(msg('plan_object_error'));
@@ -409,8 +563,10 @@ function createPlanFlow({ db, catalog, planWizard }) {
 
   async function finalizePlan(ctx, userId, objectId, diagnosis) {
     try {
+      const tgUserId = ctx.from?.id || null;
       console.info('plan_flow.finalize.begin', {
         userId,
+        tgUserId,
         objectId,
         planKind: diagnosis?.plan_kind || null,
       });
@@ -421,6 +577,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
       if (!object || !requesterKey || requesterKey !== ownerKey) {
         console.warn('plan_flow.finalize.object_mismatch', {
           userId,
+          tgUserId,
           userDbId: user?.id ?? null,
           objectId,
           found: Boolean(object),
@@ -432,7 +589,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
       }
       const chatId = resolveChatId(ctx);
       if (!chatId) {
-        console.warn('plan_flow.finalize.no_chat', { userId, objectId });
+        console.warn('plan_flow.finalize.no_chat', { userId, tgUserId, objectId });
         await safeAnswer(ctx, 'plan_object_error', true);
         return;
       }
@@ -465,6 +622,13 @@ function createPlanFlow({ db, catalog, planWizard }) {
         await planWizard.showPlanTable(chatId, duplicatePlan.id, {
           userId: user.id,
           diffAgainst: planKind === 'PLAN_UPDATE' ? 'accepted' : null,
+        });
+        notifyWatchers({
+          type: 'plan_created',
+          userId: user.id,
+          planId: duplicatePlan.id,
+          objectId: object.id,
+          chatId,
         });
         return;
       }
@@ -502,7 +666,9 @@ function createPlanFlow({ db, catalog, planWizard }) {
           console.error('recent_diagnosis link failed', err);
         }
       }
-      const stageDefs = await collectStageDefinitions(catalog, diagnosis, object);
+      const stageResult = await collectStageDefinitions(catalog, diagnosis, object);
+      const stageDefs = stageResult?.stages || [];
+      const fallbackNotices = stageResult?.fallbackNotices || [];
       await logFunnelEvent(db, {
         event: 'object_selected',
         userId: user.id,
@@ -515,6 +681,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
       });
       console.info('plan_flow.plan_created', {
         userId: user.id,
+        tgUserId,
         planId: plan.id,
         planKind,
         objectId: object.id,
@@ -524,6 +691,7 @@ function createPlanFlow({ db, catalog, planWizard }) {
       if (!stageDefs.length) {
         console.warn('plan_flow.plan_missing_stages', {
           userId: user.id,
+          tgUserId,
           planId: plan.id,
           planKind,
           objectId: object.id,
@@ -531,20 +699,44 @@ function createPlanFlow({ db, catalog, planWizard }) {
         await ctx.reply(msg('plan_object_error'));
         return;
       }
+      if (fallbackNotices.length) {
+        const stageTitles = [
+          ...new Set(
+            fallbackNotices
+              .map((entry) => (entry?.stageTitle ? String(entry.stageTitle).trim() : ''))
+              .filter(Boolean),
+          ),
+        ];
+        if (stageTitles.length) {
+          const stageList = stageTitles.map((title) => `• ${title}`).join('\n');
+          await ctx.reply(msg('plan_stage_fallback_notice', { stages: stageList }));
+        }
+      }
       await db.createStagesWithOptions(plan.id, stageDefs);
       const responseKey =
         planKind === 'PLAN_UPDATE' ? 'plan_object_saved_update' : 'plan_object_saved';
       await safeAnswer(ctx, responseKey);
-      await ctx.reply(msg('plan_step_plan_intro', { name: object.name }));
-      await planWizard.showPlanTable(chatId, plan.id, {
-        userId: user.id,
-        diffAgainst: planKind === 'PLAN_UPDATE' ? 'accepted' : null,
-      });
-      await persistPlanSession({
+      const planSession = await persistPlanSession({
         user,
         object,
         plan,
         diagnosis,
+      });
+      const nav = buildStepControls(planSession?.token);
+      await ctx.reply(msg('plan_step_plan_intro', { name: object.name }), {
+        reply_markup: nav.length ? { inline_keyboard: nav } : undefined,
+      });
+      await planWizard.showPlanTable(chatId, plan.id, {
+        userId: user.id,
+        diffAgainst: planKind === 'PLAN_UPDATE' ? 'accepted' : null,
+      });
+      notifyWatchers({
+        type: 'plan_created',
+        userId: user.id,
+        tgUserId,
+        planId: plan.id,
+        objectId: object.id,
+        chatId,
       });
     } catch (err) {
       console.error('plan_flow finalize error', err);
@@ -565,32 +757,30 @@ function createPlanFlow({ db, catalog, planWizard }) {
   }
 
   async function persistPlanSession({ user, object, plan, diagnosis }) {
-  if (!user?.id || !plan?.id || !diagnosis) return;
-  if (!db?.createPlanSession) return;
-  const token = generateToken();
-  try {
-    if (typeof db.deletePlanSessionsByPlan === 'function') {
-      await db.deletePlanSessionsByPlan(plan.id);
-    }
-    await db.createPlanSession({
-      userId: user.id,
-      token,
-      diagnosisPayload: diagnosis,
-      recentDiagnosisId: diagnosis.recent_diagnosis_id || null,
-      objectId: object?.id || null,
-      planId: plan.id,
-      currentStep: 'time_idle',
-      state: {
-        mode: 'time_idle',
-        planId: plan.id,
+    if (!user?.id || !plan?.id || !diagnosis) return null;
+    const token = generateToken();
+    try {
+      await sessionStore.deleteByPlan(user.id, plan.id);
+      const record = await sessionStore.upsert(user, {
+        token,
+        diagnosisPayload: diagnosis,
+        recentDiagnosisId: diagnosis.recent_diagnosis_id || null,
         objectId: object?.id || null,
-      },
-      ttlHours: 72,
-    });
-  } catch (err) {
-    console.error('plan_flow.persist_session error', err);
+        planId: plan.id,
+        currentStep: 'time_idle',
+        state: {
+          mode: 'time_idle',
+          planId: plan.id,
+          objectId: object?.id || null,
+        },
+        ttlHours: 72,
+      });
+      return record;
+    } catch (err) {
+      console.error('plan_flow.persist_session error', err);
+      return null;
+    }
   }
-}
 
   return {
     start,
@@ -598,6 +788,10 @@ function createPlanFlow({ db, catalog, planWizard }) {
     choose,
     pick,
     create,
+    cancelSession,
+    restartSession,
+    attachObjectChips,
+    watch: (fn) => watchers.add(fn),
   };
 }
 
@@ -644,9 +838,14 @@ function buildPlanTitle(object, data) {
 }
 
 async function collectStageDefinitions(catalog, data, object) {
+  const productRulesEnabled = catalog?.productRulesEnabled !== false;
   if (data?.plan_machine?.stages?.length) {
-    return buildDefinitionsFromMachinePlan(data);
+    return {
+      stages: buildDefinitionsFromMachinePlan(data),
+      fallbackNotices: [],
+    };
   }
+  const fallbackNotices = [];
   try {
     const stages = (await catalog.suggestStages({
       crop: data?.crop,
@@ -654,7 +853,8 @@ async function collectStageDefinitions(catalog, data, object) {
     })) || [];
     const region = object?.location_tag || null;
     const defs = [];
-    for (const stage of stages) {
+    for (const [idx, stage] of stages.entries()) {
+      const resolvedTitle = resolveStageTitle(stage, idx);
       let options = await catalog.suggestOptions({
         crop: data?.crop,
         disease: data?.disease,
@@ -665,16 +865,23 @@ async function collectStageDefinitions(catalog, data, object) {
       if ((!options || !options.length) && stage.kind !== 'trigger') {
         const fallback = buildFallbackOptionFromDiagnosis(stage, data);
         if (fallback) {
+          const reason = productRulesEnabled ? 'catalog_empty' : 'ai_only_mode';
           console.info('plan_flow.stage_fallback_option', {
             planKind: data?.plan_kind || null,
-            stageTitle: stage.title,
-            reason: 'catalog_empty',
+            stageTitle: resolvedTitle,
+            reason,
           });
+          if (productRulesEnabled) {
+            fallbackNotices.push({
+              stageTitle: resolvedTitle,
+              reason: 'catalog_empty',
+            });
+          }
           options = [fallback];
         }
       }
       defs.push({
-        title: stage.title,
+        title: resolvedTitle,
         kind: stage.kind,
         note: stage.note,
         phi_days: stage.phi_days,
@@ -689,11 +896,21 @@ async function collectStageDefinitions(catalog, data, object) {
         })),
       });
     }
-    return defs;
+    return { stages: defs, fallbackNotices };
   } catch (err) {
     console.error('collectStageDefinitions error', err);
-    return [];
+    return { stages: [], fallbackNotices };
   }
+}
+
+function resolveStageTitle(stage, index = null) {
+  const rawTitle = typeof stage?.title === 'string' ? stage.title.trim() : '';
+  if (rawTitle) return rawTitle;
+  const defaultLabel = msg('plan_stage_default') || 'Этап';
+  if (Number.isInteger(index)) {
+    return `${defaultLabel} ${index + 1}`;
+  }
+  return defaultLabel;
 }
 
 function buildDefinitionsFromMachinePlan(data) {
@@ -824,6 +1041,196 @@ function chunkChips(items, size) {
     rows.push(items.slice(i, i + size));
   }
   return rows;
+}
+
+function deriveMissingContextCode(token) {
+  return token ? 'BUTTON_EXPIRED' : 'NO_RECENT_DIAGNOSIS';
+}
+
+function createSessionStore({ db, planSessions }) {
+  const hasApi = Boolean(planSessions);
+
+  function normalizeSession(record) {
+    if (!record) return null;
+    if ('diagnosis_payload' in record) {
+      return {
+        ...record,
+        state: ensureObject(record.state),
+      };
+    }
+    return {
+      id: record.id,
+      user_id: record.user_id,
+      token: record.token,
+      diagnosis_payload: record.diagnosis || {},
+      recent_diagnosis_id: record.recent_diagnosis_id ?? null,
+      object_id: record.object_id ?? null,
+      plan_id: record.plan_id ?? null,
+      current_step: record.current_step,
+      state: ensureObject(record.state),
+      expires_at: record.expires_at,
+    };
+  }
+
+  function ensureObject(value) {
+    if (value && typeof value === 'object') return value;
+    return {};
+  }
+
+  async function deleteForUser(userId) {
+    if (!userId) return;
+    try {
+      if (hasApi) {
+        await planSessions.deleteAll(userId);
+      } else if (typeof db.deletePlanSessionsForUser === 'function') {
+        await db.deletePlanSessionsForUser(userId);
+      }
+    } catch (err) {
+      console.error('plan_flow.session_cleanup_failed', err);
+    }
+  }
+
+  async function upsert(user, payload) {
+    if (!user?.id || !payload?.token) return null;
+    try {
+      if (hasApi) {
+        const record = await planSessions.upsert(user.id, {
+          token: payload.token,
+          diagnosis: payload.diagnosisPayload,
+          current_step: payload.currentStep,
+          state: payload.state || {},
+          recent_diagnosis_id: payload.recentDiagnosisId ?? null,
+          object_id: payload.objectId ?? null,
+          plan_id: payload.planId ?? null,
+          ttl_hours: payload.ttlHours ?? null,
+        });
+        return normalizeSession(record);
+      }
+      if (typeof db.createPlanSession !== 'function') return null;
+      const record = await db.createPlanSession({
+        userId: user.id,
+        token: payload.token,
+        diagnosisPayload: payload.diagnosisPayload,
+        recentDiagnosisId: payload.recentDiagnosisId ?? null,
+        objectId: payload.objectId ?? null,
+        planId: payload.planId ?? null,
+        currentStep: payload.currentStep,
+        state: payload.state || {},
+        ttlHours: payload.ttlHours,
+      });
+      return normalizeSession(record);
+    } catch (err) {
+      console.error('plan_flow.session_upsert_failed', err);
+      return null;
+    }
+  }
+
+  async function fetchLatest(userId) {
+    if (!userId) return null;
+    try {
+      if (hasApi) {
+        const record = await planSessions.fetchLatest(userId, { includeExpired: true });
+        return normalizeSession(record);
+      }
+      if (typeof db.getLatestPlanSessionForUser !== 'function') return null;
+      return normalizeSession(await db.getLatestPlanSessionForUser(userId));
+    } catch (err) {
+      if (err.status === 404) return null;
+      console.error('plan_flow.session_fetch_failed', err);
+      return null;
+    }
+  }
+
+  async function fetchByToken(userId, token) {
+    if (!userId) return null;
+    if (!token) return null;
+    try {
+      if (hasApi) {
+        const record = await planSessions.fetchByToken(userId, token, { includeExpired: true });
+        return normalizeSession(record);
+      }
+      if (typeof db.getPlanSessionByToken !== 'function') return null;
+      return normalizeSession(await db.getPlanSessionByToken(token));
+    } catch (err) {
+      if (err.status === 404) return null;
+      console.error('plan_flow.session_fetch_failed', err);
+      return null;
+    }
+  }
+
+  async function deleteSession(session) {
+    if (!session?.token || !session?.user_id) return;
+    try {
+      if (hasApi) {
+        await planSessions.deleteByToken(session.user_id, session.token);
+      } else if (typeof db.deletePlanSession === 'function') {
+        await db.deletePlanSession(session.id);
+      }
+    } catch (err) {
+      console.error('plan_flow.session_delete_failed', err);
+    }
+  }
+
+  async function updateSession(session, patch) {
+    if (!session?.id || !session?.user_id) return;
+    const payload = {
+      currentStep: patch.currentStep,
+      state: patch.state,
+      planId: patch.planId,
+      objectId: patch.objectId,
+      ttlHours: patch.ttlHours,
+      diagnosisPayload: patch.diagnosisPayload,
+      recentDiagnosisId: patch.recentDiagnosisId,
+    };
+    try {
+      if (hasApi) {
+        await planSessions.patch(session.user_id, session.id, {
+          current_step: payload.currentStep,
+          state: payload.state,
+          plan_id: payload.planId,
+          object_id: payload.objectId,
+          ttl_hours: payload.ttlHours,
+          diagnosis: payload.diagnosisPayload,
+          recent_diagnosis_id: payload.recentDiagnosisId,
+        });
+      } else if (typeof db.updatePlanSession === 'function') {
+        await db.updatePlanSession(session.id, {
+          currentStep: payload.currentStep,
+          state: payload.state,
+          planId: payload.planId,
+          objectId: payload.objectId,
+          ttlHours: payload.ttlHours,
+          diagnosisPayload: payload.diagnosisPayload,
+          recentDiagnosisId: payload.recentDiagnosisId,
+        });
+      }
+    } catch (err) {
+      console.error('plan_flow.session_update_failed', err);
+    }
+  }
+
+  async function deleteByPlan(userId, planId) {
+    if (!userId || !planId) return;
+    try {
+      if (hasApi) {
+        await planSessions.deleteByPlan(userId, planId);
+      } else if (typeof db.deletePlanSessionsByPlan === 'function') {
+        await db.deletePlanSessionsByPlan(planId);
+      }
+    } catch (err) {
+      console.error('plan_flow.session_plan_cleanup_failed', err);
+    }
+  }
+
+  return {
+    deleteForUser,
+    upsert,
+    fetchLatest,
+    fetchByToken,
+    deleteSession,
+    updateSession,
+    deleteByPlan,
+  };
 }
 
 module.exports = { createPlanFlow };

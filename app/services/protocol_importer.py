@@ -37,6 +37,7 @@ from app.models.catalog import Catalog
 from app.models.catalog_item import CatalogItem
 from app.config import Settings
 from app.db import init_db
+import pandas as pd
 
 # ===== Meta =====
 __VERSION__ = "protocol_importer/2025-08-28-r10"
@@ -54,6 +55,15 @@ if not logging.getLogger().handlers:
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+EXPECTED_PROTOCOL_COLUMNS = [
+    "crop",
+    "disease",
+    "product",
+    "dosage_value",
+    "dosage_unit",
+    "phi",
+]
+
 # ===== Runtime limits / anti-OOM switches =====
 MAX_PAGES_DEFAULT = 120        # обрабатываем только первые N страниц
 STOP_AFTER_ROWS   = 2000       # останавливаемся, как только набрано столько строк
@@ -62,6 +72,42 @@ DEBUG_DUMP_PAGES  = 10         # дампим ТОЛЬКО текст первы
 # Для очень больших PDF (категория pesticide) используем ещё более щадящие настройки
 LIGHT_MAX_PAGES   = 80
 LIGHT_STOP_ROWS   = 1200
+
+
+def pdf_to_csv(pdf_path: Path, csv_path: Path, *, pages: str = "all", flavor: str = "lattice") -> Path:
+    """Extract protocol tables from PDF and dump to CSV with normalized headers."""
+    try:
+        import camelot
+    except Exception as exc:  # pragma: no cover - depends on optional dep
+        raise RuntimeError("camelot dependency is required for pdf_to_csv") from exc
+
+    tables = camelot.read_pdf(
+        str(pdf_path),
+        pages=pages,
+        flavor=flavor,
+        strip_text="\n",
+    )
+    if not tables:
+        raise ValueError("protocol PDF does not contain tables")
+
+    frames = []
+    for table in tables:
+        df = getattr(table, "df", None)
+        if df is None or df.empty:
+            continue
+        if df.shape[1] != len(EXPECTED_PROTOCOL_COLUMNS):
+            raise ValueError(
+                f"protocol table has {df.shape[1]} columns, expected {len(EXPECTED_PROTOCOL_COLUMNS)}"
+            )
+        frames.append(df)
+
+    if not frames:
+        raise ValueError("protocol PDF does not contain compatible tables")
+
+    combined = pd.concat(frames, ignore_index=True)
+    combined.columns = EXPECTED_PROTOCOL_COLUMNS
+    combined.to_csv(csv_path, index=False)
+    return csv_path
 
 # ===== Heuristics: PDF scoring tokens =====
 # Положительные маркеры "протокольных" регламентов

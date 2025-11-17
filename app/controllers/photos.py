@@ -29,7 +29,7 @@ from app.metrics import (
     queue_size_pending,
     roi_calc_seconds,
 )
-from app.models import Event, Photo, ErrorCode
+from app.models import Event, Photo, ErrorCode, RecentDiagnosis
 from app.services.gpt import call_gpt_vision
 from app.services.plan_payload import (
     PlanPayloadError,
@@ -38,6 +38,12 @@ from app.services.plan_payload import (
 from app.services.protocols import async_find_protocol
 from app.services.storage import get_public_url, upload_photo
 from app.services.roi import calculate_roi
+from app.services.recent_diagnosis import (
+    get_latest_recent_diagnosis,
+    get_recent_diagnosis_by_id,
+    save_recent_diagnosis,
+)
+from app.services.recent_diagnosis import save_recent_diagnosis
 
 settings = Settings()
 logger = logging.getLogger(__name__)
@@ -179,6 +185,21 @@ async def _process_image(
     }
 
 
+def _persist_recent_diagnosis(user_id: int, payload: dict[str, Any]) -> None:
+    if not payload:
+        return
+    with db_module.SessionLocal() as db:
+        save_recent_diagnosis(
+            db,
+            user_id=user_id,
+            payload=payload,
+            ttl_hours=settings.recent_diag_ttl_h,
+            max_age_hours=settings.recent_diag_max_age_h,
+        )
+
+
+
+
 class DiagnoseRequestBase64(BaseModel):
     image_base64: str
     prompt_id: str
@@ -278,6 +299,87 @@ class PhotoHistoryItem(BaseModel):
     status: str
     confidence: float
     thumb_url: str
+
+
+class RecentDiagnosisRecord(BaseModel):
+    id: int
+    created_at: datetime
+    expires_at: datetime
+    expired: bool
+    object_id: int | None
+    plan_id: int | None
+    diagnosis: DiagnoseResponse
+
+
+def _build_recent_response(record: RecentDiagnosis) -> RecentDiagnosisRecord:
+    expires_at = record.expires_at
+    created_at = record.created_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    expired = expires_at <= datetime.now(timezone.utc)
+    try:
+        diagnosis = DiagnoseResponse(**record.diagnosis_payload)
+    except Exception as exc:  # pragma: no cover - unexpected payload mismatch
+        raise HTTPException(status_code=500, detail="RECENT_DIAGNOSIS_INVALID") from exc
+    return RecentDiagnosisRecord(
+        id=record.id,
+        created_at=created_at,
+        expires_at=expires_at,
+        expired=expired,
+        object_id=record.object_id,
+        plan_id=record.plan_id,
+        diagnosis=diagnosis,
+    )
+
+
+@router.get(
+    "/diagnoses/recent",
+    response_model=RecentDiagnosisRecord,
+    responses={401: {"model": ErrorResponse}, 404: {"description": "Not found"}},
+)
+async def get_recent_diagnosis_record(
+    include_expired: bool = False,
+    user_id: int = Depends(rate_limit),
+):
+    def _db_call() -> RecentDiagnosis | None:
+        with db_module.SessionLocal() as db:
+            return get_latest_recent_diagnosis(
+                db,
+                user_id=user_id,
+                include_expired=include_expired,
+            )
+
+    record = await asyncio.to_thread(_db_call)
+    if not record:
+        raise HTTPException(status_code=404, detail="RECENT_DIAGNOSIS_NOT_FOUND")
+    return _build_recent_response(record)
+
+
+@router.get(
+    "/diagnoses/recent/{diagnosis_id}",
+    response_model=RecentDiagnosisRecord,
+    responses={401: {"model": ErrorResponse}, 404: {"description": "Not found"}},
+)
+async def get_recent_diagnosis_by_id_endpoint(
+    diagnosis_id: int,
+    user_id: int = Depends(rate_limit),
+):
+    def _db_call() -> RecentDiagnosis | None:
+        with db_module.SessionLocal() as db:
+            return get_recent_diagnosis_by_id(
+                db,
+                user_id=user_id,
+                diagnosis_id=diagnosis_id,
+            )
+
+    record = await asyncio.to_thread(_db_call)
+    if not record:
+        raise HTTPException(status_code=404, detail="RECENT_DIAGNOSIS_NOT_FOUND")
+    return _build_recent_response(record)
+
+
 
 
 @router.post(
@@ -514,7 +616,7 @@ async def diagnose(
         cleaned_variants = [str(item).strip() for item in raw_variants if str(item or "").strip()]
         clarify_crop_variants = cleaned_variants or None
 
-    return DiagnoseResponse(
+    response_payload = DiagnoseResponse(
         crop=crop,
         crop_ru=crop_ru,
         disease=disease,
@@ -538,6 +640,15 @@ async def diagnose(
         plan_missing_reason=plan_missing_reason,
         roi=roi,
     )
+
+    if status == "ok":
+        payload_dict = response_payload.model_dump()
+        try:
+            await asyncio.to_thread(_persist_recent_diagnosis, user_id, payload_dict)
+        except Exception:
+            logger.exception("recent_diagnosis persist failed")
+
+    return response_payload
 
 
 @router.get(

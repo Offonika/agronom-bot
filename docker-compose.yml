@@ -43,6 +43,23 @@ services:
       - minio
     networks:
       - agronet
+  autoplan:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    env_file: .env
+    environment:
+      BOT_DATABASE_URL: ${BOT_DATABASE_URL}
+      DATABASE_URL: ${BOT_DATABASE_URL:-${DATABASE_URL}}
+      REDIS_URL: ${REDIS_URL}
+      BOT_TOKEN_DEV: ${BOT_TOKEN_DEV}
+      WEATHER_LAT: ${WEATHER_LAT:-55.751244}
+      WEATHER_LON: ${WEATHER_LON:-37.618423}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - agronet
   db:
     image: postgres:15
     environment:

@@ -20,7 +20,9 @@ const {
 } = require('./diagnosis');
 const { createPlanPickHandler } = require('./callbacks/plan_pick');
 const { createPlanTriggerHandler } = require('./callbacks/plan_trigger');
+const { createPlanLocationHandler } = require('./callbacks/plan_location');
 const { createPlanSlotHandlers } = require('./callbacks/plan_slot');
+const { createPlanManualSlotHandlers } = require('./callbacks/plan_manual_slot');
 const {
   subscribeHandler,
   buyProHandler,
@@ -34,6 +36,12 @@ const { reminderHandler, reminders } = require('./reminder');
 const { createPlanCommands } = require('./planCommands');
 const { createReminderScheduler } = require('./reminders');
 const { createPlanFlow } = require('./planFlow');
+const { createGeocoder } = require('../services/geocoder');
+const {
+  rememberLocationRequest: rememberLocationSession,
+  clearLocationRequest: clearLocationSession,
+  peekLocationRequest,
+} = require('./locationSession');
 const {
   buildAssistantText,
   buildKeyboardLayout,
@@ -168,9 +176,14 @@ function buildSlotContext(overrides = {}) {
     reason: overrides.reason || ['☔ без дождя', '🌡 14 °C'],
     autoplan_run_id: overrides.autoplan_run_id ?? 11,
   };
+  const objectId = overrides.object_id || 15;
   return {
     slot,
-    plan: { id: slot.plan_id, user_id: overrides.plan_user_id || 1 },
+    plan: {
+      id: slot.plan_id,
+      user_id: overrides.plan_user_id || 1,
+      object_id: overrides.plan_object_id || objectId,
+    },
     user: { id: overrides.user_id || 1, tg_id: overrides.tg_id || 123 },
     stage: {
       id: slot.stage_id,
@@ -180,7 +193,7 @@ function buildSlotContext(overrides = {}) {
       title: overrides.stage_title || 'Обработка',
     },
     stageOption: null,
-    object: { id: overrides.object_id || 15, name: 'Ежевика' },
+    object: { id: objectId, name: 'Ежевика' },
     autoplanRun: overrides.autoplanRun || { id: slot.autoplan_run_id, min_hours_ahead: 2, horizon_hours: 72 },
   };
 }
@@ -191,7 +204,7 @@ function createCallbackCtx(data, telegramId = 123) {
   return {
     from: { id: telegramId },
     callbackQuery: { data },
-    reply: async (text) => replies.push(text),
+    reply: async (text, opts) => replies.push({ text, opts }),
     answerCbQuery: async (text, opts) => answers.push({ text, opts }),
     __replies: replies,
     __answers: answers,
@@ -275,50 +288,45 @@ test('planPickHandler enqueues autoplan job when queue available', async () => {
   ]);
 });
 
-test('planPickHandler schedules treatment and phi reminders when autoplan unavailable', async () => {
+test('planPickHandler shows fallback slot card when autoplan unavailable', async () => {
   const answers = [];
-  const remindersCaptured = [];
-  const eventsCaptured = [];
-  const scheduled = [];
   const planStatusUpdates = [];
+  const slotPayloads = [];
   const handler = createPlanPickHandler({
     db: {
       ensureUser: async () => ({ id: 5 }),
       selectStageOption: async () => ({
-        stage: { id: 12, plan_id: 77, kind: 'season', phi_days: 7 },
+        stage: { id: 12, plan_id: 77, object_id: 90, title: 'Обработка', kind: 'season', phi_days: 7 },
         option: { id: 3 },
       }),
-      createEvents: async (events) => {
-        eventsCaptured.push(...events);
-        return events.map((event, idx) => ({ ...event, id: idx + 1 }));
-      },
-      createReminders: async (reminders) => {
-        remindersCaptured.push(...reminders);
-        return reminders.map((reminder, idx) => ({ ...reminder, id: idx + 1 }));
+      upsertTreatmentSlot: async (payload) => {
+        slotPayloads.push(payload);
+        return {
+          id: 555,
+          plan_id: payload.plan_id,
+          stage_id: payload.stage_id,
+          stage_option_id: payload.stage_option_id,
+          slot_start: payload.slot_start,
+          slot_end: payload.slot_end,
+          reason: payload.reason,
+          status: payload.status,
+        };
       },
       updatePlanStatus: async (payload) => planStatusUpdates.push(payload),
+      getObjectById: async () => ({ id: 90, name: 'Грядка' }),
     },
-    reminderScheduler: { scheduleMany: (rem) => scheduled.push(...rem) },
+    reminderScheduler: null,
     autoplanQueue: null,
   });
-  const realNow = Date.now;
-  Date.now = () => new Date('2025-01-01T00:00:00Z').getTime();
-  try {
-    await handler({
-      from: { id: 42 },
-      callbackQuery: { data: 'pick_opt|77|12|3' },
-      answerCbQuery: async (text) => answers.push(text),
-    });
-  } finally {
-    Date.now = realNow;
-  }
-  assert.equal(eventsCaptured.length, 2);
-  assert.equal(remindersCaptured.length, 2);
-  assert.equal(scheduled.length, 2);
-  assert.equal(answers[0], msg('plan_saved_toast'));
-  assert.deepEqual(planStatusUpdates, [
-    { planId: 77, userId: 5, status: 'scheduled' },
-  ]);
+  const ctx = createCallbackCtx('pick_opt|77|12|3');
+  await handler(ctx);
+  assert.equal(planStatusUpdates[0].status, 'accepted');
+  assert.equal(ctx.__answers[0].text, msg('plan_autoplan_ready'));
+  assert.ok(ctx.__replies[0].text.includes('Шаг 3/3'));
+  assert.ok(
+    ctx.__replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data.startsWith('plan_slot_accept'),
+  );
+  assert.equal(slotPayloads.length, 1);
 });
 
 test('planPickHandler prompts manual selection when autoplan unavailable', async () => {
@@ -385,6 +393,40 @@ test('planPickHandler skips scheduling for trigger stages', async () => {
   ]);
 });
 
+test('planPickHandler logs funnel events', async () => {
+  const funnelEvents = [];
+  const handler = createPlanPickHandler({
+    db: {
+      ensureUser: async () => ({ id: 6 }),
+      selectStageOption: async () => ({
+        stage: { id: 10, plan_id: 77, object_id: 4, kind: 'season' },
+        option: { id: 3 },
+      }),
+      updatePlanStatus: async () => {},
+      logFunnelEvent: async (payload) => funnelEvents.push(payload),
+      getPlanSessionByPlan: async () => null,
+      upsertTreatmentSlot: async (payload) => ({
+        id: 99,
+        plan_id: payload.plan_id,
+        stage_id: payload.stage_id,
+        stage_option_id: payload.stage_option_id,
+        slot_start: payload.slot_start,
+        slot_end: payload.slot_end,
+        reason: payload.reason,
+      }),
+      getObjectById: async () => ({ id: 4, name: 'Грядка' }),
+    },
+    manualSlots: { prompt: async () => false },
+    autoplanQueue: null,
+  });
+  const ctx = createCallbackCtx('pick_opt|77|10|3', 6);
+  await handler(ctx);
+  const eventNames = funnelEvents.map((entry) => entry.event);
+  assert.deepEqual(eventNames, ['option_picked']);
+  assert.equal(ctx.__answers[0].text, msg('plan_autoplan_ready'));
+  assert.ok(ctx.__replies[0].text.includes(msg('plan_slot_reason_default')));
+});
+
 test('planFlow start prompts for object selection', async () => {
   const replies = [];
   const sessionStubs = createSessionDbStubs();
@@ -406,6 +448,8 @@ test('planFlow start prompts for object selection', async () => {
       showPlanTable: async () => {},
     },
   });
+  const chipCalls = [];
+  planFlow.attachObjectChips({ send: async () => chipCalls.push('sent') });
   await planFlow.start(
     {
       from: { id: 77 },
@@ -414,8 +458,128 @@ test('planFlow start prompts for object selection', async () => {
     },
     { crop: 'apple', confidence: 0.9 },
   );
-  assert.ok(replies[0].msg.includes(msg('plan_step_choose_object')));
-  assert.ok(replies[0].opts.reply_markup.inline_keyboard.length >= 1);
+  const prompt = replies.find((entry) => entry.msg?.includes(msg('plan_step_choose_chips')));
+  assert.ok(prompt);
+  assert.equal(chipCalls.length, 1);
+  const nav = prompt.opts.reply_markup.inline_keyboard.flat();
+  const backBtn = nav.find((btn) => btn.callback_data.startsWith('plan_step_back|'));
+  const cancelBtn = nav.find((btn) => btn.callback_data.startsWith('plan_step_cancel|'));
+  assert.ok(backBtn);
+  assert.ok(cancelBtn);
+});
+
+test('planFlow auto-detects coordinates with geocoder', async () => {
+  const updates = [];
+  const geocoderCalls = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 11, last_object_id: 5 }),
+      listObjects: async () => [
+        { id: 5, name: 'Грядка', user_id: 11, meta: {}, location_tag: 'Московская область' },
+      ],
+      updateUserLastObject: async () => {},
+      updateObjectMeta: async (objectId, patch) => {
+        updates.push({ objectId, patch });
+        return { id: objectId, meta: patch };
+      },
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: { showPlanTable: async () => {} },
+    geocoder: {
+      lookup: async (query) => {
+        geocoderCalls.push(query);
+        return { lat: 55.75, lon: 37.62, label: 'Москва', confidence: 0.9 };
+      },
+    },
+  });
+  await planFlow.start(
+    {
+      from: { id: 11 },
+      chat: { id: 1 },
+      reply: async () => {},
+    },
+    { crop: 'apple', confidence: 0.96, region: 'Москва' },
+    { skipAutoFinalize: true },
+  );
+  assert.equal(geocoderCalls[0], 'Москва');
+  const geoUpdate = updates.find((entry) => Number.isFinite(entry.patch?.lat));
+  assert.ok(geoUpdate);
+  assert.equal(geoUpdate.objectId, 5);
+  assert.equal(geoUpdate.patch.lat, 55.75);
+  const promptUpdate = updates.find((entry) => entry.patch?.location_prompted);
+  assert.ok(promptUpdate);
+});
+
+test('planFlow prompts manual location when coordinates missing', async () => {
+  const replies = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 22, last_object_id: 1 }),
+      listObjects: async () => [{ id: 1, name: 'Без координат', user_id: 22, meta: {} }],
+      updateUserLastObject: async () => {},
+      updateObjectMeta: async () => {},
+    },
+    catalog: { suggestStages: async () => [], suggestOptions: async () => [] },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 22 },
+      chat: { id: 5 },
+      reply: async (text, opts) => replies.push({ text, opts }),
+    },
+    { crop: 'apple', confidence: 0.9 },
+    { skipAutoFinalize: true },
+  );
+  const prompt = replies.find((r) => r.text?.includes('Укажите участок вручную'));
+  assert.ok(prompt);
+  const keyboard = prompt.opts.reply_markup.inline_keyboard;
+  assert.ok(keyboard[0][0].callback_data.startsWith('plan_location_geo|1'));
+});
+
+test('planFlow prompts confirmation for auto location', async () => {
+  const replies = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 13, last_object_id: 4 }),
+      listObjects: async () => [
+        {
+          id: 4,
+          name: 'Грядка',
+          user_id: 13,
+          meta: { location_source: 'geo_auto', geo_label: 'Калуга', lat: 54.5, lon: 36.3 },
+          location_tag: 'Калужская область',
+        },
+      ],
+      updateUserLastObject: async () => {},
+      updateObjectMeta: async () => {},
+    },
+    catalog: { suggestStages: async () => [], suggestOptions: async () => [] },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 13 },
+      chat: { id: 2 },
+      reply: async (text, opts) => replies.push({ text, opts }),
+    },
+    { crop: 'apple', confidence: 0.9 },
+    { skipAutoFinalize: true },
+  );
+  const prompt = replies.find((r) => r.text?.includes('Предположил координаты'));
+  assert.ok(prompt);
+  const buttons = prompt.opts.reply_markup.inline_keyboard;
+  assert.ok(buttons[0][0].callback_data.startsWith('plan_location_confirm|4'));
+  assert.ok(buttons[0][1].callback_data.startsWith('plan_location_change|4'));
 });
 
 test('planFlow pick shows continue prompt', async () => {
@@ -466,11 +630,14 @@ test('planFlow pick shows continue prompt', async () => {
   assert.equal(answers.length, 1);
 });
 
-test('planFlow auto builds plan when single object', async () => {
+test('planFlow auto builds plan when single object and shows nav', async () => {
   const wizardCalls = [];
   const planPayloads = [];
+  const replies = [];
+  const sessionStubs = createSessionDbStubs();
   const planFlow = createPlanFlow({
     db: {
+      ...sessionStubs,
       ensureUser: async () => ({ id: 21, last_object_id: null }),
       listObjects: async () => [{ id: 5, name: 'Единственный', user_id: 21 }],
       updateUserLastObject: async () => {},
@@ -483,6 +650,7 @@ test('planFlow auto builds plan when single object', async () => {
       createStagesWithOptions: async () => {},
       findPlanByHash: async () => null,
       findLatestPlanByObject: async () => null,
+      linkRecentDiagnosisToPlan: async () => {},
     },
     catalog: {
       suggestStages: async () => [{ title: 'Этап', kind: 'season', note: null, phi_days: 5, meta: {} }],
@@ -492,17 +660,168 @@ test('planFlow auto builds plan when single object', async () => {
       showPlanTable: async (chatId, planId, options) => wizardCalls.push({ chatId, planId, options }),
     },
   });
+  const chipCalls = [];
+  planFlow.attachObjectChips({ send: async () => chipCalls.push('sent') });
   await planFlow.start(
     {
       from: { id: 21 },
       chat: { id: 777 },
-      reply: async () => {},
+      reply: async (msg, opts) => replies.push({ msg, opts }),
     },
     { crop: 'apple', disease: 'scab', confidence: 0.95 },
   );
   assert.equal(planPayloads.length, 1);
   assert.equal(wizardCalls[0].planId, 601);
   assert.equal(wizardCalls[0].options.userId, 21);
+  assert.equal(chipCalls.length, 0);
+  const stepMsg = replies.find((entry) => entry.msg?.includes('Шаг 2/3'));
+  assert.ok(stepMsg);
+  const navButtons = stepMsg.opts?.reply_markup?.inline_keyboard?.flat() || [];
+  const backBtn = navButtons.find((btn) => btn.callback_data?.startsWith('plan_step_back|'));
+  const cancelBtn = navButtons.find((btn) => btn.callback_data?.startsWith('plan_step_cancel|'));
+  assert.ok(backBtn);
+  assert.ok(cancelBtn);
+});
+
+test('planFlow watch emits plan_created with chatId', async () => {
+  const events = [];
+  const planFlow = createPlanFlow({
+    db: {
+      ensureUser: async () => ({ id: 50, last_object_id: null }),
+      listObjects: async () => [{ id: 2, name: 'Куст', user_id: 50 }],
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 2, name: 'Куст', user_id: 50, location_tag: null }),
+      createCase: async () => ({ id: 900 }),
+      createPlan: async () => ({ id: 111 }),
+      createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+      linkRecentDiagnosisToPlan: async () => {},
+    },
+    catalog: {
+      suggestStages: async () => [{ title: 'Этап', kind: 'season', note: null, phi_days: 5, meta: {} }],
+      suggestOptions: async () => [{ product: 'Препарат', dose_value: 10, dose_unit: 'г/10л', meta: {} }],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  planFlow.watch((evt) => events.push(evt));
+  await planFlow.start(
+    {
+      from: { id: 50 },
+      chat: { id: 303 },
+      reply: async () => {},
+    },
+    { crop: 'apple', disease: 'scab', confidence: 0.95 },
+  );
+  const evt = events[0];
+  assert.equal(evt.type, 'plan_created');
+  assert.equal(evt.planId, 111);
+  assert.equal(evt.chatId, 303);
+});
+
+test('planFlow cancelSession removes stored token', async () => {
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 41, last_object_id: null }),
+      listObjects: async () => [
+        { id: 1, name: 'Первая', user_id: 41 },
+        { id: 2, name: 'Вторая', user_id: 41 },
+      ],
+      updateUserLastObject: async () => {},
+    },
+    catalog: { suggestStages: async () => [], suggestOptions: async () => [] },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 41 },
+      chat: { id: 11 },
+      reply: async () => {},
+    },
+    { crop: 'apple', confidence: 0.9 },
+  );
+  const token = sessionStubs.__sessionStore.current?.token;
+  assert.ok(token);
+  const cancelled = await planFlow.cancelSession(41, token);
+  assert.equal(cancelled, true);
+  assert.equal(sessionStubs.__sessionStore.current, null);
+});
+
+test('planFlow restartSession reopens choose step', async () => {
+  const sessionStubs = createSessionDbStubs();
+  const replies = [];
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 52, last_object_id: 7 }),
+      listObjects: async () => [{ id: 7, name: 'Куст', user_id: 52 }],
+      updateUserLastObject: async () => {},
+    },
+    catalog: { suggestStages: async () => [], suggestOptions: async () => [] },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 52 },
+      chat: { id: 12 },
+      reply: async () => {},
+    },
+    { crop: 'apple', confidence: 0.9 },
+    { skipAutoFinalize: true },
+  );
+  const token = sessionStubs.__sessionStore.current?.token;
+  assert.ok(token);
+  const restarted = await planFlow.restartSession(
+    {
+      from: { id: 52 },
+      chat: { id: 12 },
+      reply: async (msg) => replies.push(msg),
+    },
+    token,
+  );
+  assert.equal(restarted, true);
+  const choosePrompt = replies.find((msg) => typeof msg === 'string' && msg.includes('Шаг 1/3'));
+  assert.ok(choosePrompt);
+});
+
+test('planFlow logs object_selected funnel event on plan creation', async () => {
+  const events = [];
+  const planFlow = createPlanFlow({
+    db: {
+      ensureUser: async () => ({ id: 31, last_object_id: null }),
+      listObjects: async () => [{ id: 4, name: 'Единственный', user_id: 31 }],
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 4, name: 'Единственный', user_id: 31 }),
+      createCase: async () => ({ id: 911 }),
+      createPlan: async () => ({ id: 333 }),
+      createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+      logFunnelEvent: async (payload) => events.push(payload),
+      linkRecentDiagnosisToPlan: async () => {},
+    },
+    catalog: {
+      suggestStages: async () => [{ title: 'Этап', kind: 'season', note: null, phi_days: 5, meta: {} }],
+      suggestOptions: async () => [{ product: 'Препарат', dose_value: 10, dose_unit: 'г/10л', meta: {} }],
+    },
+    planWizard: {
+      showPlanTable: async () => {},
+    },
+  });
+  await planFlow.start(
+    {
+      from: { id: 31 },
+      chat: { id: 700 },
+      reply: async () => {},
+    },
+    { crop: 'apple', disease: 'scab', confidence: 0.95 },
+  );
+  const record = events.find((entry) => entry.event === 'object_selected');
+  assert.ok(record);
+  assert.equal(record.planId, 333);
+  assert.equal(record.objectId, 4);
 });
 
 test('planCommands handleEventAction marks done', async () => {
@@ -541,19 +860,26 @@ test('planCommands handleEventAction reschedules', async () => {
         plan_id: 3,
         plan_title: 'План',
         stage_title: 'Этап',
-        due_at: new Date('2025-01-01T12:00:00Z'),
+        stage_id: 5,
+        stage_option_id: 11,
       }),
       updateEventStatus: async (...args) => updates.push(args),
     },
     planWizard: { showPlanTable: async () => {} },
   });
   await planCommands.handleEventAction(
-    { from: { id: 42 }, reply: async (msg) => replies.push(msg) },
+    {
+      from: { id: 42 },
+      reply: async (text, opts) => replies.push({ text, opts }),
+    },
     'reschedule',
     '8',
   );
-  assert.ok(updates[0][0] === 8);
-  assert.ok(replies[0].includes('Перенёс'));
+  assert.equal(updates[0][0], 8);
+  assert.equal(updates[0][1], 'cancelled');
+  assert.ok(replies[0].text.includes('Выберите новое время'));
+  const cb = replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data;
+  assert.equal(cb, 'plan_manual_start|3|5|11');
 });
 
 test('planCommands handleEventAction cancels', async () => {
@@ -987,6 +1313,7 @@ test('planCommands handlePlans lists upcoming events', async () => {
           plan_title: 'План A',
           stage_title: 'Опрыскивание',
           due_at: new Date('2025-01-01T12:00:00Z'),
+          object_name: 'Ежевика',
         },
       ],
       listObjects: async () => [],
@@ -1001,9 +1328,424 @@ test('planCommands handlePlans lists upcoming events', async () => {
     reply: async (text, opts) => replies.push({ text, opts }),
   });
   assert.ok(replies[0].text.includes('Планы ближайших'));
-  const buttons = replies[1].opts.reply_markup.inline_keyboard;
+  assert.equal(replies[1].text, msg('plans_actions_hint'));
+  const header = replies.find((entry) => entry.text?.includes('План «План A»'));
+  assert.ok(header);
+  const card = replies.find((entry) => entry.text?.includes('этап «Опрыскивание»'));
+  const buttons = card.opts.reply_markup.inline_keyboard;
   assert.ok(buttons[0][0].callback_data === 'plan_event|done|10');
   assert.ok(buttons[1][1].callback_data === 'plan_event|open|2');
+});
+
+test('planCommands handleEventAction reschedule prompts manual picker', async () => {
+  const replies = [];
+  const updates = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 2 }),
+      getEventByIdForUser: async () => ({
+        id: 15,
+        plan_id: 3,
+        plan_title: 'План B',
+        stage_id: 7,
+        stage_title: 'Опрыскивание',
+        stage_option_id: 9,
+      }),
+      updateEventStatus: async (...args) => updates.push(args),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleEventAction(
+    {
+      from: { id: 2 },
+      reply: async (text, opts) => replies.push({ text, opts }),
+    },
+    'reschedule',
+    '15',
+  );
+  assert.equal(updates[0][1], 'cancelled');
+  assert.ok(replies[0].text.includes('Выберите новое время'));
+  const cb = replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data;
+  assert.equal(cb, 'plan_manual_start|3|7|9');
+});
+
+test('planCommands handleEventAction done marks event as done', async () => {
+  const replies = [];
+  const updates = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 4 }),
+      getEventByIdForUser: async () => ({
+        id: 20,
+        plan_title: 'План C',
+        stage_title: 'Полив',
+      }),
+      updateEventStatus: async (...args) => updates.push(args),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleEventAction(
+    {
+      from: { id: 4 },
+      reply: async (text) => replies.push(text),
+    },
+    'done',
+    '20',
+  );
+  assert.equal(updates[0][1], 'done');
+  assert.ok(replies[0].includes(msg('event_marked_done', { stage: 'Полив', plan: 'План C' })));
+});
+
+test('planCommands handlePlans filter keyboard highlights object', async () => {
+  const replies = [];
+  const calls = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 3 }),
+      listObjects: async () => [
+        { id: 5, name: 'Ежевика' },
+        { id: 6, name: 'Смородина' },
+      ],
+      listUpcomingEventsByUser: async (...args) => {
+        calls.push(args);
+        return [
+          {
+            id: 1,
+            plan_id: 4,
+            plan_title: 'План',
+            stage_title: 'Этап',
+            due_at: new Date('2025-01-02T12:00:00Z'),
+          },
+        ];
+      },
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handlePlans(
+    {
+      from: { id: 3 },
+      reply: async (text, opts) => replies.push({ text, opts }),
+    },
+    { objectId: 6 },
+  );
+  assert.equal(calls[0][2], 6);
+  const filterMsg = replies.find((entry) => entry.text === msg('plans_filter_prompt'));
+  assert.ok(filterMsg);
+  const filterButtons = filterMsg.opts.reply_markup.inline_keyboard.flat();
+  const activeBtn = filterButtons.find((btn) => btn.callback_data === 'plan_plans_filter|6');
+  assert.ok(activeBtn.text.startsWith('✅'));
+});
+
+test('planCommands handlePlans shows more button with cursor', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 7 }),
+      listObjects: async () => [],
+      listUpcomingEventsByUser: async () => {
+        const now = Date.now();
+        const buildEvent = (idx) => ({
+          id: idx + 1,
+          plan_id: 100 + idx,
+          plan_title: `План ${idx}`,
+          stage_title: `Этап ${idx}`,
+          due_at: new Date(now + idx * 3600000),
+        });
+        return Array.from({ length: 6 }, (_, idx) => buildEvent(idx));
+      },
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handlePlans({
+    from: { id: 7 },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  });
+  const moreMsg = replies.find((entry) => entry.text === msg('plans_more_hint'));
+  assert.ok(moreMsg);
+  const callback = moreMsg.opts.reply_markup.inline_keyboard[0][0].callback_data;
+  assert.ok(callback.startsWith('plan_plans_more|'));
+});
+
+test('planCommands handlePlans with cursor skips overview', async () => {
+  const replies = [];
+  const cursorEvent = {
+    id: 5,
+    plan_id: 8,
+    plan_title: 'План',
+    stage_title: 'Этап',
+    due_at: new Date('2025-01-01T12:00:00Z'),
+  };
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 9 }),
+      listObjects: async () => [],
+      listUpcomingEventsByUser: async (_userId, _limit, _objectId, cursor) => {
+        assert.ok(cursor);
+        return [cursorEvent];
+      },
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  const cursor = `${cursorEvent.due_at.getTime()}:${cursorEvent.id}`;
+  await planCommands.handlePlans(
+    {
+      from: { id: 9 },
+      reply: async (text, opts) => replies.push({ text, opts }),
+    },
+    { cursor },
+  );
+  assert.equal(replies[0].text, msg('plans_more_hint'));
+});
+
+test('planCommands handlePlans shows overdue section', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 11 }),
+      listObjects: async () => [],
+      listUpcomingEventsByUser: async () => [
+        {
+          id: 1,
+          plan_id: 2,
+          plan_title: 'План',
+          stage_title: 'Этап',
+          due_at: new Date(Date.now() + 3600000),
+        },
+      ],
+      listOverdueEventsByUser: async () => [
+        {
+          id: 99,
+          plan_id: 2,
+          plan_title: 'План',
+          stage_title: 'Просрочено',
+          due_at: new Date(Date.now() - 86400000),
+        },
+      ],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handlePlans({
+    from: { id: 11 },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  });
+  const overdueHeader = replies.find((entry) => entry.text === msg('plans_overdue_header'));
+  assert.ok(overdueHeader);
+  const overdueCard = replies.find((entry) => entry.text?.includes('Просрочено'));
+  assert.ok(overdueCard);
+});
+
+test('planCommands handleLocation updates coordinates from args', async () => {
+  const replies = [];
+  let updated = null;
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 10, last_object_id: 5 }),
+      getObjectById: async () => ({ id: 5, name: 'Грядка', user_id: 10, meta: {} }),
+      listObjects: async () => [],
+      updateUserLastObject: async () => {},
+      updateObjectMeta: async (objectId, patch) => {
+        updated = { objectId, patch };
+        return { id: objectId, meta: patch };
+      },
+    },
+    planWizard: { showPlanTable: async () => {} },
+    objectChips: { send: async () => replies.push('chips') },
+  });
+  await planCommands.handleLocation({
+    from: { id: 10 },
+    message: { text: '/location 55.75 37.62' },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(updated.objectId, 5);
+  assert.equal(updated.patch.lat, 55.75);
+  assert.equal(updated.patch.lon, 37.62);
+  assert.ok(replies[0].includes('координаты'));
+});
+
+test('planCommands handleLocationShare stores location after prompt', async () => {
+  const replies = [];
+  let latestPatch = null;
+  const db = {
+    ensureUser: async () => ({ id: 12, last_object_id: null }),
+    listObjects: async () => [{ id: 3, name: 'Грядка', user_id: 12, meta: {} }],
+    updateUserLastObject: async () => {},
+    getObjectById: async (id) => ({ id, name: 'Грядка', user_id: 12, meta: {} }),
+    updateObjectMeta: async (objectId, patch) => {
+      latestPatch = { objectId, patch };
+      return { id: objectId, meta: patch };
+    },
+  };
+  const planCommands = createPlanCommands({
+    db,
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleLocation({
+    from: { id: 12 },
+    message: { text: '/location' },
+    reply: async (text) => replies.push(text),
+  });
+  await planCommands.handleLocationShare({
+    from: { id: 12 },
+    message: { location: { latitude: 55.71, longitude: 37.55 } },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(latestPatch.objectId, 3);
+  assert.equal(latestPatch.patch.lat, 55.71);
+  assert.equal(latestPatch.patch.lon, 37.55);
+  assert.ok(replies.some((text) => typeof text === 'string' && text.includes('Сохранил координаты')));
+});
+
+test('planCommands handleLocationText geocodes address', async () => {
+  const replies = [];
+  const updates = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 15, last_object_id: null }),
+      getObjectById: async () => ({ id: 7, name: 'Грядка', user_id: 15, meta: {} }),
+      updateObjectMeta: async (objectId, patch) => {
+        updates.push({ objectId, patch });
+        return { id: objectId, meta: patch };
+      },
+    },
+    planWizard: { showPlanTable: async () => {} },
+    geocoder: {
+      lookup: async () => ({ lat: 54.5, lon: 36.3, label: 'Калужская область' }),
+    },
+  });
+  rememberLocationSession(15, 7, 'address');
+  await planCommands.handleLocationText({
+    from: { id: 15 },
+    message: { text: 'Калуга, поле' },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(updates[0].objectId, 7);
+  assert.equal(updates[0].patch.lat, 54.5);
+  clearLocationSession(15);
+});
+
+test('planLocationHandler confirm updates meta', async () => {
+  const updates = [];
+  const handler = createPlanLocationHandler({
+    db: {
+      ensureUser: async () => ({ id: 1 }),
+      getObjectById: async () => ({ id: 3, user_id: 1, meta: { location_source: 'geo_auto' } }),
+      updateObjectMeta: async (objectId, patch) => {
+        updates.push({ objectId, patch });
+      },
+    },
+  });
+  const replies = [];
+  await handler.confirm({
+    from: { id: 7 },
+    callbackQuery: { data: 'plan_location_confirm|3' },
+    answerCbQuery: async (text) => replies.push(text),
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(updates[0].objectId, 3);
+  assert.ok(updates[0].patch.location_confirmed);
+});
+
+test('planLocationHandler change points to /location', async () => {
+  const handler = createPlanLocationHandler({
+    db: {
+      ensureUser: async () => ({ id: 1 }),
+      getObjectById: async () => ({ id: 3, user_id: 1, meta: {} }),
+    },
+  });
+  const replies = [];
+  await handler.change({
+    from: { id: 7 },
+    callbackQuery: { data: 'plan_location_change|3' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+    answerCbQuery: async (text) => replies.push(text),
+  });
+  const prompt = replies.find((entry) => typeof entry === 'object' && entry.text?.includes('обновить координаты'));
+  assert.ok(prompt);
+  assert.ok(prompt.opts.reply_markup.inline_keyboard[0][0].callback_data.includes('plan_location_geo'));
+});
+
+test('planLocationHandler requestGeo remembers session', async () => {
+  clearLocationSession(5);
+  const handler = createPlanLocationHandler({
+    db: {
+      ensureUser: async () => ({ id: 5 }),
+      getObjectById: async () => ({ id: 9, user_id: 5, meta: {} }),
+    },
+  });
+  await handler.requestGeo({
+    from: { id: 99 },
+    callbackQuery: { data: 'plan_location_geo|9' },
+    answerCbQuery: async () => {},
+    reply: async () => {},
+  });
+  const { entry } = peekLocationRequest(5);
+  assert.equal(entry.objectId, 9);
+  assert.equal(entry.mode, 'geo');
+  clearLocationSession(5);
+});
+
+test('planLocationHandler requestAddress remembers session', async () => {
+  clearLocationSession(6);
+  const handler = createPlanLocationHandler({
+    db: {
+      ensureUser: async () => ({ id: 6 }),
+      getObjectById: async () => ({ id: 8, user_id: 6, meta: {} }),
+    },
+  });
+  await handler.requestAddress({
+    from: { id: 101 },
+    callbackQuery: { data: 'plan_location_address|8' },
+    answerCbQuery: async () => {},
+    reply: async () => {},
+  });
+  const { entry } = peekLocationRequest(6);
+  assert.equal(entry.objectId, 8);
+  assert.equal(entry.mode, 'address');
+  clearLocationSession(6);
+});
+
+test('planLocationHandler cancel clears request', async () => {
+  rememberLocationSession(4, 2, 'address');
+  const handler = createPlanLocationHandler({
+    db: {
+      ensureUser: async () => ({ id: 4 }),
+      getObjectById: async () => ({ id: 2, user_id: 4, meta: {} }),
+    },
+  });
+  await handler.cancel({
+    from: { id: 50 },
+    callbackQuery: { data: 'plan_location_cancel|2' },
+    answerCbQuery: async () => {},
+    reply: async () => {},
+  });
+  const { entry } = peekLocationRequest(4);
+  assert.equal(entry, null);
+});
+
+test('createGeocoder caches repeated lookups', async () => {
+  const cacheStore = new Map();
+  const cache = {
+    async get(key) {
+      return cacheStore.get(key) || null;
+    },
+    async set(key, value) {
+      cacheStore.set(key, value);
+    },
+  };
+  let calls = 0;
+  const geocoder = createGeocoder({
+    cache,
+    providerImpl: {
+      lookup: async () => {
+        calls += 1;
+        return { lat: 10, lon: 20, label: 'Test' };
+      },
+    },
+  });
+  const first = await geocoder.lookup('Москва');
+  const second = await geocoder.lookup('Москва');
+  assert.ok(first && second);
+  assert.equal(calls, 1);
 });
 
 test('planCommands handleStats prints data', async () => {
@@ -1470,6 +2212,48 @@ test('photoHandler adds planning buttons', { concurrency: false }, async () => {
   assert.ok(cbs.includes('pdf_note'));
   assert.ok(cbs.includes('ask_products'));
   assert.ok(replies[1].msg.includes('⚠️ Пересъёмка'));
+});
+
+test('photoHandler logs funnel events', { concurrency: false }, async () => {
+  const events = [];
+  const deps = {
+    pool: { query: async () => {} },
+    db: {
+      ensureUser: async () => ({ id: 77, last_object_id: 3 }),
+      saveRecentDiagnosis: async () => ({ id: 501, object_id: 9 }),
+      logFunnelEvent: async (payload) => events.push(payload),
+    },
+    objectChips: { send: async () => {} },
+  };
+  const ctx = {
+    message: { photo: [{ file_id: 'id90', file_unique_id: 'uniq', width: 2, height: 2, file_size: 2 }] },
+    from: { id: 77 },
+    reply: async () => {},
+    telegram: { getFileLink: async () => ({ href: 'http://file' }) },
+  };
+  await withMockFetch(
+    {
+      'http://file': { body: Readable.from(Buffer.from('y')) },
+      default: {
+        json: async () => ({
+          crop: 'apple',
+          disease: 'scab',
+          confidence: 0.9,
+          treatment_plan: { product: 'Топаз', dosage: '2 мл', phi: '30', safety: 'Перчатки' },
+          need_reshoot: false,
+          reshoot_tips: [],
+          next_steps: { reminder: 'Повтори', green_window: 'После дождя', cta: 'Запланировать' },
+        }),
+      },
+    },
+    async () => {
+      await photoHandler(deps, ctx);
+    },
+  );
+  const names = events.map((entry) => entry.event);
+  assert.deepEqual(names, ['photo_received', 'diagnosis_shown']);
+  const diagEvent = events.find((entry) => entry.event === 'diagnosis_shown');
+  assert.equal(diagEvent.objectId, 9);
 });
 
 test('photoHandler paywall on 402', { concurrency: false }, async () => {
@@ -2043,6 +2827,37 @@ test('reminderHandler cancels reminder', { concurrency: false }, async () => {
   reminders.clear();
 });
 
+test('plan_manual_start callback prompts manual picker', async () => {
+  const replies = [];
+  const answers = [];
+  const sessionUpdates = [];
+  const handler = createPlanManualSlotHandlers({
+    db: {
+      ensureUser: async () => ({ id: 5 }),
+      getStageById: async () => ({
+        id: 12,
+        plan_id: 77,
+        user_id: 5,
+        title: 'Обработка',
+      }),
+      getPlanSessionByPlan: async () => ({ id: 200, state: { foo: 'bar' } }),
+      updatePlanSession: async (sessionId, patch) =>
+        sessionUpdates.push({ sessionId, patch }),
+    },
+    reminderScheduler: null,
+  });
+  const ctx = createCallbackCtx('plan_manual_start|77|12|3', 5);
+  ctx.reply = async (text, opts) => replies.push({ text, opts });
+  ctx.answerCbQuery = async (text) => answers.push(text);
+  await handler.start(ctx);
+  assert.ok(replies[0].text.includes(msg('plan_manual_prompt', { stage: 'Обработка' })));
+  const keyboard = replies[0].opts.reply_markup.inline_keyboard;
+  assert.ok(keyboard.some((row) => row.some((btn) => btn.callback_data?.startsWith('plan_manual_slot|'))));
+  assert.equal(answers[0], msg('plan_manual_prompt_toast'));
+  assert.equal(sessionUpdates[0].sessionId, 200);
+  assert.equal(sessionUpdates[0].patch.currentStep, 'time_manual_prompt');
+});
+
 test('plan_slot accept schedules events and reminders', { concurrency: false }, async () => {
   const context = buildSlotContext();
   const eventCalls = [];
@@ -2050,6 +2865,7 @@ test('plan_slot accept schedules events and reminders', { concurrency: false }, 
   const slotUpdates = [];
   const runUpdates = [];
   const planUpdates = [];
+  const funnelEvents = [];
   const reminderScheduler = {
     scheduled: [],
     scheduleMany(remindersList) {
@@ -2069,6 +2885,7 @@ test('plan_slot accept schedules events and reminders', { concurrency: false }, 
     updateTreatmentSlot: async (id, patch) => slotUpdates.push({ id, patch }),
     updateAutoplanRun: async (id, patch) => runUpdates.push({ id, patch }),
     updatePlanStatus: async (payload) => planUpdates.push(payload),
+    logFunnelEvent: async (payload) => funnelEvents.push(payload),
   };
   const handlers = createPlanSlotHandlers({ db, reminderScheduler, autoplanQueue: null });
   const ctx = createCallbackCtx('plan_slot_accept|5');
@@ -2091,7 +2908,10 @@ test('plan_slot accept schedules events and reminders', { concurrency: false }, 
     timeZone: process.env.AUTOPLAN_TIMEZONE || 'Europe/Moscow',
   }).format(context.slot.slot_start);
   assert.equal(ctx.__answers[0].text, msg('plan_slot_confirmed_toast'));
-  assert.equal(ctx.__replies[0], msg('plan_slot_confirmed', { date: expectedDate, time: expectedTime }));
+  assert.equal(ctx.__replies[0].text, msg('plan_slot_confirmed', { date: expectedDate, time: expectedTime }));
+  assert.equal(funnelEvents[0].event, 'slot_confirmed');
+  assert.equal(funnelEvents[0].planId, context.plan.id);
+  assert.equal(funnelEvents[0].objectId, context.object.id);
 });
 
 test('plan_slot reschedule requeues autoplan', { concurrency: false }, async () => {
@@ -2122,7 +2942,7 @@ test('plan_slot reschedule requeues autoplan', { concurrency: false }, async () 
   assert.equal(createdRuns[0].stage_option_id, context.slot.stage_option_id);
   assert.equal(autoplanAdds[0].payload.runId, 77);
   assert.equal(ctx.__answers[0].text, msg('plan_slot_retry_toast'));
-  assert.equal(ctx.__replies[0], msg('plan_slot_retry'));
+  assert.equal(ctx.__replies[0].text, msg('plan_slot_retry'));
 });
 
 test('plan_slot cancel stops pending slot', { concurrency: false }, async () => {
@@ -2140,5 +2960,5 @@ test('plan_slot cancel stops pending slot', { concurrency: false }, async () => 
   assert.deepEqual(slotUpdates[0], { id: context.slot.id, patch: { status: 'cancelled' } });
   assert.deepEqual(runUpdates[0], { id: context.slot.autoplan_run_id, patch: { status: 'cancelled' } });
   assert.equal(ctx.__answers[0].text, msg('plan_slot_cancelled_toast'));
-  assert.equal(ctx.__replies[0], msg('plan_slot_cancelled'));
+  assert.equal(ctx.__replies[0].text, msg('plan_slot_cancelled'));
 });

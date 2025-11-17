@@ -8,6 +8,8 @@ from .user import User
 from .catalog import Catalog
 from .catalog_item import CatalogItem
 from .error_code import ErrorCode
+from .recent_diagnosis import RecentDiagnosis
+from .plan_session import PlanSession
 
 __all__ = [
     "Base",
@@ -20,4 +22,6 @@ __all__ = [
     "Catalog",
     "CatalogItem",
     "ErrorCode",
+    "RecentDiagnosis",
+    "PlanSession",
 ]

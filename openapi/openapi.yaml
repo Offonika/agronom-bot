@@ -404,6 +404,102 @@ components:
         limit:
           type: integer
           example: 5
+    PlanSessionUpsertRequest:
+      type: object
+      required: [token, diagnosis]
+      properties:
+        token:
+          type: string
+          example: mi0jzzh5i6ba7l
+        diagnosis:
+          type: object
+          additionalProperties: true
+          description: "Ответ diagnose API, сохранённый для мастера планов."
+        current_step:
+          type: string
+          example: choose_object
+        state:
+          type: object
+          additionalProperties: true
+          description: "Произвольное состояние мастера (выбор объекта, триггер и т.д.)."
+        recent_diagnosis_id:
+          type: integer
+          nullable: true
+        object_id:
+          type: integer
+          nullable: true
+        plan_id:
+          type: integer
+          nullable: true
+        ttl_hours:
+          type: integer
+          nullable: true
+          description: "Переопределение TTL (по умолчанию берётся из PLAN_SESSION_TTL_H)."
+    PlanSessionRecord:
+      type: object
+      required: [id, user_id, token, created_at, updated_at, expires_at, expired, current_step, state, diagnosis]
+      properties:
+        id:
+          type: integer
+          example: 5
+        user_id:
+          type: integer
+          example: 42
+        token:
+          type: string
+          example: mi0jzzh5i6ba7l
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        expired:
+          type: boolean
+        current_step:
+          type: string
+          example: time_picker
+        state:
+          type: object
+          additionalProperties: true
+        diagnosis:
+          type: object
+          additionalProperties: true
+        recent_diagnosis_id:
+          type: integer
+          nullable: true
+        object_id:
+          type: integer
+          nullable: true
+        plan_id:
+          type: integer
+          nullable: true
+    PlanSessionPatchRequest:
+      type: object
+      properties:
+        diagnosis:
+          type: object
+          additionalProperties: true
+        current_step:
+          type: string
+        state:
+          type: object
+          additionalProperties: true
+        recent_diagnosis_id:
+          type: integer
+          nullable: true
+        object_id:
+          type: integer
+          nullable: true
+        plan_id:
+          type: integer
+          nullable: true
+        ttl_hours:
+          type: integer
+          nullable: true
 
 paths:
   /v1/ai/diagnose:
@@ -476,6 +572,165 @@ paths:
         ip_limit: 30
         user_limit: 120
         window: minute
+
+  /v1/plans/sessions:
+    post:
+      summary: Create or refresh plan wizard session state
+      operationId: upsertPlanSession
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanSessionUpsertRequest'
+      responses:
+        '200':
+          description: Session stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanSessionRecord'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: Fetch the latest or token-specific plan wizard session
+      operationId: getPlanSession
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "Если не указан, возвращается последняя сессия пользователя."
+        - name: include_expired
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: plan_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: "Вернуть сессию, связанную с планом (взаимоисключается с token)."
+      responses:
+        '200':
+          description: Session returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanSessionRecord'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Session expired (unless include_expired=true)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete plan wizard session(s)
+      operationId: deletePlanSession
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+            description: "Если не указан, удаляются все сессии пользователя."
+        - name: plan_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            description: "Удалить сессии, связанные с планом."
+
+  /v1/plans/sessions/{session_id}:
+    patch:
+      summary: Update plan wizard session fields
+      operationId: patchPlanSession
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanSessionPatchRequest'
+      responses:
+        '200':
+          description: Updated session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanSessionRecord'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /v1/photos:
     get:
