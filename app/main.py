@@ -50,8 +50,8 @@ async def lifespan(app: FastAPI):
 
 if sys.version_info[:2] < (3, 11):
     if os.getenv("ALLOW_OLD_PYTHON", "0") != "1":
-        raise RuntimeError("Python 3.11+ is required")
-    logger.warning("Running on unsupported Python version %s.%s", *sys.version_info[:2])
+        raise RuntimeError("Python 3.11+ is required (run tests on 3.12)")
+    logger.warning("Running on older Python %s.%s (recommended 3.12+)", *sys.version_info[:2])
 
 app = FastAPI(
     title="Agronom Bot Internal API",

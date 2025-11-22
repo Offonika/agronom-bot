@@ -9,7 +9,7 @@ const { createWeatherService } = require('../services/weather');
 const { createAutoPlanner } = require('../services/auto_planner');
 const strings = require('../locales/ru.json');
 const { formatSlotCard, buildSlotKeyboard } = require('../services/slot_card');
-const { resolveObjectLocation } = require('./location_utils');
+const { processAutoplanContext, buildLocationDetails, pickLocationLabel } = require('./autoplan_core');
 
 const connection = { url: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = process.env.AUTOPLAN_QUEUE || 'autoplan';
@@ -58,80 +58,20 @@ async function processAutoplan(runId) {
     console.warn('autoplan run not found', runId);
     return;
   }
-  const location = resolveLocation(context);
-  await trackLocationSource(context, location);
-  console.info('autoplan.location', {
-    runId,
-    planId: context.plan?.id || null,
-    objectId: context.plan?.object_id || context.object?.id || null,
-    source: location.source || 'unknown',
+  await processAutoplanContext(context, {
+    planner,
+    db,
+    strings,
+    fallbackLat: process.env.WEATHER_LAT,
+    fallbackLon: process.env.WEATHER_LON,
+    trackLocation: trackLocationSource,
+    maybeNotifyDefaultLocation,
+    sendSlotCard,
+    notifyNoWindow,
+    notifyFailure,
+    updateTimeSession,
+    logger: console,
   });
-  const stageRules = (context.stage?.meta && context.stage.meta.weather) || {};
-  try {
-    await db.updateAutoplanRun(runId, {
-      status: 'in_progress',
-      started_at: new Date(),
-    });
-    if (location.source === 'default') {
-      await maybeNotifyDefaultLocation(context, location);
-    }
-    const slot = await planner.findWindow({
-      latitude: location.lat,
-      longitude: location.lon,
-      minHoursAhead: context.run.min_hours_ahead,
-      horizonHours: context.run.horizon_hours,
-      rules: stageRules,
-    });
-    if (!slot) {
-      await db.updateAutoplanRun(runId, {
-        status: 'awaiting_window',
-        reason: 'no_window',
-        finished_at: new Date(),
-      });
-      await notifyNoWindow(context);
-      return;
-    }
-    const savedSlot = await db.upsertTreatmentSlot({
-      autoplan_run_id: runId,
-      plan_id: context.plan.id,
-      stage_id: context.stage.id,
-      stage_option_id: context.run.stage_option_id,
-      slot_start: slot.start,
-      slot_end: slot.end,
-      score: slot.score,
-      reason: slot.reason,
-      status: 'proposed',
-    });
-    await db.updateAutoplanRun(runId, {
-      status: 'awaiting_confirmation',
-      reason: slot.reason.join('; '),
-      finished_at: new Date(),
-    });
-    await updateTimeSession(context.plan.id, {
-      step: 'time_autoplan_slot',
-      state: {
-        planId: context.plan.id,
-        stageId: context.stage.id,
-        stageOptionId: context.run.stage_option_id || null,
-        slotId: savedSlot.id,
-      },
-    });
-    await sendSlotCard(context, savedSlot);
-  } catch (err) {
-    console.error('autoplan run failed', runId, err);
-    await db.updateAutoplanRun(runId, {
-      status: 'failed',
-      error: err.message,
-      finished_at: new Date(),
-    });
-    await notifyFailure(context);
-    throw err;
-  }
-}
-
-function resolveLocation(context) {
-  const meta = (context.object && context.object.meta) || {};
-  return resolveObjectLocation(meta, process.env.WEATHER_LAT, process.env.WEATHER_LON);
 }
 
 async function sendSlotCard(context, slotRow) {
@@ -163,15 +103,19 @@ async function notifyFailure(context) {
   await sendTelegramMessage(context.user.tg_id, text);
 }
 
-async function notifyDefaultLocation(context) {
+async function notifyDefaultLocation(context, location) {
   if (!context.user?.tg_id) return;
-  const text = strings.plan_autoplan_default_location || 'Использую стандартные координаты. Отправьте /location, чтобы сделать прогноз точнее.';
+  const details = buildLocationDetails(location, pickLocationLabel(context));
+  const text =
+    format(strings.plan_autoplan_default_location || 'Использую стандартные координаты{details}. Отправьте /location, чтобы сделать прогноз точнее.', {
+      details,
+    });
   await sendTelegramMessage(context.user.tg_id, text);
 }
 
 async function maybeNotifyDefaultLocation(context, location) {
   if (!context.user?.tg_id || !context?.object?.id || location.warned) return;
-  await notifyDefaultLocation(context);
+  await notifyDefaultLocation(context, location);
   if (typeof db.updateObjectMeta === 'function') {
     try {
       await db.updateObjectMeta(context.object.id, { location_default_warned: true });
@@ -191,6 +135,10 @@ async function trackLocationSource(context, location) {
       objectId: context.plan?.object_id || context.object?.id || null,
       data: {
         source: location.source || 'unknown',
+        lat: location.lat ?? null,
+        lon: location.lon ?? null,
+        label: location.label || null,
+        warned: Boolean(location.warned),
       },
     });
   } catch (err) {

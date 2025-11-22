@@ -1,5 +1,6 @@
 const { msg } = require('./utils');
 const { logEvent, buyProHandler, cancelAutopay } = require('./payments');
+const { buildTipsKeyboard } = require('./photoTips');
 
 async function startHandler(ctx, pool) {
   if (ctx.startPayload === 'paywall') {
@@ -61,7 +62,9 @@ async function autopayEnableHandler(ctx, pool) {
 }
 
 async function newDiagnosisHandler(ctx) {
-  await ctx.reply(msg('new_command_hint'));
+  const keyboard = buildTipsKeyboard();
+  const opts = keyboard ? { reply_markup: keyboard } : undefined;
+  await ctx.reply(msg('new_command_hint'), opts);
 }
 
 module.exports = {

@@ -236,11 +236,11 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
       const user = await ensureUser(ctx);
       const object = await ensureActiveObject(user);
       const args = ctx.message?.text?.split(' ').slice(1).filter(Boolean) ?? [];
-      if (args.length >= 2) {
-        clearLocationRequest(user.id);
-        const coords = parseCoordinates(args);
-        if (!coords) {
-          await ctx.reply(msg('location_invalid_format'));
+    if (args.length >= 2) {
+      clearLocationRequest(user.id);
+      const coords = parseCoordinates(args);
+      if (!coords) {
+        await ctx.reply(msg('location_invalid_format'));
           return;
         }
         await updateObjectCoordinates(object, coords, 'manual_input');
@@ -255,12 +255,17 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         }
         return;
       }
-      rememberLocationRequest(user.id, object.id);
+      const ok = rememberLocationRequest(user.id, object.id);
+      if (!ok) {
+        await ctx.reply(msg('location_request_limit'));
+        return;
+      }
       await ctx.reply(
         msg('location_prompt', {
           name: object.name,
         }),
       );
+      await ctx.reply(msg('location_pending'));
     } catch (err) {
       console.error('location command error', err);
       await ctx.reply(msg('location_error'));
@@ -310,28 +315,34 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     const userId = ctx.from?.id;
     const text = ctx.message?.text?.trim();
     if (!userId || !text) return false;
-    const { entry, expired } = peekLocationRequest(userId);
-    if (!entry) {
-      if (expired) {
-        await ctx.reply(msg('location_request_expired'));
+    try {
+      const user = await ensureUser(ctx);
+      const { entry, expired } = peekLocationRequest(userId);
+      if (!entry) {
+        if (expired) {
+          await ctx.reply(msg('location_request_expired'));
+          return true;
+        }
+        return false;
+      }
+      if (entry.mode !== 'address') {
+        if (!text.startsWith('/')) {
+          await ctx.reply(msg('location_pending'));
+          return true;
+        }
+        return false;
+      }
+      consumeLocationRequest(userId);
+      if (!geocoder) {
+        await ctx.reply(msg('location_address_geocoder_missing'));
         return true;
       }
-      return false;
-    }
-    if (entry.mode !== 'address') return false;
-    consumeLocationRequest(userId);
-    if (!geocoder) {
-      await ctx.reply(msg('location_address_geocoder_missing'));
-      return true;
-    }
-    try {
-      const geo = await geocoder.lookup(text, { language: 'ru' });
+      const geo = await geocoder.lookup(text, { language: 'ru', userId: user.id });
       if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lon)) {
         await ctx.reply(msg('location_address_not_found'));
         rememberLocationRequest(userId, entry.objectId, 'address');
         return true;
       }
-      const user = await ensureUser(ctx);
       const object = await db.getObjectById(entry.objectId);
       if (!object || object.user_id !== user.id) {
         await ctx.reply(msg('location_object_missing'));

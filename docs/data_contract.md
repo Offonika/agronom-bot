@@ -1,10 +1,16 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.12 — 13 November 2025(v1.11 → v1.12: добавлен Google Sheets Runs, shift_status enum, логика Variant 2)
+Version 1.16 — 21 November 2025(v1.15 → v1.16: гео автодетект с картой, rate limit geocoder)
 
 0 · Scope
 
 Документ фиксирует схему БД, правила хранения, линии происхождения данных и JSON‑контракты API для MVP Telegram‑бота.
+
+Мастер диагностики собирает медиагруппу 3–8 фото с подсказками «Как сфоткать» (общий вид, лист лицевая, лист изнанка, плод/цветок/корень опционально). Анализ запускается после базового минимума: общий + лицевая + изнанка листа; остальное предлагается дослать или пропустить. Подборка чистится по таймауту 30 мин.
+
+Объекты хранят координаты в meta.lat/meta.lon (числа, диапазон lat −90..90, lon −180..180); частичные апдейты не затирают существующий meta. Координаты можно обновить через /location, geo-point или адрес (геокодер + кеш).
+
+При автодетекте локации бот показывает карточку «Нашли участок возле…?» с кнопкой карты (OSM) и подтверждением/изменением. Автопросы не спамят: TTL 12 ч на подтверждение, повторный запрос не чаще 30 мин. Геокодер кешируется в Redis, ограничивается per-user rate‑limit и логирует таймауты/ошибки.
 
 1 · Storage & Retention
 
@@ -94,7 +100,7 @@ SERIAL PK
 
 user_id
 
-INT FK → users(id)
+BIGINT (tg_id)
 
 file_id
 
@@ -232,7 +238,7 @@ SERIAL PK
 
 user_id
 
-INT FK
+BIGINT (tg_id)
 
 order_id
 
@@ -272,7 +278,7 @@ PK
 
 user_id
 
-INT
+BIGINT
 
 ✓
 
@@ -304,7 +310,7 @@ SERIAL PK
 
 user_id
 
-INT
+BIGINT
 
 event
 
@@ -504,7 +510,7 @@ INSERT → partner_orders (signature)
 
 6.1 · /v1/ai/diagnose
 
-Принимает фото (multipart image или JSON image_base64).Возвращает {crop, disease, confidence, protocol_status, protocol{id, product, dosage_value, dosage_unit, phi, category, status, waiting_days}}; создаёт photos + инкрементирует photo_usage.used.
+Принимает фото (multipart image или JSON image_base64). Возвращает {crop, disease, confidence, protocol_status, protocol{id, product, dosage_value, dosage_unit, phi, category, status, waiting_days}}; создаёт photos + инкрементирует photo_usage.used. Бот вызывает endpoint после сбора базового минимума (общий вид + лист лицевая + лист изнанка) в сессии до 8 фото; плод/цветок и корень опциональны. Сессия снимков очищается по таймауту 30 мин; лишние кадры >8 игнорируются.
 
 7 · Ownership & Lineage
 

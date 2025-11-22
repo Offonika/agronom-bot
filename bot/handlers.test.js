@@ -49,6 +49,17 @@ const {
 } = require('./messageFormatters/diagnosisMessage');
 const strings = require('../locales/ru.json');
 const { msg } = require('./utils');
+const {
+  addPhoto: addPhotoToAlbum,
+  getState: getPhotoAlbumState,
+  pickPrimary: pickPrimaryPhoto,
+  clearSession: clearPhotoAlbum,
+  skipOptional: skipOptionalPhotos,
+  MIN_PHOTOS,
+  MAX_PHOTOS,
+} = require('./photoCollector');
+const photoTips = require('./photoTips');
+const locationThrottler = require('./locationThrottler');
 function tr(key, vars = {}) {
   let text = strings[key];
   for (const [k, v] of Object.entries(vars)) {
@@ -1584,6 +1595,8 @@ test('planCommands handleLocationShare stores location after prompt', async () =
     message: { text: '/location' },
     reply: async (text) => replies.push(text),
   });
+  assert.ok(replies.includes(msg('location_pending')));
+  rememberLocationSession(12, 3, 'geo');
   await planCommands.handleLocationShare({
     from: { id: 12 },
     message: { location: { latitude: 55.71, longitude: 37.55 } },
@@ -1621,6 +1634,25 @@ test('planCommands handleLocationText geocodes address', async () => {
   assert.equal(updates[0].objectId, 7);
   assert.equal(updates[0].patch.lat, 54.5);
   clearLocationSession(15);
+});
+
+test('planCommands handleLocationText reminds pending geo request', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 18, last_object_id: null }),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  rememberLocationSession(18, 4, 'geo');
+  const handled = await planCommands.handleLocationText({
+    from: { id: 18 },
+    message: { text: 'привет' },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(handled, true);
+  assert.ok(replies.includes(msg('location_pending')));
+  clearLocationSession(18);
 });
 
 test('planLocationHandler confirm updates meta', async () => {
@@ -1672,15 +1704,18 @@ test('planLocationHandler requestGeo remembers session', async () => {
       getObjectById: async () => ({ id: 9, user_id: 5, meta: {} }),
     },
   });
+  rememberLocationSession(5, 9, 'geo');
+  const replies = [];
   await handler.requestGeo({
-    from: { id: 99 },
+    from: { id: 5 },
     callbackQuery: { data: 'plan_location_geo|9' },
     answerCbQuery: async () => {},
-    reply: async () => {},
+    reply: async (text) => replies.push(text),
   });
   const { entry } = peekLocationRequest(5);
   assert.equal(entry.objectId, 9);
   assert.equal(entry.mode, 'geo');
+  assert.ok(replies.includes(msg('location_pending')));
   clearLocationSession(5);
 });
 
@@ -1692,15 +1727,18 @@ test('planLocationHandler requestAddress remembers session', async () => {
       getObjectById: async () => ({ id: 8, user_id: 6, meta: {} }),
     },
   });
+  rememberLocationSession(6, 8, 'address');
+  const replies = [];
   await handler.requestAddress({
-    from: { id: 101 },
+    from: { id: 6 },
     callbackQuery: { data: 'plan_location_address|8' },
     answerCbQuery: async () => {},
-    reply: async () => {},
+    reply: async (text) => replies.push(text),
   });
   const { entry } = peekLocationRequest(6);
   assert.equal(entry.objectId, 8);
   assert.equal(entry.mode, 'address');
+  assert.ok(replies.includes(msg('location_pending')));
   clearLocationSession(6);
 });
 
@@ -1742,8 +1780,8 @@ test('createGeocoder caches repeated lookups', async () => {
       },
     },
   });
-  const first = await geocoder.lookup('Москва');
-  const second = await geocoder.lookup('Москва');
+  const first = await geocoder.lookup('Москва', { userId: 99 });
+  const second = await geocoder.lookup('Москва', { userId: 99 });
   assert.ok(first && second);
   assert.equal(calls, 1);
 });
@@ -2321,9 +2359,99 @@ test('startHandler replies with onboarding text', { concurrency: false }, async 
 
 test('newDiagnosisHandler replies with hint', { concurrency: false }, async () => {
   const replies = [];
-  const ctx = { reply: async (m) => replies.push(m) };
+  const ctx = { reply: async (m, opts) => replies.push({ m, opts }) };
   await newDiagnosisHandler(ctx);
-  assert.equal(replies[0], tr('new_command_hint'));
+  assert.equal(replies[0].m, tr('new_command_hint'));
+  assert.equal(replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data, 'photo_tips');
+  assert.equal(replies[0].opts.reply_markup.inline_keyboard[0][0].text, strings.photo_tips.button);
+});
+
+test('photoTips sends cards once per user', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 555 }, reply: async (m) => replies.push(m) };
+  await photoTips.sendTips(ctx);
+  await photoTips.sendTips(ctx);
+  assert.equal(replies[0], strings.photo_tips.intro);
+  assert.deepEqual(replies.slice(1, 1 + strings.photo_tips.cards.length), strings.photo_tips.cards);
+  assert.equal(replies[1 + strings.photo_tips.cards.length], strings.photo_tips.light);
+  assert.equal(replies.at(-1), strings.photo_tips.already_sent);
+});
+
+test('photoTips offerHint sends hint only once', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 556 }, reply: async (m, opts) => replies.push({ m, opts }) };
+  await photoTips.offerHint(ctx);
+  await photoTips.offerHint(ctx);
+  assert.equal(replies.length, 1);
+  assert.equal(replies[0].m, strings.photo_tips.hint);
+  assert.equal(replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data, 'photo_tips');
+});
+
+test('photoCollector enforces min/max and picks last photo', () => {
+  const userId = 7777;
+  clearPhotoAlbum(userId);
+  let state = addPhotoToAlbum(userId, { photo: [{ file_id: 'p1', file_size: 1, width: 1, height: 1 }] });
+  assert.equal(state.count, 1);
+  assert.equal(state.ready, false);
+  addPhotoToAlbum(userId, { photo: [{ file_id: 'p2', file_size: 1, width: 1, height: 1 }] });
+  state = addPhotoToAlbum(userId, { photo: [{ file_id: 'p3', file_size: 1, width: 1, height: 1 }] });
+  assert.equal(state.count, MIN_PHOTOS);
+  assert.equal(state.ready, true);
+  // exceed max
+  for (let i = 4; i <= MAX_PHOTOS + 2; i += 1) {
+    state = addPhotoToAlbum(userId, { photo: [{ file_id: `p${i}`, file_size: 1, width: 1, height: 1 }] });
+  }
+  assert.equal(state.count, MAX_PHOTOS);
+  assert.equal(state.overflow, true);
+  const primary = pickPrimaryPhoto(userId);
+  assert.equal(primary.file_id, `p${MAX_PHOTOS}`);
+  const snapshot = getPhotoAlbumState(userId);
+  assert.equal(snapshot.count, MAX_PHOTOS);
+  clearPhotoAlbum(userId);
+});
+
+test('photoCollector skip optional toggles flag', () => {
+  const userId = 8888;
+  clearPhotoAlbum(userId);
+  addPhotoToAlbum(userId, { photo: [{ file_id: 'x1', file_size: 1, width: 1, height: 1 }] });
+  let state = getPhotoAlbumState(userId);
+  assert.equal(state.optionalSkipped, false);
+  addPhotoToAlbum(userId, { photo: [{ file_id: 'x2', file_size: 1, width: 1, height: 1 }] });
+  state = getPhotoAlbumState(userId);
+  assert.equal(state.optionalSkipped, false);
+  // skip optional
+  skipOptionalPhotos(userId);
+  state = getPhotoAlbumState(userId);
+  assert.equal(state.optionalSkipped, true);
+  clearPhotoAlbum(userId);
+});
+
+test('photoCollector resets expired session', () => {
+  const userId = 9999;
+  clearPhotoAlbum(userId);
+  addPhotoToAlbum(userId, { photo: [{ file_id: 'y1', file_size: 1, width: 1, height: 1 }] });
+  const { getState: getCollectorState } = require('./photoCollector');
+  const sessions = require('./photoCollector').__getSessions
+    ? require('./photoCollector').__getSessions()
+    : null;
+  if (sessions && sessions.has(userId)) {
+    const s = sessions.get(userId);
+    s.updatedAt = Date.now() - 31 * 60 * 1000; // expire
+  }
+  const state = getCollectorState(userId);
+  assert.equal(state.count, 0);
+  assert.equal(state.ready, false);
+  clearPhotoAlbum(userId);
+});
+
+test('locationThrottler limits prompts per window', () => {
+  locationThrottler.reset();
+  const first = locationThrottler.remember(1);
+  const second = locationThrottler.remember(1);
+  const third = locationThrottler.remember(1);
+  assert.equal(first.allowed, true);
+  assert.equal(second.allowed, true);
+  assert.equal(third.allowed, false);
 });
 
 test('startHandler replies with FAQ', { concurrency: false }, async () => {

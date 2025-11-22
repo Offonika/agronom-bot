@@ -3,6 +3,7 @@
 const { createNominatimProvider } = require('./nominatim');
 
 const DEFAULT_CACHE_TTL_SECONDS = Number(process.env.GEOCODER_CACHE_TTL_S || '86400');
+const USER_LIMIT_PER_MIN = Number(process.env.GEOCODER_USER_LIMIT_PER_MIN || '10');
 
 function createRedisCache(redis, prefix = 'geo') {
   if (!redis) return null;
@@ -29,6 +30,40 @@ function createRedisCache(redis, prefix = 'geo') {
   };
 }
 
+function createUserLimiter(redis, prefix = 'geo', limitPerMin = USER_LIMIT_PER_MIN) {
+  if (!Number.isFinite(limitPerMin) || limitPerMin <= 0) return null;
+  const safePrefix = prefix.endsWith(':') ? prefix : `${prefix}:`;
+  if (redis) {
+    return async (userKey) => {
+      if (!userKey) return true;
+      try {
+        const key = `${safePrefix}rl:${userKey}`;
+        const val = await redis.incr(key);
+        if (val === 1) {
+          await redis.expire(key, 60);
+        }
+        return val <= limitPerMin;
+      } catch (err) {
+        console.error('geocoder rate limit failed', err);
+        return true;
+      }
+    };
+  }
+  const buckets = new Map();
+  return async (userKey) => {
+    if (!userKey) return true;
+    const now = Date.now();
+    const bucket = buckets.get(userKey) || { count: 0, resetAt: now + 60_000 };
+    if (now > bucket.resetAt) {
+      bucket.count = 0;
+      bucket.resetAt = now + 60_000;
+    }
+    bucket.count += 1;
+    buckets.set(userKey, bucket);
+    return bucket.count <= limitPerMin;
+  };
+}
+
 function normalizeQuery(value) {
   if (!value) return null;
   const text = String(value).trim();
@@ -52,10 +87,20 @@ function createGeocoder(options = {}) {
     Number.isFinite(options.ttlSeconds) && options.ttlSeconds > 0
       ? options.ttlSeconds
       : DEFAULT_CACHE_TTL_SECONDS;
+  const userLimiter =
+    options.userLimiter || createUserLimiter(options.redis, options.cachePrefix, options.userLimitPerMin);
 
   async function lookup(query, opts = {}) {
     const normalized = normalizeQuery(query);
     if (!normalized) return null;
+    const userKey = opts.userId ? String(opts.userId) : null;
+    if (userLimiter && userKey) {
+      const allowed = await userLimiter(userKey);
+      if (!allowed) {
+        console.warn('geocoder user rate limit exceeded', { provider: providerName, user: userKey });
+        return null;
+      }
+    }
     const cacheKey = `${providerName}:${normalized}`;
     if (cache) {
       const cached = await cache.get(cacheKey);

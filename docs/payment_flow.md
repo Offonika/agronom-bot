@@ -1,6 +1,6 @@
 Payment Flow – SBP Integration
 
-Версия 1.1 — 5 августа 2025 г.(v1.0 → v1.1: добавлена интеграция с Tinkoff Autopay, эндпойнт /autopay/cancel, описана retry‑логика)
+Версия 1.2 — 17 ноября 2025 г.(v1.1 → v1.2: user_id в payments/events теперь BIGINT из‑за Telegram ID)
 
 1. REST API
 
@@ -119,7 +119,7 @@ SERIAL PK
 
 user_id
 
-INT FK
+BIGINT (tg_id)
 
 
 
@@ -193,7 +193,7 @@ SERIAL PK
 
 user_id
 
-INT
+BIGINT
 
 1
 

@@ -43,7 +43,6 @@ from app.services.recent_diagnosis import (
     get_recent_diagnosis_by_id,
     save_recent_diagnosis,
 )
-from app.services.recent_diagnosis import save_recent_diagnosis
 
 settings = Settings()
 logger = logging.getLogger(__name__)

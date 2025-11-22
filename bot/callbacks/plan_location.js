@@ -38,6 +38,7 @@ function createPlanLocationHandler({ db }) {
           location_prompted: true,
           location_source: object.meta?.location_source || 'manual',
           location_confirmed_at: new Date().toISOString(),
+          location_confirmed_at: new Date().toISOString(),
         });
       }
       await safeAnswer(ctx, 'location_confirmed_toast');
@@ -87,9 +88,14 @@ function createPlanLocationHandler({ db }) {
         await replyUserError(ctx, 'OBJECT_NOT_OWNED');
         return;
       }
-      rememberLocationRequest(user.id, object.id, 'geo');
+      const ok = rememberLocationRequest(user.id, object.id, 'geo');
+      if (!ok) {
+        await safeAnswer(ctx, 'location_request_limit', true);
+        return;
+      }
       await safeAnswer(ctx, 'location_geo_toast');
       await ctx.reply(msg('location_geo_instructions'));
+      await ctx.reply(msg('location_pending'));
     } catch (err) {
       console.error('plan_location.geo error', err);
       await safeAnswer(ctx, 'location_error', true);
@@ -111,9 +117,14 @@ function createPlanLocationHandler({ db }) {
         await replyUserError(ctx, 'OBJECT_NOT_OWNED');
         return;
       }
-      rememberLocationRequest(user.id, object.id, 'address');
+      const ok = rememberLocationRequest(user.id, object.id, 'address');
+      if (!ok) {
+        await safeAnswer(ctx, 'location_request_limit', true);
+        return;
+      }
       await safeAnswer(ctx, 'location_address_toast');
       await ctx.reply(msg('location_address_instructions'));
+      await ctx.reply(msg('location_pending'));
     } catch (err) {
       console.error('plan_location.address error', err);
       await safeAnswer(ctx, 'location_error', true);

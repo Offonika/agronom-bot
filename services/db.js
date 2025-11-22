@@ -137,11 +137,44 @@ function createDb(poolInstance) {
     return result;
   }
 
+  function sanitizeCoordinates(baseMeta = {}, mergedMeta = {}, patch = {}) {
+    const hasCoordPatch =
+      Object.prototype.hasOwnProperty.call(patch, 'lat') ||
+      Object.prototype.hasOwnProperty.call(patch, 'lon');
+    if (!hasCoordPatch) return mergedMeta;
+    const lat = Number(mergedMeta.lat);
+    const lon = Number(mergedMeta.lon);
+    const valid =
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lon >= -180 &&
+      lon <= 180;
+    if (valid) {
+      mergedMeta.lat = lat;
+      mergedMeta.lon = lon;
+      return mergedMeta;
+    }
+    if (Object.prototype.hasOwnProperty.call(baseMeta, 'lat')) {
+      mergedMeta.lat = baseMeta.lat;
+    } else {
+      delete mergedMeta.lat;
+    }
+    if (Object.prototype.hasOwnProperty.call(baseMeta, 'lon')) {
+      mergedMeta.lon = baseMeta.lon;
+    } else {
+      delete mergedMeta.lon;
+    }
+    return mergedMeta;
+  }
+
   async function updateObjectMeta(objectId, patch = {}) {
     if (!objectId || !patch || typeof patch !== 'object') return null;
     const current = await getObjectById(objectId);
     if (!current) return null;
-    const merged = mergeMeta(current.meta || {}, patch);
+    const baseMeta = current.meta || {};
+    const merged = sanitizeCoordinates(baseMeta, mergeMeta(baseMeta, patch), patch);
     const sql = `
       UPDATE objects
       SET meta = $2

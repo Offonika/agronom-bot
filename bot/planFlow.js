@@ -4,12 +4,16 @@ const { msg } = require('./utils');
 const { logFunnelEvent } = require('./funnel');
 const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessage');
 const { replyUserError } = require('./userErrors');
+const { remember: rememberLocationPrompt } = require('./locationThrottler');
 
 const PLAN_KIND_DEFAULT = 'PLAN_NEW';
 const ROW_SIZE = 3;
 const PLAN_KIND_SKIP = new Set(['QNA', 'FAQ']);
 const PLAN_KIND_ALLOWED = new Set(['PLAN_NEW', 'PLAN_UPDATE']);
-const LOCATION_PROMPT_TTL_MS = 24 * 60 * 60 * 1000;
+const LOCATION_PROMPT_TTL_MS = 30 * 60 * 1000; // 30 min prompt timeout
+const LOCATION_AUTO_CONFIRM_TTL_MS = 12 * 60 * 60 * 1000; // 12h
+const LOCATION_EXPIRE_MS = 30 * 60 * 1000; // 30 min for pending prompts
+const DEFAULT_MAP_ZOOM = 15;
 
 function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions = null }) {
   if (!db || !catalog || !planWizard) {
@@ -165,7 +169,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       objects = [primary];
     }
     await db.updateUserLastObject(user.id, primary.id);
-    const enriched = await maybeAutodetectLocation(primary, diagnosis);
+    const enriched = await maybeAutodetectLocation(primary, diagnosis, user?.id);
     if (enriched && enriched !== primary) {
       primary = enriched;
       objects = objects.map((obj) => (obj.id === primary.id ? primary : obj));
@@ -198,14 +202,14 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     return null;
   }
 
-  async function maybeAutodetectLocation(object, diagnosis) {
+  async function maybeAutodetectLocation(object, diagnosis, userId = null) {
     if (!geocoder || !object?.id) return object;
     if (typeof db.updateObjectMeta !== 'function') return object;
     if (hasCoordinates(object.meta)) return object;
     const query = pickLocationQuery(diagnosis, object);
     if (!query) return object;
     try {
-      const geo = await geocoder.lookup(query, { language: 'ru' });
+      const geo = await geocoder.lookup(query, { language: 'ru', userId });
       if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lon)) return object;
       const updated = await db.updateObjectMeta(object.id, {
         lat: geo.lat,
@@ -228,6 +232,20 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
 
   async function promptManualLocation(ctx, object) {
     if (!ctx?.reply || !object?.id) return;
+    const userId = ctx.from?.id;
+    const throttle = rememberLocationPrompt(userId);
+    if (!throttle.allowed) {
+      await ctx.reply(msg('location_prompt_limit'));
+      return;
+    }
+    const meta = object.meta || {};
+    const promptedAt = meta.location_prompted_at ? new Date(meta.location_prompted_at) : null;
+    if (promptedAt && !Number.isNaN(promptedAt.getTime())) {
+      const age = Date.now() - promptedAt.getTime();
+      if (age > LOCATION_PROMPT_TTL_MS) {
+        await ctx.reply(msg('location_expired_notice'));
+      }
+    }
     try {
       await ctx.reply(msg('location_manual_prompt', { name: object.name }), {
         reply_markup: {
@@ -251,12 +269,19 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     }
   }
 
-  async function maybePromptLocationConfirmation(ctx, object) {
+  async function maybePromptLocationConfirmation(ctx, object, user) {
     if (!ctx?.reply || !object?.id) return;
     const meta = object.meta || {};
-    if (meta.location_confirmed || meta.location_prompted) return;
+    const confirmedAt = meta.location_confirmed_at ? new Date(meta.location_confirmed_at) : null;
+    if (meta.location_confirmed || (confirmedAt && Date.now() - confirmedAt.getTime() < LOCATION_AUTO_CONFIRM_TTL_MS))
+      return;
+    if (meta.location_prompted) {
+      const promptedAt = meta.location_prompted_at ? new Date(meta.location_prompted_at) : null;
+      if (promptedAt && Date.now() - promptedAt.getTime() < LOCATION_EXPIRE_MS) return;
+    }
     if (meta.location_source !== 'geo_auto') return;
     const label = meta.geo_label || object.location_tag || msg('location_guess_fallback');
+    const mapLink = buildMapLink(meta.lat, meta.lon);
     const keyboard = {
       inline_keyboard: [
         [
@@ -265,7 +290,24 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         ],
       ],
     };
+    if (mapLink) {
+      keyboard.inline_keyboard.push([
+        { text: msg('location_map_button') || 'Открыть карту', url: mapLink },
+      ]);
+    }
     await ctx.reply(msg('location_guess_prompt', { label }), { reply_markup: keyboard });
+    if (user?.id) {
+      try {
+        await logFunnelEvent(db, {
+          event: 'location_guess_prompt',
+          userId: user.id,
+          objectId: object.id,
+          data: { source: meta.location_source || 'geo_auto', label },
+        });
+      } catch (err) {
+        console.error('plan_flow.location_prompt_log_failed', err);
+      }
+    }
     if (typeof db.updateObjectMeta === 'function') {
       try {
         await db.updateObjectMeta(object.id, { location_prompted: true, location_prompted_at: new Date().toISOString() });
@@ -273,6 +315,13 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         console.error('plan_flow.location_prompt_mark_failed', err);
       }
     }
+  }
+
+  function buildMapLink(lat, lon, zoom = DEFAULT_MAP_ZOOM) {
+    const latitude = Number(lat);
+    const longitude = Number(lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return `https://www.openstreetmap.org/?mlat=${latitude.toFixed(6)}&mlon=${longitude.toFixed(6)}#map=${zoom}/${latitude.toFixed(6)}/${longitude.toFixed(6)}`;
   }
 
   async function start(ctx, diagnosis, opts = {}) {
@@ -297,7 +346,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       if (needsManualLocation(primary.meta || {})) {
         await promptManualLocation(ctx, primary);
       } else {
-        await maybePromptLocationConfirmation(ctx, primary);
+        await maybePromptLocationConfirmation(ctx, primary, user);
       }
       if (Array.isArray(objects) && objects.length === 1) {
         if (opts.skipAutoFinalize) {

@@ -11,7 +11,7 @@ from sqlalchemy import text
 from app.dependencies import compute_signature, verify_hmac
 from app.config import Settings
 from app.db import SessionLocal
-from app.models import Catalog, CatalogItem, ErrorCode, RecentDiagnosis, PlanSession
+from app.models import Catalog, CatalogItem, ErrorCode, RecentDiagnosis
 
 
 def seed_protocol():
@@ -1303,7 +1303,6 @@ def test_diagnose_missing_protocols_table(client):
     """Diagnose should gracefully handle a missing protocols table."""
     from app.db import SessionLocal
     from sqlalchemy import text
-    import subprocess
 
     with SessionLocal() as session:
         session.execute(text("DROP VIEW IF EXISTS protocols_current"))

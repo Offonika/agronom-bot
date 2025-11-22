@@ -1,6 +1,8 @@
 'use strict';
 
 const LOCATION_REQUEST_TTL_MS = Number(process.env.LOCATION_REQUEST_TTL_MS || '120000');
+const LOCATION_MAX_RETRIES = Number(process.env.LOCATION_MAX_RETRIES || '3');
+const LOCATION_COOLDOWN_MS = Number(process.env.LOCATION_COOLDOWN_MS || `${5 * 60 * 1000}`); // 5 min
 
 const store = new Map();
 
@@ -9,12 +11,21 @@ function now() {
 }
 
 function rememberLocationRequest(userId, objectId, mode = 'geo') {
-  if (!userId || !objectId) return;
+  if (!userId || !objectId) return false;
+  const existing = store.get(userId);
+  const retries = existing?.retries ? existing.retries + 1 : 1;
+  if (retries > LOCATION_MAX_RETRIES) {
+    store.delete(userId);
+    return false;
+  }
   store.set(userId, {
     objectId,
     mode,
     expiresAt: now() + Math.max(LOCATION_REQUEST_TTL_MS, 1000),
+    retries,
+    cooldownUntil: now() + LOCATION_COOLDOWN_MS,
   });
+  return true;
 }
 
 function clearLocationRequest(userId) {

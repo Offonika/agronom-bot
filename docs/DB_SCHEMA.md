@@ -12,7 +12,8 @@
 
 ### objects
 - Привязка пользователя к грядкам/растениям.
-- Поля: `id`, `user_id` (FK users), `title`, `crop`, `photo_url`, `is_default`, `created_at`, `archived_at`.
+- Поля: `id`, `user_id` (FK users), `title`, `crop`, `photo_url`, `is_default`, `meta` (JSONB), `created_at`, `archived_at`.
+  - meta.lat/meta.lon — координаты (числа, lat −90..90, lon −180..180), meta.location_source, meta.location_updated_at, meta.location_prompted, meta.location_prompted_at, meta.location_default_warned.
 - Индекс: `objects_user_active_idx (user_id, archived_at NULLS FIRST)`.
 
 ### cases
@@ -59,7 +60,7 @@
 - Поле `priority` используется для сортировки опций и фильтрации аналогов.
 
 ### autoplan_runs
-- История запусков автопланировщика.
+- История запусков автопланировщика (source координат фиксируется в событии `autoplan_location`, данные содержат lat/lon/label/warned).
 - `id`, `plan_id`, `stage_option_id`, `treatment_id`, `status` (pending|window_found|awaiting_window|failed), `reason`, `forecast_version`, `started_at`, `finished_at`.
 
 ### treatment_slots

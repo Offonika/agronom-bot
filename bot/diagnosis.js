@@ -189,13 +189,10 @@ async function replyFollowupFromHistory(ctx, text) {
   return true;
 }
 
-async function photoHandler(depsOrPool, ctx) {
-  const deps = normalizeDeps(depsOrPool);
+async function analyzePhoto(deps, ctx, photo) {
+  if (!photo) return;
   const pool = deps?.pool;
-  if (!pool) {
-    throw new Error('photoHandler requires pool in deps');
-  }
-  const photo = ctx.message.photo[ctx.message.photo.length - 1];
+  if (!pool) throw new Error('analyzePhoto requires pool in deps');
   const { file_id, file_unique_id, width, height, file_size } = photo;
   if (file_size > MAX_FILE_SIZE) {
     if (typeof ctx.reply === 'function') {
@@ -203,7 +200,8 @@ async function photoHandler(depsOrPool, ctx) {
     }
     return;
   }
-  const userId = ctx.from.id;
+  const userId = ctx.from?.id;
+  if (!userId) return;
   const dbClient = deps?.db;
   let dbUser = null;
   if (dbClient?.ensureUser) {
@@ -459,7 +457,11 @@ function normalizeDeps(value) {
 }
 
 module.exports = {
-  photoHandler,
+  photoHandler: async (depsOrPool, ctx) => {
+    const deps = normalizeDeps(depsOrPool);
+    const photo = ctx?.message?.photo?.[ctx.message.photo.length - 1];
+    return analyzePhoto(deps, ctx, photo);
+  },
   messageHandler,
   retryHandler,
   getProductName,
@@ -469,4 +471,5 @@ module.exports = {
   getLastDiagnosis,
   getCropHint,
   buildProtocolRow,
+  analyzePhoto,
 };

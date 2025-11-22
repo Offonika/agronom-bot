@@ -43,6 +43,17 @@ const { createObjectChips } = require('./objectChips');
 const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessage');
 const { replyUserError } = require('./userErrors');
 const { logFunnelEvent } = require('./funnel');
+const photoTips = require('./photoTips');
+const {
+  addPhoto,
+  getState: getPhotoState,
+  pickPrimary: pickPhotoForAnalysis,
+  clearSession: clearPhotoSession,
+  skipOptional: skipOptionalPhotos,
+  MIN_PHOTOS,
+  MAX_PHOTOS,
+} = require('./photoCollector');
+const { analyzePhoto } = require('./diagnosis');
 
 const { formatSlotCard, buildSlotKeyboard } = require('../services/slot_card');
 const { createGeocoder } = require('../services/geocoder');
@@ -119,11 +130,51 @@ const deps = { pool, db, catalog, planWizard, planFlow, objectChips };
 const planOnboardingShown = new Set();
 const planShortHintShown = new Map();
 
+const PHOTO_LABEL_KEYS = [
+  'photo_album_label_overview',
+  'photo_album_label_front',
+  'photo_album_label_back',
+  'photo_album_label_fruit',
+  'photo_album_label_root',
+];
+
 function toDate(value) {
   if (!value) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function buildPhotoChecklist(count) {
+  const rows = [];
+  for (let i = 0; i < PHOTO_LABEL_KEYS.length; i += 1) {
+    const label = msg(PHOTO_LABEL_KEYS[i]);
+    if (!label) continue;
+    const status = count > i ? msg('photo_album_status_ready') || '✓' : msg('photo_album_status_missing') || '✗';
+    rows.push(msg('photo_album_check_item', { label, status }) || `${label}: ${status}`);
+  }
+  return rows.join('\n');
+}
+
+function buildPhotoKeyboard(ready, optionalSkipped, canAddMore) {
+  const doneText = msg('photo_album_button_done');
+  const resetText = msg('photo_album_button_reset');
+  const addText = msg('photo_album_button_add');
+  const skipText = msg('photo_album_button_skip_optional');
+  const rows = [];
+  if (ready && doneText) {
+    rows.push([{ text: doneText, callback_data: 'photo_album_done' }]);
+  }
+  if (addText && canAddMore) {
+    rows.push([{ text: addText, callback_data: 'photo_album_add' }]);
+  }
+  if (skipText && !optionalSkipped) {
+    rows.push([{ text: skipText, callback_data: 'photo_album_skip_optional' }]);
+  }
+  if (resetText) {
+    rows.push([{ text: resetText, callback_data: 'photo_album_reset' }]);
+  }
+  return { inline_keyboard: rows };
 }
 
 function isRecentDiagnosisExpired(record) {
@@ -563,7 +614,34 @@ async function init() {
       }
       return undefined;
     });
-    bot.on('photo', (ctx) => photoHandler(deps, ctx));
+    bot.on('photo', async (ctx) => {
+      await photoTips.offerHint(ctx);
+      const userId = ctx.from?.id;
+      const state = addPhoto(userId, ctx.message);
+      const checklist = buildPhotoChecklist(state.count);
+      const parts = [
+        msg('photo_album_status', { count: state.count, min: MIN_PHOTOS, max: MAX_PHOTOS }),
+      ];
+      if (state.overflow) {
+        parts.push(msg('photo_album_overflow', { max: MAX_PHOTOS }));
+      }
+      if (checklist) {
+        parts.push(msg('photo_album_checklist', { checklist }));
+      }
+      if (!state.optionalSkipped) {
+        parts.push(msg('photo_album_optional'));
+      }
+      if (state.ready) {
+        parts.push(msg('photo_album_ready', { max: MAX_PHOTOS }));
+      } else {
+        const need = Math.max(0, MIN_PHOTOS - state.count);
+        parts.push(msg('photo_album_not_ready', { need }));
+      }
+      const text = parts.filter(Boolean).join('\n');
+      await ctx.reply(text, {
+        reply_markup: buildPhotoKeyboard(state.ready, state.optionalSkipped, state.count < MAX_PHOTOS),
+      });
+    });
 
     bot.on('message', messageHandler);
 
@@ -757,6 +835,61 @@ async function init() {
       const tips = list('reshoot.tips').map((tip) => `• ${tip}`).join('\n');
       const text = [msg('reshoot.action'), tips].filter(Boolean).join('\n');
       return ctx.reply(text);
+    });
+
+    bot.action('photo_tips', async (ctx) => {
+      await photoTips.sendTips(ctx);
+    });
+
+    bot.action('photo_album_done', async (ctx) => {
+      await ctx.answerCbQuery();
+      const userId = ctx.from?.id;
+      const state = getPhotoState(userId);
+      if (!state.ready || !userId) {
+        const need = Math.max(0, MIN_PHOTOS - (state.count || 0));
+        await ctx.reply(msg('photo_album_not_ready', { need }));
+        return;
+      }
+      const photo = pickPhotoForAnalysis(userId);
+      if (!photo) {
+        await ctx.reply(msg('photo_album_not_ready', { need: MIN_PHOTOS }));
+        return;
+      }
+      try {
+        await analyzePhoto(deps, ctx, photo);
+        clearPhotoSession(userId);
+      } catch (err) {
+        console.error('photo_album_done analyze failed', err);
+        await ctx.reply(msg('diagnose_error'));
+      }
+    });
+
+    bot.action('photo_album_add', async (ctx) => {
+      await ctx.answerCbQuery();
+      const text = msg('photo_album_add_more', { max: MAX_PHOTOS });
+      if (text) {
+        await ctx.reply(text);
+      }
+    });
+
+    bot.action('photo_album_skip_optional', async (ctx) => {
+      await ctx.answerCbQuery();
+      const userId = ctx.from?.id;
+      if (userId) skipOptionalPhotos(userId);
+      const reply = msg('photo_album_skip_optional_done');
+      if (reply) {
+        await ctx.reply(reply);
+      }
+    });
+
+    bot.action('photo_album_reset', async (ctx) => {
+      await ctx.answerCbQuery();
+      const userId = ctx.from?.id;
+      const cleared = clearPhotoSession(userId);
+      const reply = cleared ? msg('photo_album_reset_done') : msg('photo_album_reset_empty');
+      if (reply) {
+        await ctx.reply(reply);
+      }
     });
 
     bot.action(/^faq\|/, async (ctx) => {

@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os
-import textwrap
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -11,7 +10,6 @@ from alembic.config import Config
 
 from app import dependencies, db as db_module
 from app.models import Base
-from sqlalchemy import text as sa_text
 
 # Ensure tests always run against SQLite regardless of host env
 os.environ["DATABASE_URL"] = "sqlite:////tmp/agronom_test.db"
