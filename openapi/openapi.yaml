@@ -5,7 +5,7 @@ info:
   version: "1.10.0"
   description: |
     Telegram-бот «Карманный агроном» — API v1.10.0.
-    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header, +ask_expert endpoint, +protocol fields category/status/waiting_days.
+    Fixes: +signature, +UNAUTHORIZED, +monthly limits, +X-API-Ver usage, +multipart required, clarified dosage units, +X-User-ID header, +ask_expert endpoint, +protocol fields category/status/waiting_days, +assistant chat/confirm_plan.
   contact:
     name: Ivan Gromov
     url: https://github.com/agronom-bot
@@ -501,7 +501,378 @@ components:
           type: integer
           nullable: true
 
+    AssistantChatRequest:
+      type: object
+      required: [message]
+      properties:
+        session_id:
+          type: string
+          example: "chat-6f7c"
+        object_id:
+          type: integer
+          nullable: true
+        message:
+          type: string
+          example: "Что делать с томатами после дождя?"
+        metadata:
+          type: object
+          properties:
+            recent_diagnosis_id:
+              type: integer
+              nullable: true
+            plan_session_id:
+              type: integer
+              nullable: true
+            locale:
+              type: string
+              example: ru
+
+    AssistantProposal:
+      type: object
+      required: [proposal_id, kind]
+      properties:
+        proposal_id:
+          type: string
+        kind:
+          type: string
+          enum: [plan, event, clarify]
+        plan_payload:
+          type: object
+          description: "Машинный план (тот же формат, что в PlanSession), draft/proposed."
+          additionalProperties: true
+        suggested_actions:
+          type: array
+          items:
+            type: string
+            enum: [pin, ask_clarification, show_plans, open_logbook]
+
+    AssistantChatResponse:
+      type: object
+      required: [assistant_message]
+      properties:
+        assistant_message:
+          type: string
+          example: "Предлагаю обработку для 🍅 Грядка №2 и напомню за час."
+        followups:
+          type: array
+          items:
+            type: string
+        proposals:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantProposal'
+
+    AssistantConfirmRequest:
+      type: object
+      required: [proposal_id, object_id]
+      properties:
+        proposal_id:
+          type: string
+        object_id:
+          type: integer
+        preferred_time:
+          type: string
+          format: date-time
+          nullable: true
+        plan_session_id:
+          type: integer
+          nullable: true
+
+    AssistantConfirmResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, scheduled]
+        plan_id:
+          type: integer
+          nullable: true
+        event_ids:
+          type: array
+          items:
+            type: integer
+        reminder_ids:
+          type: array
+          items:
+            type: integer
+
+    PlanCreateStage:
+      type: object
+      properties:
+        stage_id:
+          type: integer
+          nullable: true
+        option_ids:
+          type: array
+          items:
+            type: integer
+
+    PlanCreateRequest:
+      type: object
+      required: [object_id, plan_payload]
+      properties:
+        object_id:
+          type: integer
+        case_id:
+          type: integer
+          nullable: true
+        source:
+          type: string
+          example: assistant
+        plan_payload:
+          type: object
+          additionalProperties: true
+
+    PlanCreateResponse:
+      type: object
+      properties:
+        plan_id:
+          type: integer
+          nullable: true
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanCreateStage'
+        errors:
+          type: array
+          items:
+            type: string
+
+    EventCreateRequest:
+      type: object
+      required: [stage_id]
+      properties:
+        stage_id:
+          type: integer
+        stage_option_id:
+          type: integer
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        slot_end:
+          type: string
+          format: date-time
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+
+    EventCreateResponse:
+      type: object
+      properties:
+        event_ids:
+          type: array
+          items:
+            type: integer
+        reminder_ids:
+          type: array
+          items:
+            type: integer
+
+    AutoplanRequest:
+      type: object
+      required: [stage_id, stage_option_id]
+      properties:
+        stage_id:
+          type: integer
+        stage_option_id:
+          type: integer
+        min_hours_ahead:
+          type: integer
+          default: 2
+        horizon_hours:
+          type: integer
+          default: 72
+
+    AutoplanResponse:
+      type: object
+      properties:
+        autoplan_run_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          example: pending
+
 paths:
+  /v1/assistant/chat:
+    post:
+      summary: Conversational assistant entrypoint
+      operationId: assistantChat
+      description: "Получить ответ живого ассистента; чат — интерфейс, данные остаются в cases/plans/events."
+      tags: [assistant]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantChatRequest'
+      responses:
+        '200':
+          description: Assistant reply with proposals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantChatResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/assistant/confirm_plan:
+    post:
+      summary: Persist assistant proposal into plan/events/reminders
+      operationId: assistantConfirmPlan
+      description: "По клику «📌 Зафиксировать» создаёт/обновляет plan + события/напоминания через те же сервисы, что мастер."
+      tags: [assistant]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantConfirmRequest'
+      responses:
+        '200':
+          description: Plan/events persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantConfirmResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/plans:
+    post:
+      summary: Create plan from plan_payload
+      operationId: createPlan
+      description: "Создаёт план по plan_payload (assistant/master)."
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanCreateRequest'
+      responses:
+        '200':
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanCreateResponse'
+        '400':
+          description: Bad payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/plans/{plan_id}/events:
+    post:
+      summary: Create event/reminder for plan
+      operationId: createPlanEvent
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreateRequest'
+      responses:
+        '200':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCreateResponse'
+        '400':
+          description: Bad payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/plans/{plan_id}/autoplan:
+    post:
+      summary: Enqueue autoplan run
+      operationId: enqueueAutoplan
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoplanRequest'
+      responses:
+        '202':
+          description: Autoplan enqueued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoplanResponse'
+        '400':
+          description: Bad payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v1/ai/diagnose:
     post:
       summary: Diagnose plant disease
@@ -1138,6 +1509,8 @@ tags:
     description: SBP integration
   - name: limits
     description: User usage limits
+  - name: assistant
+    description: Conversational assistant (чат, tool-calls)
   - name: partner
     description: External partner callbacks
   - name: expert

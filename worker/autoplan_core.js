@@ -66,6 +66,7 @@ async function processAutoplanContext(context, deps = {}) {
     lon: location.lon,
     label: location.label || label || null,
     warned: Boolean(location.warned),
+    warned_at: location.warned_at || null,
   };
 
   if (trackLocation) {

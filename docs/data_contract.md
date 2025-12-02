@@ -1,6 +1,6 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.16 — 21 November 2025(v1.15 → v1.16: гео автодетект с картой, rate limit geocoder)
+Version 1.17 — 21 November 2025(v1.16 → v1.17: variety в диагнозе, привязка recent_diagnosis к объекту)
 
 0 · Scope
 
@@ -511,6 +511,8 @@ INSERT → partner_orders (signature)
 6.1 · /v1/ai/diagnose
 
 Принимает фото (multipart image или JSON image_base64). Возвращает {crop, disease, confidence, protocol_status, protocol{id, product, dosage_value, dosage_unit, phi, category, status, waiting_days}}; создаёт photos + инкрементирует photo_usage.used. Бот вызывает endpoint после сбора базового минимума (общий вид + лист лицевая + лист изнанка) в сессии до 8 фото; плод/цветок и корень опциональны. Сессия снимков очищается по таймауту 30 мин; лишние кадры >8 игнорируются.
+
+Дополнительно: ответ может содержать variety/variety_ru (сорт/культивар). Если бот смог привязать диагноз к существующему/новому объекту по культуре, поле object_id прокидывается в recent_diagnoses и далее используется /plan_treatment без ручного выбора старых объектов.
 
 7 · Ownership & Lineage
 

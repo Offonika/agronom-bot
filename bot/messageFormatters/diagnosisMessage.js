@@ -1,7 +1,8 @@
 const { msg } = require('../utils');
 const { list, dict, diseaseNameRu } = require('../i18n');
 
-const LOW_CONFIDENCE_THRESHOLD = 0.6;
+const rawLowConfidence = Number(process.env.LOW_CONFIDENCE_THRESHOLD);
+const LOW_CONFIDENCE_THRESHOLD = Number.isFinite(rawLowConfidence) ? rawLowConfidence : 0.6;
 
 const FOLLOWUP_KEYWORDS = [
   { pattern: /(курс|повтор|через\s+сколько|следующ)/i, key: 'course' },

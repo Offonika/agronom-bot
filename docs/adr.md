@@ -2,8 +2,8 @@
 
 **Проект:** «Карманный агроном» — фаза Telegram‑бот (MVP)
 
-**Версия:** 1.6 — 5 августа 2025 г.
-*(v1.5 → v1.6: выбран эквайринг SBP Тинькофф + Autopay, добавлены новые Webhook’и, уточнена метрика observability)*
+**Версия:** 1.7 — 21 ноября 2025 г.
+*(v1.6 → v1.7: добавлен поток живого ассистента и правило «чат — оркестратор, данные — в cases/plans/events»)* 
 
 ---
 
@@ -14,6 +14,7 @@
 * Обработка до **50 000 MAU** без редизайна.
 * **OPEX минимальный:** 1 small VM + S3.
 * Плавный апгрейд к фазам **B (Native)** и **C (On‑device CV)**.
+* Живой ассистент — тонкий слой оркестрации поверх существующих сервисов (diagnose/plan/logbook/weather); чат остаётся интерфейсом, бизнес‑состояние хранится в `cases/plans/events/reminders`.
 
 ---
 
@@ -36,16 +37,16 @@
 ## 3 · C4‑Diagram (text)
 
 **C1 – System**
-Farmer → TG‑Bot ↔ Telegram API → App Service → `GPT‑Vision / PostgreSQL / S3` → Prometheus
+Farmer → TG‑Bot ↔ Telegram API → App Service (+ AssistantOrchestrator/LLM) → `GPT‑Vision / PostgreSQL / S3` → Prometheus
 
 **C2 – Containers**
-`Bot Gateway │ App Service │ Worker │ PostgreSQL │ S3 │ Prom+Grafana+Loki`
+`Bot Gateway │ App Service │ Assistant (LLM/tool-calls) │ Worker │ PostgreSQL │ S3 │ Prom+Grafana+Loki`
 
 **C3 – Components (App)**
-`DiagnoseController`, `PaymentController`, `AutopayController`, `LimitsController`, `ROIService`
+`DiagnoseController`, `PaymentController`, `AutopayController`, `LimitsController`, `ROIService`, `AssistantOrchestrator (LLM + tool-calls к diagnose/plan/logbook/weather)`
 
 **C4 – Worker**
-`Bull Queue → RetryJobHandler (fetch photo → GPT → DB update)`
+`Bull Queue → RetryJobHandler (fetch photo → GPT → DB update)`; ассистентские tool-calls обращаются к тем же Plan/Event/Weather сервисам, без дублирования бизнес-логики.
 
 ---
 
@@ -59,6 +60,17 @@ Farmer → TG‑Bot ↔ Telegram API → App Service → `GPT‑Vision
 6. **/v1/payments/sbp/autopay/webhook** → validate HMAC, update `payments`, prolong **Pro** (ежемесячно).
 7. **/v1/payments/sbp/autopay/cancel** → disable `users.autopay_enabled`.
 8. **/v1/partner/orders** → verify signature, insert order.
+
+**Live Chat (Conversational Assistant)**
+1. User → Telegram‑бот: «💬 Задать вопрос ассистенту».
+2. Bot → App: `POST /v1/assistant/chat` (session_id, user_id, active object, последние cases/plans/events, weather hints).
+3. App → LLM: prompt + tool‑calls; LLM → App: ответ + запрошенные tools.
+4. App → Domain: `get_objects`, `get_recent_diagnosis`, `create_plan/update_plan`, `create_event/update_event_status`, `autoplan/weather` (те же сервисы, что мастер по фото).
+5. App → Bot: текст + CTA «📌 Зафиксировать» (proposal_id).
+6. User → Bot: нажимает «📌 Зафиксировать».
+7. Bot → App: `POST /v1/assistant/confirm_plan` → PlanService/EventService (draft → proposed → accepted/scheduled), автоплан или ручной слот.
+8. App → DB: writes `cases/plans/events/reminders`; Bot → User: подтверждение + «Показать дневник».
+> Чат‑история может логироваться (audit/контекст), но бизнес‑состояние хранится только в структурах cases/plans/events/reminders; ассистент не дублирует логику план‑флоу.
 
 ---
 

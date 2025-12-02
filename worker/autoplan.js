@@ -16,6 +16,9 @@ const queueName = process.env.AUTOPLAN_QUEUE || 'autoplan';
 const BOT_TOKEN = process.env.BOT_TOKEN_DEV;
 const DEFAULT_TZ = process.env.AUTOPLAN_TIMEZONE || 'Europe/Moscow';
 const DB_URL = process.env.BOT_DATABASE_URL || process.env.DATABASE_URL;
+const POLL_INTERVAL_MS = Number(process.env.AUTOPLAN_POLL_MS || '15000');
+const LOCATION_WARN_TTL_HOURS = Number(process.env.LOCATION_WARN_TTL_HOURS || '12');
+const LOCATION_WARN_TTL_MS = Math.max(1, LOCATION_WARN_TTL_HOURS || 12) * 60 * 60 * 1000;
 
 if (!DB_URL) {
   throw new Error('BOT_DATABASE_URL or DATABASE_URL not set for autoplan worker');
@@ -51,6 +54,21 @@ worker.on('completed', (job) => {
 worker.on('failed', (job, err) => {
   console.error('autoplan job failed', job.id, err);
 });
+
+// Дополнительный поллер на случай, если продюсер не добавил задачу в очередь (например, ассистент создал run напрямую в БД).
+if (Number.isFinite(POLL_INTERVAL_MS) && POLL_INTERVAL_MS > 0) {
+  setInterval(async () => {
+    try {
+      const pending = await db.listPendingAutoplanRuns(5);
+      for (const row of pending) {
+        if (!row?.id) continue;
+        await processAutoplan(row.id);
+      }
+    } catch (err) {
+      console.error('autoplan polling failed', err);
+    }
+  }, POLL_INTERVAL_MS);
+}
 
 async function processAutoplan(runId) {
   const context = await db.getAutoplanRunContext(runId);
@@ -110,15 +128,25 @@ async function notifyDefaultLocation(context, location) {
     format(strings.plan_autoplan_default_location || 'Использую стандартные координаты{details}. Отправьте /location, чтобы сделать прогноз точнее.', {
       details,
     });
-  await sendTelegramMessage(context.user.tg_id, text);
+  const keyboard = buildLocationKeyboard(context);
+  await sendTelegramMessage(context.user.tg_id, text, keyboard ? { reply_markup: keyboard } : {});
 }
 
 async function maybeNotifyDefaultLocation(context, location) {
-  if (!context.user?.tg_id || !context?.object?.id || location.warned) return;
+  if (!context.user?.tg_id || !context?.object?.id) return;
+  const warnedAt =
+    location?.warned_at instanceof Date && !Number.isNaN(location.warned_at.getTime())
+      ? location.warned_at.getTime()
+      : null;
+  const warnedRecently = location?.warned && warnedAt && Date.now() - warnedAt < LOCATION_WARN_TTL_MS;
+  if (warnedRecently) return;
   await notifyDefaultLocation(context, location);
   if (typeof db.updateObjectMeta === 'function') {
     try {
-      await db.updateObjectMeta(context.object.id, { location_default_warned: true });
+      await db.updateObjectMeta(context.object.id, {
+        location_default_warned: true,
+        location_default_warned_at: new Date().toISOString(),
+      });
     } catch (err) {
       console.error('autoplan default location meta update failed', err);
     }
@@ -139,6 +167,7 @@ async function trackLocationSource(context, location) {
         lon: location.lon ?? null,
         label: location.label || null,
         warned: Boolean(location.warned),
+        warned_at: location.warned_at || null,
       },
     });
   } catch (err) {
@@ -164,6 +193,20 @@ function normalizeSlotRow(row) {
 function format(template, vars = {}) {
   if (!template) return '';
   return Object.entries(vars).reduce((acc, [key, value]) => acc.replace(`{${key}}`, value ?? ''), template);
+}
+
+function buildLocationKeyboard(context) {
+  const objectId = context?.object?.id || context?.plan?.object_id || null;
+  if (!objectId) return null;
+  return {
+    inline_keyboard: [
+      [
+        { text: strings.location_geo_button || '📍 Геолокация', callback_data: `plan_location_geo|${objectId}` },
+        { text: strings.location_address_button || '⌨️ Ввести адрес', callback_data: `plan_location_address|${objectId}` },
+      ],
+      [{ text: strings.location_cancel_button || '↩️ Пропустить', callback_data: `plan_location_cancel|${objectId}` }],
+    ],
+  };
 }
 
 async function sendTelegramMessage(chatId, text, options = {}) {

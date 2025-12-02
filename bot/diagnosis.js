@@ -17,6 +17,117 @@ const MAX_DIAG_HISTORY = 200;
 const lastDiagnoses = new Map();
 const MAX_CROP_HINTS = 500;
 const cropHints = new Map();
+const STRING_MIN_MATCH = 3;
+const PLAN_BINDING_SOURCE = 'ai';
+const PROGRESS_KEYS = {
+  downloading: 'photo_progress_downloading',
+  analyzing: 'photo_progress_analyzing',
+  pending: 'photo_progress_pending',
+  ready: 'photo_progress_ready',
+  failed: 'photo_progress_failed',
+};
+
+function normalizeText(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function normalizeCrop(value) {
+  const text = normalizeText(value);
+  return text ? text.toLowerCase() : '';
+}
+
+function cropsMatch(a, b) {
+  if (!a || !b) return false;
+  return normalizeCrop(a) === normalizeCrop(b);
+}
+
+function nameMatchesCrop(name, cropKey) {
+  const normName = normalizeCrop(name);
+  if (!normName || !cropKey || cropKey.length < STRING_MIN_MATCH) return false;
+  return normName.includes(cropKey);
+}
+
+function buildObjectMetaFromDiagnosis(payload, source = PLAN_BINDING_SOURCE) {
+  const meta = { source };
+  const variety = normalizeText(payload?.variety_ru || payload?.variety);
+  if (variety) {
+    meta.variety = variety;
+  }
+  const cropRu = normalizeText(payload?.crop_ru);
+  if (cropRu) {
+    meta.crop_ru = cropRu;
+  }
+  return meta;
+}
+
+async function maybeUpdateObjectMeta(db, object, payload) {
+  if (!db?.updateObjectMeta || !object?.id) return object;
+  const variety = normalizeText(payload?.variety_ru || payload?.variety);
+  if (!variety) return object;
+  const currentVariety = normalizeText(object.meta?.variety);
+  if (currentVariety && normalizeCrop(currentVariety) === normalizeCrop(variety)) return object;
+  try {
+    const updated = await db.updateObjectMeta(object.id, { variety });
+    return updated || object;
+  } catch (err) {
+    console.error('object meta update failed', err);
+    return object;
+  }
+}
+
+async function resolveObjectForDiagnosis(db, user, payload) {
+  if (!db || !user?.id || !payload) return null;
+  if (typeof db.listObjects !== 'function') return null;
+  const cropKey = normalizeCrop(payload.crop || payload.crop_ru);
+  let objects = [];
+  try {
+    objects = (await db.listObjects(user.id)) || [];
+  } catch (err) {
+    console.error('listObjects failed', err);
+  }
+  const targetId = payload.object_id ? Number(payload.object_id) : null;
+  const byId = targetId ? objects.find((obj) => Number(obj.id) === targetId) : null;
+  if (byId) {
+    return maybeUpdateObjectMeta(db, byId, payload);
+  }
+  let candidate = null;
+  if (cropKey) {
+    candidate =
+      objects.find((obj) => cropsMatch(obj.type, cropKey)) ||
+      objects.find((obj) => nameMatchesCrop(obj.name, cropKey));
+  }
+  if (!candidate && cropKey) {
+    const meta = buildObjectMetaFromDiagnosis(payload);
+    try {
+      candidate = await db.createObject(user.id, {
+        name: payload.crop_ru || payload.crop || msg('object.default_name'),
+        type: payload.crop || null,
+        locationTag: payload.region || null,
+        meta,
+      });
+    } catch (err) {
+      console.error('createObject failed', err);
+    }
+    if (candidate) {
+      objects.push(candidate);
+    }
+  }
+  if (!candidate && user.last_object_id) {
+    candidate = objects.find((obj) => Number(obj.id) === Number(user.last_object_id));
+  }
+  if (!candidate && objects.length) {
+    candidate = objects[0];
+  }
+  if (candidate && typeof db.updateUserLastObject === 'function') {
+    try {
+      await db.updateUserLastObject(user.id, candidate.id);
+    } catch (err) {
+      console.error('updateUserLastObject failed', err);
+    }
+  }
+  return maybeUpdateObjectMeta(db, candidate, payload);
+}
 
 function cleanupProductNames() {
   if (productNames.size >= PRODUCT_NAMES_MAX) {
@@ -42,7 +153,11 @@ async function persistRecentDiagnosis(deps, userId, payload, existingUser = null
   if (!deps?.db?.saveRecentDiagnosis || !userId || !payload) return null;
   try {
     const user = existingUser || (await deps.db.ensureUser(userId));
-    const objectId = user?.last_object_id || null;
+    const object = await resolveObjectForDiagnosis(deps.db, user, payload);
+    const objectId = object?.id || user?.last_object_id || null;
+    if (objectId) {
+      payload.object_id = objectId;
+    }
     const record = await deps.db.saveRecentDiagnosis({
       userId: user.id,
       objectId,
@@ -80,6 +195,34 @@ function maskRawBody(body) {
   return String(body).replace(/\d{4,}/g, '[id]');
 }
 
+function createProgressTracker(ctx) {
+  let messageId = null;
+  let chatId = ctx?.chat?.id || ctx?.from?.id || null;
+  let lastText = null;
+
+  function capture(reply) {
+    if (reply?.message_id) messageId = reply.message_id;
+    if (reply?.chat?.id) chatId = reply.chat.id;
+  }
+
+  async function set(text) {
+    if (!text || !messageId || !chatId) return;
+    if (text === lastText) return;
+    if (typeof ctx?.telegram?.editMessageText !== 'function') return;
+    try {
+      await ctx.telegram.editMessageText(chatId, messageId, undefined, text);
+      lastText = text;
+    } catch (err) {
+      const desc = String(err?.description || '');
+      if (!desc.includes('message is not modified')) {
+        console.error('progress_edit_failed', err);
+      }
+    }
+  }
+
+  return { capture, set };
+}
+
 function buildParseErrorReply() {
   return {
     text: msg('diagnosis.parse_error'),
@@ -112,12 +255,12 @@ function buildProtocolRow(ctx, protocol) {
   cleanupProductNames();
   productNames.set(decodeURIComponent(prodEncoded), product);
   const callback = ['proto', prodEncoded, ...other].join('|').slice(0, 64);
-  const row = [{ text: 'Показать протокол', callback_data: callback }];
+  const row = [{ text: '📄 Показать протокол', callback_data: callback }];
   if (protocol.id) {
     const urlBase = process.env.PARTNER_LINK_BASE || 'https://agrostore.example/agronom';
     const uid = crypto.createHash('sha256').update(String(ctx.from?.id ?? 'anon')).digest('hex');
     const link = `${urlBase}?pid=${protocol.id}&src=bot&uid=${uid}&dis=5&utm_campaign=agrobot`;
-    row.push({ text: 'Купить препарат', url: link });
+    row.push({ text: '🛒 Купить препарат', url: link });
   }
   return row;
 }
@@ -200,17 +343,18 @@ async function analyzePhoto(deps, ctx, photo) {
     }
     return;
   }
-  const userId = ctx.from?.id;
-  if (!userId) return;
+  const tgUserId = ctx.from?.id;
+  if (!tgUserId) return;
   const dbClient = deps?.db;
   let dbUser = null;
   if (dbClient?.ensureUser) {
     try {
-      dbUser = await dbClient.ensureUser(userId);
+      dbUser = await dbClient.ensureUser(tgUserId);
     } catch (err) {
       console.error('ensureUser failed', err);
     }
   }
+  const userId = dbUser?.id || tgUserId;
   if (dbUser) {
     await logFunnelEvent(dbClient, {
       event: 'photo_received',
@@ -237,8 +381,12 @@ async function analyzePhoto(deps, ctx, photo) {
     return;
   }
 
+  const progress = createProgressTracker(ctx);
+
   if (typeof ctx.reply === 'function') {
-    await ctx.reply(msg('photo_processing'));
+    const initial = await ctx.reply(msg('photo_processing'));
+    progress.capture(initial);
+    await progress.set(msg(PROGRESS_KEYS.downloading) || null);
   }
 
   try {
@@ -250,6 +398,7 @@ async function analyzePhoto(deps, ctx, photo) {
       if (typeof ctx.reply === 'function') {
         await ctx.reply(msg('diagnose_error'));
       }
+      await progress.set(msg(PROGRESS_KEYS.failed) || null);
       return;
     }
     const form = new FormData();
@@ -263,9 +412,10 @@ async function analyzePhoto(deps, ctx, photo) {
       }
       buffer = Buffer.concat(chunks);
     }
+    await progress.set(msg(PROGRESS_KEYS.analyzing) || null);
     const blob = new Blob([buffer], { type: 'image/jpeg' });
     form.append('image', blob, 'photo.jpg');
-    const cropHint = getCropHint(userId);
+    const cropHint = getCropHint(tgUserId);
     if (cropHint) {
       console.log('Applying crop hint', cropHint);
       form.append('crop_hint', cropHint);
@@ -283,6 +433,7 @@ async function analyzePhoto(deps, ctx, photo) {
     });
     if (apiResp.status === 402) {
       await sendPaywall(ctx, pool);
+      await progress.set(msg(PROGRESS_KEYS.failed) || null);
       return;
     }
     if (!apiResp.ok) {
@@ -301,6 +452,7 @@ async function analyzePhoto(deps, ctx, photo) {
           await ctx.reply(msg('diagnose_error'));
         }
       }
+      await progress.set(msg(PROGRESS_KEYS.failed) || null);
       return;
     }
     const rawBody = await apiResp.text();
@@ -314,12 +466,14 @@ async function analyzePhoto(deps, ctx, photo) {
         const parseReply = buildParseErrorReply();
         await ctx.reply(parseReply.text, { reply_markup: parseReply.reply_markup });
       }
+      await progress.set(msg(PROGRESS_KEYS.failed) || null);
       return;
     }
     console.log('API response', data);
 
     if (data.status === 'pending') {
       const cb = `retry|${encodeURIComponent(String(data.id))}`.slice(0, 64);
+      await progress.set(msg(PROGRESS_KEYS.pending) || null);
       await ctx.reply(msg('diag_pending'), {
         reply_markup: {
           inline_keyboard: [[{ text: msg('retry_button'), callback_data: cb }]],
@@ -328,6 +482,7 @@ async function analyzePhoto(deps, ctx, photo) {
       return;
     }
 
+    await progress.set(msg(PROGRESS_KEYS.ready) || null);
     rememberDiagnosis(userId, data);
     const recentRecord = await persistRecentDiagnosis(deps, userId, data, dbUser);
     const text = buildAssistantText(data);
@@ -352,6 +507,7 @@ async function analyzePhoto(deps, ctx, photo) {
     if (typeof ctx.reply === 'function') {
       await ctx.reply(msg('diagnose_error'));
     }
+    await progress.set(msg(PROGRESS_KEYS.failed) || null);
   }
 }
 

@@ -145,6 +145,8 @@ def test_openapi_schema(client):
         "/v1/payments/create",
         "/v1/payments/sbp/webhook",
         "/v1/partner/orders",
+        "/v1/assistant/chat",
+        "/v1/assistant/confirm_plan",
     ]:
         assert path in data.get("paths", {})
 

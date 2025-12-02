@@ -1,8 +1,39 @@
 # API Contracts — Plan Memory & Auto-Planning
 
-Версия: 0.1 (13.11.2025)
+Версия: 0.2 (21.11.2025) — добавлены эндпоинты ассистента (/assistant/chat, /assistant/confirm_plan)
 
 ## 1. Treatments & Plans
+### POST /assistant/chat
+
+- **Purpose:** живой ассистент отвечает на вопросы, оркестрируя запросы к diagnose/plan/logbook/weather без дублирования логики мастера.
+- **Request body (кратко)** `{ "session_id": "uuid?", "object_id": "uuid?", "message": "string", "metadata": { "recent_diagnosis_id?": "uuid", "plan_session_id?": "uuid" } }`
+- **Response** `{ "assistant_message": "text", "proposals": [{ "proposal_id": "uuid", "kind": "plan|event", "plan_payload": {...}, "suggested_actions": ["pin","ask_clarification","show_plans"] }] }`
+- Ассистент добавляет CTA «📌 Зафиксировать» для предложений plan/event.
+
+### POST /assistant/confirm_plan
+
+- **Purpose:** превращает предложение ассистента в структурированные сущности.
+- **Request body (кратко)** `{ "proposal_id": "uuid", "object_id": "uuid", "preferred_time?": "ISO8601", "plan_session_id?": "uuid" }`
+- **Behavior:** вызывает те же сервисы, что мастер по фото (draft→proposed→accepted/scheduled, события/напоминания, автоплан или ручной слот).
+- **Response** `{ "status": "accepted|scheduled", "plan_id": "uuid", "event_ids": ["uuid"], "reminder_ids": ["uuid"] }`
+
+### POST /plans
+
+- **Purpose:** создать план из `plan_payload` (assistant/master).
+- **Request body** `{ "object_id": 1, "case_id?": 2, "plan_payload": { ... } }`
+- **Response** `{ "plan_id": 10, "stages": [{ "stage_id": 11, "option_ids": [111, 112]}], "errors": [] }`
+
+### POST /plans/{id}/events
+
+- **Purpose:** создать событие/напоминание для этапа.
+- **Request body** `{ "stage_id": 11, "stage_option_id?": 111, "due_at?": "ISO", "slot_end?": "ISO", "reason?": "string" }`
+- **Response** `{ "event_ids": [201], "reminder_ids": [301] }`
+
+### POST /plans/{id}/autoplan
+
+- **Purpose:** поставить автоплан в очередь.
+- **Request body** `{ "stage_id": 11, "stage_option_id": 111, "min_hours_ahead": 2, "horizon_hours": 72 }`
+- **Response 202** `{ "autoplan_run_id": 401, "status": "pending" }`
 
 ### POST /treatments/{id}/autoplan
 

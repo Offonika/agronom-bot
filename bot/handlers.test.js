@@ -1573,6 +1573,67 @@ test('planCommands handleLocation updates coordinates from args', async () => {
   assert.ok(replies[0].includes('координаты'));
 });
 
+test('planCommands handleObjects shows variety and note', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 50, last_object_id: 9 }),
+      listObjects: async () => [
+        { id: 9, name: 'яблоня', meta: { variety: 'Антоновка', note: 'Ряд 3, дерево 5' } },
+        { id: 10, name: 'яблоня', meta: {} },
+      ],
+      updateUserLastObject: async () => {},
+      createObject: async () => ({ id: 11, name: 'новое', meta: {} }),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleObjects({
+    from: { id: 50 },
+    reply: async (msg) => replies.push(msg),
+  });
+  assert.ok(replies[0].includes('Антоновка'));
+  assert.ok(replies[0].includes('Ряд 3'));
+});
+
+test('planCommands handleMerge merges objects', async () => {
+  const replies = [];
+  const calls = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 77 }),
+      mergeObjects: async (...args) => calls.push(args),
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleMerge({
+    message: { text: '/merge 3 1' },
+    from: { id: 77 },
+    reply: async (msg) => replies.push(msg),
+  });
+  assert.ok(calls.length === 1);
+  assert.ok(replies[0].includes('3'));
+});
+
+test('planCommands handleEdit prompts variety/note buttons', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 51, last_object_id: 9 }),
+      listObjects: async () => [{ id: 9, name: 'яблоня', meta: {} }],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleEdit({
+    message: { text: '/edit' },
+    from: { id: 51 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+  });
+  assert.equal(replies.length, 1);
+  const buttons = replies[0].opts?.reply_markup?.inline_keyboard || [];
+  assert.ok(buttons.flat().some((b) => (b.text || '').includes('сорт')));
+  assert.ok(buttons.flat().some((b) => (b.text || '').includes('метку')));
+});
+
 test('planCommands handleLocationShare stores location after prompt', async () => {
   const replies = [];
   let latestPatch = null;
@@ -1606,6 +1667,37 @@ test('planCommands handleLocationShare stores location after prompt', async () =
   assert.equal(latestPatch.patch.lat, 55.71);
   assert.equal(latestPatch.patch.lon, 37.55);
   assert.ok(replies.some((text) => typeof text === 'string' && text.includes('Сохранил координаты')));
+});
+
+test('planCommands handleLocationShare applies to last object without prompt', async () => {
+  const replies = [];
+  let latestPatch = null;
+  const db = {
+    ensureUser: async () => ({ id: 20, last_object_id: 7 }),
+    listObjects: async () => [
+      { id: 7, name: 'Яблоня', user_id: 20, meta: {} },
+      { id: 8, name: 'Груша', user_id: 20, meta: {} },
+    ],
+    getObjectById: async (id) => ({ id, name: id === 7 ? 'Яблоня' : 'Груша', user_id: 20, meta: {} }),
+    updateUserLastObject: async () => {},
+    updateObjectMeta: async (objectId, patch) => {
+      latestPatch = { objectId, patch };
+      return { id: objectId, meta: patch };
+    },
+  };
+  const planCommands = createPlanCommands({
+    db,
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleLocationShare({
+    from: { id: 20 },
+    message: { location: { latitude: 55.12345, longitude: 37.54321 } },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(latestPatch.objectId, 7);
+  assert.equal(latestPatch.patch.lat, 55.12345);
+  assert.equal(latestPatch.patch.lon, 37.54321);
+  assert.ok(replies.some((text) => typeof text === 'string' && text.includes('координаты')));
 });
 
 test('planCommands handleLocationText geocodes address', async () => {
@@ -2161,7 +2253,7 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
   });
   assert.equal(replies[0].msg, tr('photo_processing'));
   const buttons = replies[1].opts.reply_markup.inline_keyboard[0];
-  assert.equal(buttons[0].text, 'Показать протокол');
+  assert.equal(buttons[0].text, '📄 Показать протокол');
   assert.equal(
     buttons[0].callback_data,
     'proto|%D0%A1%D0%BA%D0%BE%D1%80%20250%20%D0%AD%D0%9A|2|ml_10l|30'
