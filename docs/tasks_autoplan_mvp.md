@@ -6,6 +6,7 @@
 - Репозиторий: agronom-bot.
 - Цель: реализовать память планов + автопланирование «зелёных окон» в соответствии с документами `docs/prd.md`, `docs/srs.md`, `docs/DB_SCHEMA.md`, `docs/API.md`, `docs/ALGORITHMS/auto_planner.md`.
 - Все PR → develop, DoD из PRD/SRS обязательны. После каждого шага обновлять документацию, если меняется поведение.
+- Отмечать выполнение задач (чекбокс/✅ + дата и пройденные тесты/линты) прямо в этом плане или связанном тикете; при блокировке добавлять `⚠ blocked: причина, дата`.
 
 ## 1. DB & миграции
 - **Описание:** добавить таблицы `objects`, `cases`, `plans`, `plan_stages`, `stage_options`, `events`, `reminders`, `autoplan_runs`, `treatment_slots`, расширить `products`/`product_rules`.

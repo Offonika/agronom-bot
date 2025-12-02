@@ -9,12 +9,15 @@ function resolveObjectLocation(meta = {}, fallbackLat = null, fallbackLon = null
   const lat = toNumber(meta.lat);
   const lon = toNumber(meta.lon);
   const resolvedLabel = meta.geo_label || label || null;
+  const warnedAtRaw = meta.location_default_warned_at ? new Date(meta.location_default_warned_at) : null;
+  const warnedAt = warnedAtRaw && !Number.isNaN(warnedAtRaw.getTime()) ? warnedAtRaw : null;
   if (lat !== null && lon !== null) {
     return {
       lat,
       lon,
       source: meta.location_source || 'manual',
       warned: Boolean(meta.location_default_warned),
+      warned_at: warnedAt,
       label: resolvedLabel,
     };
   }
@@ -25,6 +28,7 @@ function resolveObjectLocation(meta = {}, fallbackLat = null, fallbackLon = null
     lon: envLon,
     source: 'default',
     warned: Boolean(meta.location_default_warned),
+    warned_at: warnedAt,
     label: resolvedLabel,
   };
 }

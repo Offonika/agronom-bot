@@ -36,12 +36,23 @@ function createObjectChips({ bot, db, planFlow }) {
     return { objects, activeId };
   }
 
+  function formatLabel(obj) {
+    const parts = [];
+    if (obj?.meta?.variety) parts.push(obj.meta.variety);
+    if (obj?.meta?.note) parts.push(obj.meta.note);
+    if (!parts.length) return obj.name;
+    return `${obj.name} • ${parts.join(' / ')}`;
+  }
+
   function buildKeyboard(objects, activeId) {
     if (!objects.length) return null;
-    const chips = objects.slice(0, MAX_CHIPS).map((obj) => ({
-      text: obj.id === activeId ? `• ${obj.name}` : obj.name,
-      callback_data: `obj_switch|${obj.id}`,
-    }));
+    const chips = objects.slice(0, MAX_CHIPS).map((obj) => {
+      const label = formatLabel(obj);
+      return {
+        text: obj.id === activeId ? `• ${label}` : label,
+        callback_data: `obj_switch|${obj.id}`,
+      };
+    });
     const rows = chunk(chips, ROW_SIZE);
     return { inline_keyboard: rows };
   }

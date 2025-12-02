@@ -124,6 +124,50 @@ function createDb(poolInstance) {
     return rows[0] || null;
   }
 
+  async function mergeObjects(userId, sourceId, targetId) {
+    if (!userId || !sourceId || !targetId || Number(sourceId) === Number(targetId)) {
+      throw new Error('invalid merge params');
+    }
+    return withTransaction(pool, async (client) => {
+      const [source, target] = await Promise.all([
+        withClient(client, (c) => c),
+        withClient(client, (c) => c),
+      ]).then(async ([c1, c2]) => {
+        const [sRows, tRows] = await Promise.all([
+          exec('SELECT * FROM objects WHERE id = $1', [sourceId], c1),
+          exec('SELECT * FROM objects WHERE id = $1', [targetId], c2),
+        ]);
+        return [sRows[0] || null, tRows[0] || null];
+      });
+      if (!source || !target) {
+        throw new Error('object not found');
+      }
+      if (Number(source.user_id) !== Number(userId) || Number(target.user_id) !== Number(userId)) {
+        throw new Error('object not owned');
+      }
+      const tablesToUpdate = [
+        'plans',
+        'cases',
+        'recent_diagnoses',
+        'plan_sessions',
+      ];
+      for (const table of tablesToUpdate) {
+        await exec(
+          `UPDATE ${table} SET object_id = $1 WHERE object_id = $2`,
+          [targetId, sourceId],
+          client,
+        );
+      }
+      await exec(
+        'UPDATE users SET last_object_id = $2 WHERE last_object_id = $1 AND id = $3',
+        [sourceId, targetId, userId],
+        client,
+      );
+      await exec('DELETE FROM objects WHERE id = $1', [sourceId], client);
+      return target;
+    });
+  }
+
   function mergeMeta(base = {}, patch = {}) {
     const result = { ...(base || {}) };
     if (!patch || typeof patch !== 'object') return result;
@@ -877,6 +921,18 @@ function createDb(poolInstance) {
     return rows[0] || null;
   }
 
+  async function listPendingAutoplanRuns(limit = 5) {
+    const sql = `
+      SELECT id
+      FROM autoplan_runs
+      WHERE status = 'pending'
+      ORDER BY created_at ASC
+      LIMIT $1
+    `;
+    const { rows } = await exec(sql, [limit]);
+    return rows;
+  }
+
   async function getAutoplanRunContext(runId) {
     const sql = `
       SELECT
@@ -1387,6 +1443,7 @@ function createDb(poolInstance) {
     listObjects,
     createObject,
     getObjectById,
+    mergeObjects,
     updateObjectMeta,
     createCase,
     createPlan,
@@ -1434,6 +1491,7 @@ function createDb(poolInstance) {
     getTopDiseases,
     createAutoplanRun,
     updateAutoplanRun,
+    listPendingAutoplanRuns,
     getAutoplanRunContext,
     upsertTreatmentSlot,
     getTreatmentSlotContext,

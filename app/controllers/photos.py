@@ -187,10 +187,12 @@ async def _process_image(
 def _persist_recent_diagnosis(user_id: int, payload: dict[str, Any]) -> None:
     if not payload:
         return
+    object_id = payload.get("object_id")
     with db_module.SessionLocal() as db:
         save_recent_diagnosis(
             db,
             user_id=user_id,
+            object_id=object_id,
             payload=payload,
             ttl_hours=settings.recent_diag_ttl_h,
             max_age_hours=settings.recent_diag_max_age_h,
@@ -245,6 +247,8 @@ class NextSteps(BaseModel):
 class DiagnoseResponse(BaseModel):
     crop: str
     crop_ru: str | None = None
+    variety: str | None = None
+    variety_ru: str | None = None
     disease: str
     disease_name_ru: str | None = None
     confidence: float
@@ -590,6 +594,8 @@ async def diagnose(
 
     disease_name_ru = str(result.get("disease_name_ru") or "").strip() or None
     crop_ru = str(result.get("crop_ru") or "").strip() or None
+    variety = str(result.get("variety") or "").strip() or None
+    variety_ru = str(result.get("variety_ru") or "").strip() or None
     need_reshoot = bool(result.get("need_reshoot")) if status == "ok" else None
     reshoot_tips = None
     raw_tips = result.get("reshoot_tips")
@@ -618,6 +624,8 @@ async def diagnose(
     response_payload = DiagnoseResponse(
         crop=crop,
         crop_ru=crop_ru,
+        variety=variety,
+        variety_ru=variety_ru,
         disease=disease,
         disease_name_ru=disease_name_ru,
         confidence=conf,

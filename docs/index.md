@@ -20,6 +20,8 @@
 | [payment_flow.md](./payment_flow.md) | Платёжный flow и webhook SBP |
 | [retry_logic.md](./retry_logic.md) | Логика повторных попыток и очередь |
 | [alerting.md](./alerting.md) | Настройка Alertmanager и вебхуков |
+| [tasks_autoplan_mvp.md](./tasks_autoplan_mvp.md) | План задач по памяти плана и автоплану |
+| [tasks_assistant_live_chat.md](./tasks_assistant_live_chat.md) | План задач по внедрению живого ассистента |
 
 ---
 

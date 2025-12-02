@@ -59,6 +59,15 @@ const { formatSlotCard, buildSlotKeyboard } = require('../services/slot_card');
 const { createGeocoder } = require('../services/geocoder');
 
 const HOUR_IN_MS = 60 * 60 * 1000;
+const PLAN_START_THROTTLE_MS = 2000;
+const planStartGuards = new Map();
+const photoReplyTimers = new Map();
+const photoLastStatus = new Map();
+
+function formatPercent(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  return Math.round(Math.max(0, Math.min(1, value)) * 100);
+}
 
 const token = process.env.BOT_TOKEN_DEV;
 if (!token) {
@@ -108,6 +117,8 @@ const planTriggerHandler = createPlanTriggerHandler({ db, reminderScheduler });
 const planSessionsApi = createPlanSessionsApi();
 const planFlow = createPlanFlow({ db, catalog, planWizard, geocoder, planSessions: planSessionsApi });
 const objectChips = createObjectChips({ bot, db, planFlow });
+const pendingObjectDetails = new Map();
+const DETAILS_PROMPT_TTL_MS = Number(process.env.OBJECT_DETAILS_PROMPT_TTL_MS || `${24 * 60 * 60 * 1000}`);
 if (typeof planFlow.attachObjectChips === 'function') {
   planFlow.attachObjectChips(objectChips);
 }
@@ -119,6 +130,10 @@ planFlow.watch(async (event) => {
         inline_keyboard: [[{ text: msg('plans_manage_button'), callback_data: 'plan_my_plans' }]],
       },
     });
+    if (event.objectId && event.userId) {
+      await maybePromptObjectDetails(event.objectId, event.userId, event.chatId);
+      await maybeSuggestMerge(event.objectId, event.userId, event.chatId);
+    }
   } catch (err) {
     console.error('plan_my_plans notify failed', err);
   }
@@ -137,6 +152,184 @@ const PHOTO_LABEL_KEYS = [
   'photo_album_label_fruit',
   'photo_album_label_root',
 ];
+
+function now() {
+  return Date.now();
+}
+
+async function getObjectSafe(objectId) {
+  if (!objectId || typeof db.getObjectById !== 'function') return null;
+  try {
+    return await db.getObjectById(objectId);
+  } catch (err) {
+    console.error('object fetch failed', err);
+    return null;
+  }
+}
+
+async function maybePromptObjectDetails(objectId, userId, chatId) {
+  const object = await getObjectSafe(objectId);
+  if (!object || Number(object.user_id) !== Number(userId)) return;
+  const meta = object.meta || {};
+  const missingVariety = !meta.variety;
+  const missingNote = !meta.note;
+  if (!missingVariety && !missingNote) return;
+  const promptedAt =
+    meta.details_prompted_at instanceof Date
+      ? meta.details_prompted_at.getTime()
+      : meta.details_prompted_at
+      ? new Date(meta.details_prompted_at).getTime()
+      : 0;
+  if (promptedAt && now() - promptedAt < DETAILS_PROMPT_TTL_MS) return;
+  const rows = [];
+  if (missingVariety) {
+    rows.push([{ text: msg('object_details_button_variety'), callback_data: `obj_detail|variety|${object.id}` }]);
+  }
+  if (missingNote) {
+    rows.push([{ text: msg('object_details_button_note'), callback_data: `obj_detail|note|${object.id}` }]);
+  }
+  rows.push([{ text: msg('object_details_skip'), callback_data: `obj_detail_skip|${object.id}` }]);
+  await bot.telegram.sendMessage(chatId, msg('object_details_intro', { name: object.name }), {
+    reply_markup: { inline_keyboard: rows },
+  });
+  if (typeof db.updateObjectMeta === 'function') {
+    await db.updateObjectMeta(object.id, { details_prompted_at: new Date().toISOString() });
+  }
+}
+
+async function maybeSuggestMerge(objectId, userId, chatId) {
+  if (!objectId || !userId || typeof db.listObjects !== 'function') return;
+  try {
+    const objects = await db.listObjects(userId);
+    const current = objects.find((o) => Number(o.id) === Number(objectId));
+    if (!current) return;
+    const similar = objects.filter(
+      (o) => Number(o.id) !== Number(objectId) && (o.type === current.type || o.name === current.name),
+    );
+    if (similar.length < 1) return;
+    const candidates = [current, ...similar].sort((a, b) => Number(a.id) - Number(b.id));
+    const target = candidates[0];
+    const merges = candidates.slice(1).map((s) => ({
+      source: s.id,
+      target: target.id,
+      label: formatObjectLabel(s),
+    }));
+    const names = candidates.map((o) => formatObjectLabel(o)).join(', ');
+    const inline_keyboard = merges.map((m) => [
+      {
+        text: msg('objects_merge_button', { source: m.source, target: m.target }),
+        callback_data: `obj_merge|${m.source}|${m.target}`,
+      },
+    ]);
+    await bot.telegram.sendMessage(chatId, msg('objects_merge_suggest', { names }), {
+      reply_markup: { inline_keyboard },
+    });
+  } catch (err) {
+    console.error('merge suggest failed', err);
+  }
+}
+
+function setDetailsSession(userId, objectId, field) {
+  pendingObjectDetails.set(userId, { objectId, field, createdAt: now() });
+}
+
+function clearDetailsSession(userId) {
+  pendingObjectDetails.delete(userId);
+}
+
+async function handleObjectDetailsText(ctx) {
+  const userId = ctx.from?.id;
+  const text = ctx.message?.text?.trim();
+  if (!userId || !text) return false;
+  const session = pendingObjectDetails.get(userId);
+  if (!session) return false;
+  if (text.startsWith('/')) return false;
+  let object = await getObjectSafe(session.objectId);
+  if (!object || Number(object.user_id) !== Number(userId)) {
+    const user = await db.ensureUser(userId);
+    const list = (await db.listObjects(user.id)) || [];
+    const fallback =
+      list.find((o) => Number(o.id) === Number(user.last_object_id)) ||
+      list.find((o) => Number(o.id) !== Number(session.objectId)) ||
+      list[0];
+    if (!fallback) {
+      clearDetailsSession(userId);
+      await ctx.reply(msg('objects_not_found'));
+      return true;
+    }
+    object = fallback;
+  }
+  const patch =
+    session.field === 'variety'
+      ? { variety: text, details_prompted_at: new Date().toISOString() }
+      : { note: text, details_prompted_at: new Date().toISOString() };
+  if (typeof db.updateObjectMeta === 'function') {
+    await db.updateObjectMeta(object.id, patch);
+  }
+  clearDetailsSession(userId);
+  const key = session.field === 'variety' ? 'object_details_saved_variety' : 'object_details_saved_note';
+  await ctx.reply(msg(key, { value: text }));
+  if (objectChips) {
+    await objectChips.send(ctx);
+  }
+  return true;
+}
+
+function buildPhotoStatusPayload(state) {
+  if (!state) return null;
+  const checklist = buildPhotoChecklist(state.count || 0);
+  const parts = [
+    msg('photo_album_status', { count: state.count || 0, min: MIN_PHOTOS, max: MAX_PHOTOS }),
+  ];
+  if (state.overflow) {
+    parts.push(msg('photo_album_overflow', { max: MAX_PHOTOS }));
+  }
+  if (checklist) {
+    parts.push(msg('photo_album_checklist', { checklist }));
+  }
+  if (!state.optionalSkipped) {
+    parts.push(msg('photo_album_optional'));
+  }
+  if (state.ready) {
+    parts.push(msg('photo_album_ready', { max: MAX_PHOTOS }));
+  } else {
+    const need = Math.max(0, MIN_PHOTOS - (state.count || 0));
+    parts.push(msg('photo_album_not_ready', { need }));
+  }
+  const text = parts.filter(Boolean).join('\n');
+  return {
+    text,
+    reply_markup: buildPhotoKeyboard(state.ready, state.optionalSkipped, (state.count || 0) < MAX_PHOTOS),
+  };
+}
+
+function schedulePhotoStatus(ctx) {
+  const userId = ctx.from?.id;
+  const chatId = ctx.chat?.id;
+  if (!userId || !chatId) return;
+  if (photoReplyTimers.has(userId)) {
+    clearTimeout(photoReplyTimers.get(userId));
+  }
+  const timer = setTimeout(async () => {
+    photoReplyTimers.delete(userId);
+    try {
+      const state = getPhotoState(userId);
+      const payload = buildPhotoStatusPayload(state);
+      if (!payload?.text) return;
+      const last = photoLastStatus.get(userId);
+      if (last === payload.text) return;
+      photoLastStatus.set(userId, payload.text);
+      await ctx.telegram.sendMessage(chatId, payload.text, {
+        reply_markup: payload.reply_markup,
+        reply_to_message_id: undefined,
+        allow_sending_without_reply: true,
+      });
+    } catch (err) {
+      console.error('photo_status_send_failed', err);
+    }
+  }, 500);
+  photoReplyTimers.set(userId, timer);
+}
 
 function toDate(value) {
   if (!value) return null;
@@ -193,6 +386,28 @@ function describeRecentAge(record) {
   }
   const days = Math.max(1, Math.round(hours / 24));
   return msg('plan_recent_age_days', { days });
+}
+
+function buildPlanDedupKey(diagnosis, record) {
+  if (!diagnosis && !record) return null;
+  return (
+    diagnosis?.recent_diagnosis_id ||
+    record?.id ||
+    diagnosis?.plan_hash ||
+    [diagnosis?.crop, diagnosis?.disease, diagnosis?.confidence].map((v) => String(v ?? '')).join('|')
+  );
+}
+
+function isPlanStartDuplicate(userId, key) {
+  if (!userId || !key) return false;
+  const state = planStartGuards.get(userId);
+  if (!state) return false;
+  return state.key === key && Date.now() - state.ts < PLAN_START_THROTTLE_MS;
+}
+
+function markPlanStart(userId, key) {
+  if (!userId || !key) return;
+  planStartGuards.set(userId, { key, ts: Date.now() });
 }
 
 function buildStaleRecordKeyboard(record) {
@@ -297,16 +512,46 @@ async function maybeSendShortPathHint(ctx, diagnosis, record, dbUser) {
 }
 
 async function handlePlanTreatment(ctx, opts = {}) {
-  const userId = ctx.from?.id;
-  if (!userId) return;
+  const tgUserId = ctx.from?.id;
+  if (!tgUserId) return;
   maybeSendPlanOnboarding(ctx);
+  let dbUser = null;
+  if (typeof db.ensureUser === 'function') {
+    try {
+      dbUser = await db.ensureUser(tgUserId);
+    } catch (err) {
+      console.error('plan_treatment.ensure_user_failed', err);
+    }
+  }
+  if (!dbUser && typeof db.getUserByTgId === 'function') {
+    try {
+      dbUser = await db.getUserByTgId(tgUserId);
+    } catch (err) {
+      console.error('plan_treatment.get_user_failed', err);
+    }
+  }
+  const userId = dbUser?.id || tgUserId;
+  console.info('plan_treatment.context', {
+    tgUserId,
+    userId,
+    hasDbUser: Boolean(dbUser),
+  });
   const pendingTime =
     typeof db.getLatestTimeSessionForUser === 'function'
       ? await db.getLatestTimeSessionForUser(userId)
       : null;
   if (pendingTime && (pendingTime.current_step || '').startsWith('time_')) {
-    const resumed = await resumePlanTimeSession(ctx, pendingTime);
-    if (resumed) return;
+    const pendingStep = pendingTime.current_step || '';
+    if (['time_autoplan_lookup', 'time_autoplan_wait'].includes(pendingStep) && typeof db.deletePlanSession === 'function') {
+      try {
+        await db.deletePlanSession(pendingTime.id);
+      } catch (err) {
+        console.error('plan_treatment.pending_time_delete_failed', err);
+      }
+    } else {
+      const resumed = await resumePlanTimeSession(ctx, pendingTime);
+      if (resumed) return;
+    }
   }
   const requireRecentId = opts.requireRecentId ? Number(opts.requireRecentId) : null;
   const context = await resolveDiagnosisForPlanning(userId, {
@@ -345,16 +590,13 @@ async function handlePlanTreatment(ctx, opts = {}) {
     return;
   }
   if ((diagnosis.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD) {
-    await replyUserError(ctx, 'LOW_CONFIDENCE');
+    const thresholdPct = formatPercent(LOW_CONFIDENCE_THRESHOLD);
+    const confidencePct = formatPercent(diagnosis.confidence);
+    await replyUserError(ctx, 'LOW_CONFIDENCE', {
+      confidence: confidencePct ?? '—',
+      threshold: thresholdPct ?? '—',
+    });
     return;
-  }
-  let dbUser = null;
-  if (typeof db.ensureUser === 'function') {
-    try {
-      dbUser = await db.ensureUser(userId);
-    } catch (err) {
-      console.error('plan_treatment.ensure_user_failed', err);
-    }
   }
   if (dbUser) {
     await maybeSendShortPathHint(ctx, diagnosis, record, dbUser);
@@ -406,9 +648,22 @@ async function resumePlanTimeSession(ctx, session) {
         return Boolean(sent);
       }
       case 'time_autoplan_lookup': {
-        await ctx.reply(msg('plan_autoplan_lookup'));
-        if (typeof db.updatePlanSession === 'function') {
-          await db.updatePlanSession(session.id, { ttlHours: 72 });
+        const handled = await resumeAutoplanLookup(ctx, session);
+        if (!handled) {
+          await ctx.reply(msg('plan_autoplan_lookup'));
+          if (typeof db.updatePlanSession === 'function') {
+            await db.updatePlanSession(session.id, { ttlHours: 72 });
+          }
+        }
+        return true;
+      }
+      case 'time_autoplan_wait': {
+        const handled = await resumeAutoplanLookup(ctx, session);
+        if (!handled) {
+          await ctx.reply(msg('plan_autoplan_lookup'));
+          if (typeof db.updatePlanSession === 'function') {
+            await db.updatePlanSession(session.id, { ttlHours: 72 });
+          }
         }
         return true;
       }
@@ -453,6 +708,58 @@ async function resumePlanTimeSession(ctx, session) {
   }
 }
 
+async function resumeAutoplanLookup(ctx, session) {
+  const state = session?.state || {};
+  const runId = state.autoplanRunId || state.autoplan_run_id || null;
+  if (!runId || typeof db.getAutoplanRunContext !== 'function') return false;
+  try {
+    const runContext = await db.getAutoplanRunContext(runId);
+    if (!runContext) return false;
+    const needsLocation = !hasCoordinates(runContext.object?.meta);
+    const locationKb = needsLocation ? buildLocationKeyboard(runContext.object?.id) : null;
+    if (runContext.run?.status === 'awaiting_window' && runContext.run?.reason === 'no_window') {
+      const manualKb = buildManualFallbackKeyboard(
+        runContext.plan?.id,
+        runContext.stage?.id,
+        runContext.run?.stage_option_id || state.stageOptionId || null,
+      );
+      const keyboard = mergeKeyboards(locationKb, manualKb);
+      await ctx.reply(
+        msg('plan_autoplan_none', {
+          stage: runContext.stage?.title || msg('reminder_stage_fallback'),
+        }),
+        keyboard ? { reply_markup: keyboard } : undefined,
+      );
+      if (typeof db.updatePlanSession === 'function') {
+        await db.updatePlanSession(session.id, {
+          currentStep: 'time_autoplan_wait',
+          state: {
+            ...(session.state || {}),
+            autoplanRunId: runId,
+            stageId: runContext.stage?.id || state.stageId || null,
+            stageOptionId: runContext.run?.stage_option_id || state.stageOptionId || null,
+          },
+          ttlHours: 72,
+        });
+      }
+      return true;
+    }
+    const keyboard = locationKb ? { reply_markup: locationKb } : undefined;
+    await ctx.reply(msg('plan_autoplan_lookup'), keyboard);
+    if (typeof db.updatePlanSession === 'function') {
+      await db.updatePlanSession(session.id, {
+        ttlHours: 72,
+        currentStep: session.current_step || 'time_autoplan_lookup',
+        state: session.state,
+      });
+    }
+    return true;
+  } catch (err) {
+    console.error('plan_time.autoplan_resume_failed', err);
+    return false;
+  }
+}
+
 async function sendSlotCardMessage(ctx, slotContext) {
   if (!ctx?.reply || !slotContext?.slot) return false;
   const slot = normalizeSlot(slotContext.slot);
@@ -477,6 +784,49 @@ function normalizeSlot(rawSlot) {
     end,
     reason: Array.isArray(rawSlot.reason) ? rawSlot.reason : rawSlot.reason ? [rawSlot.reason] : [],
   };
+}
+
+function hasCoordinates(meta = {}) {
+  const lat = Number(meta?.lat);
+  const lon = Number(meta?.lon);
+  return Number.isFinite(lat) && Number.isFinite(lon);
+}
+
+function buildLocationKeyboard(objectId) {
+  if (!objectId) return null;
+  return {
+    inline_keyboard: [
+      [
+        { text: msg('location_geo_button'), callback_data: `plan_location_geo|${objectId}` },
+        { text: msg('location_address_button'), callback_data: `plan_location_address|${objectId}` },
+      ],
+      [{ text: msg('location_cancel_button'), callback_data: `plan_location_cancel|${objectId}` }],
+    ],
+  };
+}
+
+function buildManualFallbackKeyboard(planId, stageId, optionId) {
+  if (!planId || !stageId) return null;
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: msg('plan_manual_start_button'),
+          callback_data: `plan_manual_start|${planId}|${stageId}|${optionId || 0}`,
+        },
+      ],
+    ],
+  };
+}
+
+function mergeKeyboards(...keyboards) {
+  const rows = [];
+  for (const kb of keyboards) {
+    if (kb?.inline_keyboard?.length) {
+      rows.push(...kb.inline_keyboard);
+    }
+  }
+  return rows.length ? { inline_keyboard: rows } : null;
 }
 
 async function init() {
@@ -513,6 +863,8 @@ async function init() {
     bot.command('objects', (ctx) => planCommands.handleObjects(ctx));
     bot.command('location', (ctx) => planCommands.handleLocation(ctx));
     bot.command('use', (ctx) => planCommands.handleUse(ctx));
+    bot.command('merge', (ctx) => planCommands.handleMerge(ctx));
+    bot.command('edit', (ctx) => planCommands.handleEdit(ctx));
     bot.command('plans', (ctx) => planCommands.handlePlans(ctx));
     bot.command('plan', (ctx) => planCommands.handlePlan(ctx));
     bot.command('done', (ctx) => planCommands.handleDone(ctx));
@@ -608,8 +960,10 @@ async function init() {
     });
 
     bot.on('text', async (ctx, next) => {
-      const handled = await planCommands.handleLocationText(ctx);
-      if (!handled && typeof next === 'function') {
+      const handledDetails = await handleObjectDetailsText(ctx);
+      if (handledDetails) return undefined;
+      const handledLocation = await planCommands.handleLocationText(ctx);
+      if (!handledLocation && typeof next === 'function') {
         return next();
       }
       return undefined;
@@ -617,30 +971,8 @@ async function init() {
     bot.on('photo', async (ctx) => {
       await photoTips.offerHint(ctx);
       const userId = ctx.from?.id;
-      const state = addPhoto(userId, ctx.message);
-      const checklist = buildPhotoChecklist(state.count);
-      const parts = [
-        msg('photo_album_status', { count: state.count, min: MIN_PHOTOS, max: MAX_PHOTOS }),
-      ];
-      if (state.overflow) {
-        parts.push(msg('photo_album_overflow', { max: MAX_PHOTOS }));
-      }
-      if (checklist) {
-        parts.push(msg('photo_album_checklist', { checklist }));
-      }
-      if (!state.optionalSkipped) {
-        parts.push(msg('photo_album_optional'));
-      }
-      if (state.ready) {
-        parts.push(msg('photo_album_ready', { max: MAX_PHOTOS }));
-      } else {
-        const need = Math.max(0, MIN_PHOTOS - state.count);
-        parts.push(msg('photo_album_not_ready', { need }));
-      }
-      const text = parts.filter(Boolean).join('\n');
-      await ctx.reply(text, {
-        reply_markup: buildPhotoKeyboard(state.ready, state.optionalSkipped, state.count < MAX_PHOTOS),
-      });
+      addPhoto(userId, ctx.message);
+      schedulePhotoStatus(ctx);
     });
 
     bot.on('message', messageHandler);
@@ -660,6 +992,32 @@ async function init() {
       });
     });
 
+    bot.action(/^obj_merge\|(\d+)\|(\d+)/, async (ctx) => {
+      const [, sourceRaw, targetRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const sourceId = Number(sourceRaw);
+      const targetId = Number(targetRaw);
+      if (!sourceId || !targetId || sourceId === targetId) {
+        await ctx.reply(msg('objects_merge_invalid'));
+        return;
+      }
+      try {
+        const user = await db.ensureUser(ctx.from.id);
+        if (typeof db.mergeObjects !== 'function') {
+          await ctx.reply(msg('objects_merge_error'));
+          return;
+        }
+        await db.mergeObjects(user.id, sourceId, targetId);
+        await ctx.reply(msg('objects_merge_success', { source: sourceId, target: targetId }));
+        if (objectChips) {
+          await objectChips.send(ctx);
+        }
+      } catch (err) {
+        console.error('objects merge action error', err);
+        await ctx.reply(msg('objects_merge_error'));
+      }
+    });
+
     bot.action('plan_recent_new', async (ctx) => {
       await ctx.answerCbQuery();
       await handlePlanTreatment(ctx, {
@@ -677,6 +1035,40 @@ async function init() {
         allowExpired: true,
         allowExistingPlan: true,
       });
+    });
+
+    bot.action(/^obj_detail\|(variety|note)\|(\d+)/, async (ctx) => {
+      const [, field, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const objectId = Number(objectIdRaw);
+      if (!objectId || !field) return;
+      let object = await getObjectSafe(objectId);
+      if (!object || Number(object.user_id) !== Number(ctx.from?.id)) {
+        const user = await db.ensureUser(ctx.from.id);
+        const list = (await db.listObjects(user.id)) || [];
+        object =
+          list.find((o) => Number(o.id) === Number(user.last_object_id)) ||
+          list.find((o) => Number(o.id) === Number(objectId)) ||
+          list[0];
+      }
+      if (!object) {
+        await ctx.reply(msg('objects_not_found'));
+        return;
+      }
+      setDetailsSession(ctx.from.id, object.id, field);
+      const promptKey = field === 'variety' ? 'object_details_prompt_variety' : 'object_details_prompt_note';
+      await ctx.reply(msg(promptKey, { name: object.name }));
+    });
+
+    bot.action(/^obj_detail_skip\|(\d+)/, async (ctx) => {
+      const [, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const objectId = Number(objectIdRaw);
+      if (objectId && typeof db.updateObjectMeta === 'function') {
+        await db.updateObjectMeta(objectId, { details_prompted_at: new Date().toISOString() });
+      }
+      clearDetailsSession(ctx.from?.id);
+      await ctx.reply(msg('object_details_cancelled'));
     });
 
     bot.action(/^plan_recent_open\|/, async (ctx) => {
@@ -876,9 +1268,18 @@ async function init() {
       await ctx.answerCbQuery();
       const userId = ctx.from?.id;
       if (userId) skipOptionalPhotos(userId);
-      const reply = msg('photo_album_skip_optional_done');
-      if (reply) {
-        await ctx.reply(reply);
+      const state = getPhotoState(userId);
+      const payload = buildPhotoStatusPayload(state);
+      const ack = msg('photo_album_skip_optional_done');
+      const parts = [ack];
+      if (payload?.text) {
+        parts.push(payload.text);
+      }
+      const text = parts.filter(Boolean).join('\n\n');
+      if (text) {
+        await ctx.reply(text, {
+          reply_markup: payload?.reply_markup,
+        });
       }
     });
 

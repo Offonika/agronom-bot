@@ -3,14 +3,25 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
+from prometheus_client import Counter
 
 from app import db as db_module
 from app.dependencies import ErrorResponse, rate_limit
 from app.models import ErrorCode, PlanSession
+from app.services.plan_payload import PlanPayloadError, normalize_plan_payload
+from app.services.plan_service import (
+    PlanCreateResult,
+    create_plan_from_payload,
+    create_event_with_reminder,
+    enqueue_autoplan,
+    has_valid_options,
+    is_object_owned,
+)
+from app.services.autoplan_queue import AutoplanQueue
 from app.services.plan_session import (
     delete_plan_session,
     get_latest_plan_session,
@@ -21,6 +32,11 @@ from app.services.plan_session import (
 )
 
 router = APIRouter(prefix="/plans", tags=["plans"])
+autoplan_queue = AutoplanQueue()
+
+plan_create_counter = Counter("plans_create_total", "Create plan requests", ["status"])
+plan_event_counter = Counter("plans_event_create_total", "Create plan event requests", ["status"])
+plan_autoplan_counter = Counter("plans_autoplan_enqueue_total", "Autoplan enqueue requests", ["status"])
 
 
 class PlanOptionResponse(BaseModel):
@@ -130,6 +146,49 @@ class PlanSessionPatchRequest(BaseModel):
     ttl_hours: int | None = None
 
 
+class PlanCreateStage(BaseModel):
+    stage_id: int | None
+    option_ids: list[int] = Field(default_factory=list)
+
+
+class PlanCreateResponse(BaseModel):
+    plan_id: int | None
+    stages: list[PlanCreateStage] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class PlanCreateRequest(BaseModel):
+    object_id: int
+    case_id: int | None = None
+    source: str = "assistant"
+    plan_payload: dict[str, Any]
+
+
+class EventCreateRequest(BaseModel):
+    stage_id: int
+    stage_option_id: int | None = None
+    due_at: str | None = None
+    slot_end: str | None = None
+    reason: str | None = None
+
+
+class EventCreateResponse(BaseModel):
+    event_ids: list[int]
+    reminder_ids: list[int]
+
+
+class AutoplanRequest(BaseModel):
+    stage_id: int
+    stage_option_id: int
+    min_hours_ahead: int = 2
+    horizon_hours: int = 72
+
+
+class AutoplanResponse(BaseModel):
+    autoplan_run_id: int | None
+    status: str
+
+
 @router.post("/sessions", response_model=PlanSessionRecord)
 async def upsert_plan_session_endpoint(
     body: PlanSessionUpsertRequest,
@@ -193,6 +252,96 @@ async def delete_plan_session_endpoint(
         plan_id,
     )
     return Response(status_code=204)
+
+
+@router.post("", response_model=PlanCreateResponse)
+async def create_plan_endpoint(
+    body: PlanCreateRequest,
+    user_id: int = Depends(rate_limit),
+):
+    if not is_object_owned(user_id, body.object_id):
+        err = ErrorResponse(code=ErrorCode.FORBIDDEN, message="OBJECT_NOT_OWNED")
+        plan_create_counter.labels(status="forbidden").inc()
+        raise HTTPException(status_code=403, detail=err.model_dump())
+    try:
+        normalized = normalize_plan_payload(body.plan_payload)
+    except PlanPayloadError as exc:
+        err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message=str(exc))
+        plan_create_counter.labels(status="bad_request").inc()
+        raise HTTPException(status_code=400, detail=err.model_dump()) from exc
+    if not has_valid_options(normalized):
+        err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="NO_OPTIONS_IN_PLAN")
+        plan_create_counter.labels(status="bad_request").inc()
+        raise HTTPException(status_code=400, detail=err.model_dump())
+
+    result: PlanCreateResult = create_plan_from_payload(
+        user_id=user_id,
+        object_id=body.object_id,
+        normalized=normalized,
+        raw_payload=body.plan_payload,
+    )
+    return PlanCreateResponse(
+        plan_id=result.plan_id,
+        stages=[PlanCreateStage(stage_id=s.stage_id, option_ids=s.option_ids) for s in result.stages],
+        errors=normalized.errors,
+    )
+    plan_create_counter.labels(status="ok").inc()
+
+
+@router.post("/{plan_id}/events", response_model=EventCreateResponse)
+async def create_event_endpoint(
+    plan_id: int,
+    body: EventCreateRequest,
+    user_id: int = Depends(rate_limit),
+):
+    if db_module.engine is None:
+        err = ErrorResponse(code=ErrorCode.SERVICE_UNAVAILABLE, message="DB unavailable")
+        raise HTTPException(status_code=503, detail=err.model_dump())
+    # Простая валидация stage_id > 0
+    if body.stage_id <= 0:
+        err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="INVALID_STAGE_ID")
+        plan_event_counter.labels(status="bad_request").inc()
+        raise HTTPException(status_code=400, detail=err.model_dump())
+
+    event_ids, reminder_ids = create_event_with_reminder(
+        user_id=user_id,
+        plan_id=plan_id,
+        stage_id=body.stage_id,
+        stage_option_id=body.stage_option_id,
+        due_at_iso=body.due_at,
+        slot_end_iso=body.slot_end,
+        reason=body.reason or "Создано ассистентом",
+        source="assistant",
+    )
+    plan_event_counter.labels(status="ok").inc()
+    return EventCreateResponse(event_ids=event_ids, reminder_ids=reminder_ids)
+
+
+@router.post("/{plan_id}/autoplan", response_model=AutoplanResponse, status_code=202)
+async def enqueue_autoplan_endpoint(
+    plan_id: int,
+    body: AutoplanRequest,
+    user_id: int = Depends(rate_limit),
+):
+    run_id = enqueue_autoplan(
+        user_id=user_id,
+        plan_id=plan_id,
+        stage_id=body.stage_id,
+        stage_option_id=body.stage_option_id,
+        min_hours_ahead=body.min_hours_ahead,
+        horizon_hours=body.horizon_hours,
+    )
+    try:
+        if run_id:
+            autoplan_queue.add_run(run_id)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("autoplan_queue add failed for run %s: %s", run_id, exc)
+    if run_id is None:
+        err = ErrorResponse(code=ErrorCode.SERVICE_UNAVAILABLE, message="AUTOPLAN_ENQUEUE_FAILED")
+        plan_autoplan_counter.labels(status="fail").inc()
+        raise HTTPException(status_code=503, detail=err.model_dump())
+    plan_autoplan_counter.labels(status="ok").inc()
+    return AutoplanResponse(autoplan_run_id=run_id, status="pending")
 
 
 @router.get("/{plan_id}", response_model=PlanResponse)

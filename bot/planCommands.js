@@ -79,7 +79,11 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
       }
       const lines = objects.map((obj) => {
         const marker = obj.id === user.last_object_id ? '✅' : '▫️';
-        return `${marker} ${obj.name} (#${obj.id})`;
+        const extras = [];
+        if (obj.meta?.variety) extras.push(obj.meta.variety);
+        if (obj.meta?.note) extras.push(obj.meta.note);
+        const suffix = extras.length ? ` — ${extras.join(' / ')}` : '';
+        return `${marker} ${obj.name}${suffix} (#${obj.id})`;
       });
       await ctx.reply(msg('objects_list', { list: lines.join('\n') }));
       if (objectChips) {
@@ -114,6 +118,60 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     } catch (err) {
       console.error('use command error', err);
       await ctx.reply(msg('objects_error'));
+    }
+  }
+
+  async function handleEdit(ctx) {
+    const parts = ctx.message?.text?.trim()?.split(/\s+/) || [];
+    const idArg = parts[1] || null;
+    try {
+      const user = await ensureUser(ctx);
+      const objects = (await db.listObjects(user.id)) || [];
+      const target =
+        (idArg && objects.find((o) => String(o.id) === String(idArg))) ||
+        objects.find((o) => Number(o.id) === Number(user.last_object_id)) ||
+        objects[0];
+      if (!target) {
+        await ctx.reply(msg('objects_not_found'));
+        return;
+      }
+      const kb = {
+        inline_keyboard: [
+          [{ text: msg('object_details_button_variety'), callback_data: `obj_detail|variety|${target.id}` }],
+          [{ text: msg('object_details_button_note'), callback_data: `obj_detail|note|${target.id}` }],
+          [{ text: msg('object_details_skip'), callback_data: `obj_detail_skip|${target.id}` }],
+        ],
+      };
+      await ctx.reply(msg('object_edit_prompt', { name: target.name }), { reply_markup: kb });
+    } catch (err) {
+      console.error('objects edit error', err);
+      await ctx.reply(msg('objects_error'));
+    }
+  }
+
+  async function handleMerge(ctx) {
+    const parts = ctx.message?.text?.trim()?.split(/\s+/) || [];
+    const [, sourceRaw, targetRaw] = parts;
+    const sourceId = Number(sourceRaw);
+    const targetId = Number(targetRaw);
+    if (!sourceId || !targetId || sourceId === targetId) {
+      await ctx.reply(msg('objects_merge_invalid'));
+      return;
+    }
+    try {
+      const user = await ensureUser(ctx);
+      if (typeof db.mergeObjects !== 'function') {
+        await ctx.reply(msg('objects_merge_error'));
+        return;
+      }
+      await db.mergeObjects(user.id, sourceId, targetId);
+      await ctx.reply(msg('objects_merge_success', { source: sourceId, target: targetId }));
+      if (objectChips) {
+        await objectChips.send(ctx);
+      }
+    } catch (err) {
+      console.error('objects merge error', err);
+      await ctx.reply(msg('objects_merge_error'));
     }
   }
 
@@ -277,17 +335,37 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     if (!userId) return;
     const location = ctx.message?.location;
     if (!location) return;
-    const { entry, expired } = consumeLocationRequest(userId);
-    if (!entry) {
-      await ctx.reply(msg(expired ? 'location_request_expired' : 'location_no_request'));
-      return;
-    }
     try {
       const user = await ensureUser(ctx);
-      const object = await db.getObjectById(entry.objectId);
+      const { entry, expired } = consumeLocationRequest(userId);
+      const objects = (typeof db.listObjects === 'function' ? await db.listObjects(user.id) : []) || [];
+      const byId = entry?.objectId
+        ? objects.find((o) => Number(o.id) === Number(entry.objectId))
+        : null;
+      const last =
+        user.last_object_id && !byId
+          ? objects.find((o) => Number(o.id) === Number(user.last_object_id))
+          : null;
+      const fallback = !byId && !last && objects.length ? objects[0] : null;
+      const targetObject = byId || last || fallback || null;
+      if (!targetObject) {
+        await ctx.reply(msg(expired ? 'location_request_expired' : 'location_no_request'));
+        return;
+      }
+      const objectId = Number(targetObject.id) || targetObject.id;
+      let object = targetObject;
+      if (typeof db.getObjectById === 'function') {
+        const fetched = await db.getObjectById(objectId);
+        if (fetched && Number(fetched.user_id) === Number(user.id)) {
+          object = fetched;
+        }
+      }
       if (!object || object.user_id !== user.id) {
         await ctx.reply(msg('location_object_missing'));
         return;
+      }
+      if (targetObject.id !== user.last_object_id && typeof db.updateUserLastObject === 'function') {
+        await db.updateUserLastObject(user.id, targetObject.id);
       }
       const coords = { lat: Number(location.latitude), lon: Number(location.longitude) };
       if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lon)) {
@@ -536,8 +614,12 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     if (!Array.isArray(objects) || objects.length < 2) return [];
     const entries = [{ id: null, label: msg('plans_filter_all') || 'Все объекты' }, ...objects];
     const buttons = entries.map((entry) => {
+      const label =
+        entry.label ||
+        entry.name ||
+        (typeof msg === 'function' ? msg('object.default_name') : 'Моё растение');
       const isActive = entry.id == null ? !activeId : Number(entry.id) === Number(activeId);
-      const text = isActive ? `✅ ${entry.label}` : entry.label;
+      const text = isActive ? `✅ ${label}` : label;
       const value = entry.id == null ? 'all' : entry.id;
       return {
         text,
@@ -666,6 +748,8 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
   return {
     handleObjects,
     handleUse,
+    handleEdit,
+    handleMerge,
     handlePlans,
     handlePlansFilter: (ctx, objectId) => handlePlans(ctx, { objectId }),
     handleOverdueBulk,

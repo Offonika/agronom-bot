@@ -98,8 +98,25 @@ def mock_redis(monkeypatch):
         def pipeline(self):
             return _Pipe(self.store)
 
+        async def setex(self, key: str, _ttl: int, value):
+            self.store[key] = value
+            return True
+
+        async def get(self, key: str):
+            return self.store.get(key)
+
+        async def delete(self, key: str):
+            return 1 if self.store.pop(key, None) is not None else 0
+
     fake = _Redis()
     monkeypatch.setattr(dependencies, "redis_client", fake)
+    # Поддерживаем ассистента и другие сервисы, которые импортируют redis_client напрямую.
+    try:
+        import app.services.assistant as assistant_service
+
+        monkeypatch.setattr(assistant_service, "redis_client", fake)
+    except Exception:
+        pass
     yield
 
 

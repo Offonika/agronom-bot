@@ -5,6 +5,7 @@ const { logFunnelEvent } = require('./funnel');
 const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessage');
 const { replyUserError } = require('./userErrors');
 const { remember: rememberLocationPrompt } = require('./locationThrottler');
+const { rememberLocationRequest } = require('./locationSession');
 
 const PLAN_KIND_DEFAULT = 'PLAN_NEW';
 const ROW_SIZE = 3;
@@ -14,6 +15,7 @@ const LOCATION_PROMPT_TTL_MS = 30 * 60 * 1000; // 30 min prompt timeout
 const LOCATION_AUTO_CONFIRM_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 const LOCATION_EXPIRE_MS = 30 * 60 * 1000; // 30 min for pending prompts
 const DEFAULT_MAP_ZOOM = 15;
+const STRING_MIN_MATCH = 3;
 
 function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions = null }) {
   if (!db || !catalog || !planWizard) {
@@ -99,14 +101,14 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     return expiresAt.getTime() < Date.now();
   }
 
-  async function createPlanSessionRecord(user, diagnosis, token, initialStep = 'choose_object') {
+  async function createPlanSessionRecord(user, diagnosis, token, initialStep = 'choose_object', objectId = null) {
     if (!token || !user?.id || !diagnosis) return null;
     await sessionStore.deleteForUser(user.id);
     return sessionStore.upsert(user, {
       token,
       diagnosisPayload: diagnosis,
       recentDiagnosisId: diagnosis.recent_diagnosis_id || null,
-      objectId: user.last_object_id || null,
+      objectId: diagnosis.object_id || objectId || user.last_object_id || null,
       currentStep: initialStep,
       state: {},
     });
@@ -147,6 +149,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       ...payload,
       recent_diagnosis_id:
         payload.recent_diagnosis_id ?? session.recent_diagnosis_id ?? null,
+      object_id: payload.object_id ?? session.object_id ?? null,
     };
     if (opts.consume) {
       await sessionStore.deleteSession(session);
@@ -158,17 +161,61 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
 
   async function ensurePrimaryObject(user, diagnosis) {
     let objects = await db.listObjects(user.id);
-    let primary = objects.find((obj) => obj.id === user.last_object_id) || objects[0];
-    if (!primary) {
-      primary = await db.createObject(user.id, {
+    const cropKey = normalizeCrop(diagnosis?.crop || diagnosis?.crop_ru);
+    const requestedObjectId = diagnosis?.object_id ? Number(diagnosis.object_id) : null;
+    let primary =
+      (requestedObjectId ? objects.find((obj) => Number(obj.id) === requestedObjectId) : null) ||
+      findObjectByCrop(objects, cropKey);
+    if (!primary && requestedObjectId && typeof db.getObjectById === 'function') {
+      try {
+        const fetched = await db.getObjectById(requestedObjectId);
+        if (fetched && Number(fetched.user_id) === Number(user.id)) {
+          primary = fetched;
+          objects = [fetched, ...objects];
+        }
+      } catch (err) {
+        console.error('plan_flow.fetch_object_failed', err);
+      }
+    }
+    if (!primary && cropKey && typeof db.createObject === 'function') {
+      const created = await db.createObject(user.id, {
         name: deriveObjectName(diagnosis),
         type: diagnosis?.crop || null,
         locationTag: diagnosis?.region || null,
-        meta: { source: 'auto' },
+        meta: buildObjectMetaFromDiagnosis(diagnosis, 'auto'),
       });
-      objects = [primary];
+      if (created) {
+        primary = created;
+        objects = [created, ...objects];
+      }
+    }
+    if (!primary && typeof db.createObject === 'function') {
+      const created = await db.createObject(user.id, {
+        name: deriveObjectName(diagnosis),
+        type: diagnosis?.crop || null,
+        locationTag: diagnosis?.region || null,
+        meta: buildObjectMetaFromDiagnosis(diagnosis, 'auto'),
+      });
+      if (created) {
+        primary = created;
+        objects = [created, ...objects];
+      }
+    }
+    if (!primary) {
+      primary = objects.find((obj) => obj.id === user.last_object_id) || objects[0];
     }
     await db.updateUserLastObject(user.id, primary.id);
+    if (primary && (diagnosis?.variety || diagnosis?.variety_ru) && typeof db.updateObjectMeta === 'function') {
+      const variety = cleanText(diagnosis.variety_ru || diagnosis.variety);
+      const currentVariety = cleanText(primary.meta?.variety);
+      if (variety && (!currentVariety || normalizeCrop(currentVariety) !== normalizeCrop(variety))) {
+        const updated = await db.updateObjectMeta(primary.id, { variety });
+        if (updated) {
+          primary = updated;
+          objects = objects.map((obj) => (obj.id === primary.id ? updated : obj));
+        }
+      }
+    }
     const enriched = await maybeAutodetectLocation(primary, diagnosis, user?.id);
     if (enriched && enriched !== primary) {
       primary = enriched;
@@ -237,6 +284,9 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     if (!throttle.allowed) {
       await ctx.reply(msg('location_prompt_limit'));
       return;
+    }
+    if (userId && typeof rememberLocationRequest === 'function') {
+      rememberLocationRequest(userId, object.id, 'geo');
     }
     const meta = object.meta || {};
     const promptedAt = meta.location_prompted_at ? new Date(meta.location_prompted_at) : null;
@@ -343,6 +393,9 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     try {
       const user = await db.ensureUser(tgUserId);
       const { primary, objects } = await ensurePrimaryObject(user, payload);
+      if (primary?.id) {
+        payload.object_id = primary.id;
+      }
       if (needsManualLocation(primary.meta || {})) {
         await promptManualLocation(ctx, primary);
       } else {
@@ -351,7 +404,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       if (Array.isArray(objects) && objects.length === 1) {
         if (opts.skipAutoFinalize) {
           const token = generateToken();
-          const session = await createPlanSessionRecord(user, payload, token);
+          const session = await createPlanSessionRecord(user, payload, token, 'choose_object', primary.id);
           if (!session) return;
           await ctx.reply(
             formatStepPrompt(
@@ -380,7 +433,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         return;
       }
       const token = generateToken();
-      const session = await createPlanSessionRecord(user, payload, token);
+      const session = await createPlanSessionRecord(user, payload, token, 'choose_object', primary.id);
       if (!session) return;
       console.info('plan_flow.start', {
         userId: user.id,
@@ -600,7 +653,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         name,
         type: diagnosis?.crop || null,
         locationTag: diagnosis?.region || null,
-        meta: { source: 'button' },
+        meta: buildObjectMetaFromDiagnosis(diagnosis, 'button'),
       });
       await db.updateUserLastObject(user.id, object.id);
       await finalizePlan(ctx, tgUserId, object.id, diagnosis);
@@ -844,8 +897,43 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
   };
 }
 
+function normalizeCrop(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text ? text.toLowerCase() : '';
+}
+
+function cleanText(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function findObjectByCrop(objects, cropKey) {
+  if (!cropKey) return null;
+  return (
+    objects.find((obj) => normalizeCrop(obj.type) === cropKey) ||
+    objects.find((obj) => {
+      const nameKey = normalizeCrop(obj.name);
+      if (!nameKey || cropKey.length < STRING_MIN_MATCH) return false;
+      return nameKey.includes(cropKey);
+    })
+  );
+}
+
 function deriveObjectName(data) {
   return data?.crop_ru || data?.crop || msg('object.default_name');
+}
+
+function buildObjectMetaFromDiagnosis(data, source = 'auto') {
+  const meta = { source };
+  const variety = cleanText(data?.variety_ru || data?.variety);
+  if (variety) {
+    meta.variety = variety;
+  }
+  const cropRu = cleanText(data?.crop_ru);
+  if (cropRu) {
+    meta.crop_ru = cropRu;
+  }
+  return meta;
 }
 
 function buildConfirmData(objectId, token) {
@@ -1080,6 +1168,7 @@ function buildChipsInlineKeyboard(objects, activeId, token) {
     callback_data: buildPickData(obj.id, token || null),
   }));
   const rows = chunkChips(chips, ROW_SIZE);
+  rows.push([{ text: msg('plan_object_create'), callback_data: buildCreateData(token) }]);
   rows.push([{ text: msg('plan_step_cancel'), callback_data: buildCancelData(token) }]);
   return { inline_keyboard: rows };
 }
