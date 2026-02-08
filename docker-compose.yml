@@ -162,7 +162,7 @@ services:
         max-file: "5"
     env_file: .env
     ports:
-      - 5433:5432
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test:
         [
