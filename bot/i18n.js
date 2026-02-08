@@ -1,4 +1,21 @@
-const strings = require('../locales/ru.json');
+function tryRequire(p) {
+  try {
+    // eslint-disable-next-line import/no-dynamic-require, global-require
+    return require(p);
+  } catch (err) {
+    if (err && err.code === 'MODULE_NOT_FOUND') return null;
+    throw err;
+  }
+}
+
+// In Docker prod image, locales are copied to /usr/src/app/locales.
+// In dev compose, locales can be mounted to /usr/src/locales (../locales from /usr/src/app).
+const strings =
+  tryRequire('../locales/ru.json') || tryRequire('./locales/ru.json') || {};
+
+if (!Object.keys(strings).length) {
+  throw new Error('Cannot load locales/ru.json (tried ../locales and ./locales)');
+}
 
 function resolve(path) {
   if (!path) return undefined;

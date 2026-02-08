@@ -1,0 +1,12 @@
+services:
+  # Dev-only overrides: mount source code into containers for fast iteration.
+  api:
+    volumes:
+      - ./openapi/openapi.yaml:/app/openapi/openapi.yaml
+
+  bot:
+    volumes:
+      - ./bot:/usr/src/app
+      - ./locales:/usr/src/locales
+      - ./services:/usr/src/services
+

@@ -23,8 +23,6 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
-    volumes:
-      - ./openapi/openapi.yaml:/app/openapi/openapi.yaml
     depends_on:
       db:
         condition: service_healthy
@@ -52,10 +50,6 @@ services:
     build:
       context: .
       dockerfile: bot/Dockerfile
-    volumes:
-      - ./bot:/usr/src/app
-      - ./locales:/usr/src/locales
-      - ./services:/usr/src/services
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL}

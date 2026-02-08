@@ -2,6 +2,15 @@
 
 Working directory: `/opt/agronom-bot`
 
+## Compose Files
+
+- `docker-compose.yml` is production-safe (no source bind mounts).
+- `docker-compose.dev.yml` re-enables bind mounts for local/dev iteration:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
 ## Autostart On Boot (systemd)
 
 Unit: `/etc/systemd/system/agronom-bot-stack.service`
