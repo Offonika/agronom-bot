@@ -1,0 +1,18 @@
+# External exposure allowlist (TCP/UDP)
+# Format: <port>/<proto> [# comment]
+#
+# This file is used by /opt/admin_scripts/audit_exposure.sh (or can be used manually).
+
+22/tcp   # SSH (consider IP allowlist)
+80/tcp   # Apache HTTP -> redirects to HTTPS / ACME
+443/tcp  # Apache HTTPS (public vhosts)
+443/udp  # WireGuard over UDP 443 (VPN)
+
+5433/tcp   # agronom-bot docker Postgres (allowlist via DOCKER-USER)
+55433/tcp  # system Postgres (pricing/offonikabaza) for PowerBI (allowlist via INPUT)
+
+4433/tcp   # Outline (VPN)
+4433/udp   # Outline (VPN, UDP)
+54321/tcp  # Outline management/UI (VPN)
+8443/tcp   # Xray (VPN)
+8444/tcp   # Xray (VPN)

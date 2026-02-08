@@ -1,10 +1,11 @@
 "use strict";
 
-const { msg } = require('../utils');
+const { msg, sanitizeObjectName } = require('../utils');
 const { replyUserError } = require('../userErrors');
 const {
   rememberLocationRequest,
   clearLocationRequest,
+  peekLocationRequest,
 } = require('../locationSession');
 
 function parsePayload(data, prefix) {
@@ -64,7 +65,8 @@ function createPlanLocationHandler({ db }) {
         return;
       }
       await safeAnswer(ctx, 'location_change_hint');
-      await ctx.reply(msg('location_manual_prompt_short', { name: object.name }), {
+      const name = sanitizeObjectName(object?.name, msg('object.default_name'));
+      await ctx.reply(msg('location_manual_prompt_short', { name }), {
         reply_markup: buildManualKeyboard(object.id),
       });
     } catch (err) {
@@ -86,6 +88,11 @@ function createPlanLocationHandler({ db }) {
       if (!validateOwnership(object, user?.id)) {
         await safeAnswer(ctx, 'location_error', true);
         await replyUserError(ctx, 'OBJECT_NOT_OWNED');
+        return;
+      }
+      const pending = peekLocationRequest(user.id);
+      if (pending?.entry && pending.entry.objectId === object.id && pending.entry.mode === 'geo') {
+        await safeAnswer(ctx, 'location_request_in_progress');
         return;
       }
       const ok = rememberLocationRequest(user.id, object.id, 'geo');
@@ -115,6 +122,11 @@ function createPlanLocationHandler({ db }) {
       if (!validateOwnership(object, user?.id)) {
         await safeAnswer(ctx, 'location_error', true);
         await replyUserError(ctx, 'OBJECT_NOT_OWNED');
+        return;
+      }
+      const pending = peekLocationRequest(user.id);
+      if (pending?.entry && pending.entry.objectId === object.id && pending.entry.mode === 'address') {
+        await safeAnswer(ctx, 'location_request_in_progress');
         return;
       }
       const ok = rememberLocationRequest(user.id, object.id, 'address');

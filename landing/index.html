@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Карманный агроном — AI-диагностика растений в Telegram</title>
+  <meta name="description" content="Сфотографируй растение — получи диагноз и план лечения от AI-агронома. Бесплатно в Telegram.">
+  <link rel="canonical" href="https://agronom.offonika.ru/">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Карманный агроном — AI-диагностика растений">
+  <meta property="og:description" content="Фото → диагноз → план действий + напоминания. Бесплатный Telegram-бот.">
+  <meta property="og:image" content="https://agronom.offonika.ru/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://agronom.offonika.ru">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Карманный агроном — AI-диагностика растений">
+  <meta name="twitter:description" content="Фото → диагноз → план действий + напоминания">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            leaf: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              300: '#86efac',
+              400: '#4ade80',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            },
+            earth: {
+              50: '#faf8f5',
+              100: '#f5f0e8',
+              200: '#e8dcc8',
+              300: '#d4c4a8',
+              400: '#b8a07a',
+              500: '#9a8156',
+              600: '#7d6644',
+              700: '#5f4d35',
+              800: '#453929',
+              900: '#2d251c',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    /* Animations */
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .animate-fade-in {
+      animation: fade-in 0.6s ease-out forwards;
+    }
+    
+    /* Staggered delays */
+    [data-animate]:nth-child(1) { animation-delay: 0.1s; }
+    [data-animate]:nth-child(2) { animation-delay: 0.2s; }
+    [data-animate]:nth-child(3) { animation-delay: 0.3s; }
+    [data-animate]:nth-child(4) { animation-delay: 0.4s; }
+    
+    /* FAQ accordion */
+    .faq-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    
+    .faq-item.open .faq-content {
+      max-height: 500px;
+    }
+    
+    .faq-item.open .faq-icon {
+      transform: rotate(180deg);
+    }
+    
+    .faq-icon {
+      transition: transform 0.3s ease;
+    }
+    
+    /* Gradient background */
+    .hero-gradient {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #faf8f5 100%);
+    }
+    
+    /* Pattern overlay */
+    .pattern-overlay {
+      background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2322c55e' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+  </style>
+  
+  <!-- JSON-LD (SEO / AI visibility) -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://agronom.offonika.ru/#org",
+          "name": "Карманный агроном",
+          "legalName": "ООО «МАСТЕР-МОБАЙЛ»",
+          "url": "https://agronom.offonika.ru/",
+          "logo": "https://agronom.offonika.ru/og-image.png",
+          "email": "teleinvest-sk@mail.ru",
+          "telephone": "+7 938 915-33-33"
+        },
+        {
+          "@type": "Product",
+          "@id": "https://agronom.offonika.ru/#product",
+          "name": "Карманный агроном (Telegram-бот)",
+          "description": "Диагностика болезней растений по фото: диагноз → план действий, PHI, напоминания и подбор времени обработки по погоде («зелёные окна»).",
+          "brand": { "@id": "https://agronom.offonika.ru/#org" },
+          "url": "https://agronom.offonika.ru/",
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "RUB",
+            "price": "199",
+            "availability": "https://schema.org/InStock",
+            "url": "https://agronom.offonika.ru/"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://agronom.offonika.ru/#app",
+          "name": "Карманный агроном",
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "Telegram",
+          "url": "https://agronom.offonika.ru/",
+          "publisher": { "@id": "https://agronom.offonika.ru/#org" }
+        }
+      ]
+    }
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context":"https://schema.org",
+      "@type":"FAQPage",
+      "mainEntity":[
+        {
+          "@type":"Question",
+          "name":"Что такое «Карманный агроном»?",
+          "acceptedAnswer":{"@type":"Answer","text":"«Карманный агроном» — Telegram-бот для диагностики болезней растений по фото: вы отправляете фото, получаете диагноз, понятный план действий, сроки ожидания (PHI) и рекомендации по времени обработки с учётом погоды."}
+        },
+        {
+          "@type":"Question",
+          "name":"Как правильно сделать фото для диагностики?",
+          "acceptedAnswer":{"@type":"Answer","text":"Сделайте 2–3 фото: 1) общий вид растения, 2) крупно повреждённый лист (лицевая сторона), 3) тот же лист с изнанки. Снимайте при хорошем освещении, без сильных бликов и размытия."}
+        },
+        {
+          "@type":"Question",
+          "name":"Что значит «низкая уверенность» (low confidence) в результате?",
+          "acceptedAnswer":{"@type":"Answer","text":"Иногда симптомы похожи у разных проблем (болезнь/вредители/дефицит питания). Если уверенность низкая, бот попросит дополнительные фото или уточнения, чтобы повысить точность и не дать ошибочный план."}
+        },
+        {
+          "@type":"Question",
+          "name":"Можно ли доверять рекомендациям по препаратам?",
+          "acceptedAnswer":{"@type":"Answer","text":"Бот даёт практические рекомендации и подсказывает безопасные шаги, но итоговое решение остаётся за пользователем. Для обработки растений важно соблюдать инструкцию производителя и нормы применения, особенно по срокам ожидания (PHI)."}
+        },
+        {
+          "@type":"Question",
+          "name":"Что такое PHI и зачем он нужен?",
+          "acceptedAnswer":{"@type":"Answer","text":"PHI (pre-harvest interval) — срок ожидания от обработки до сбора урожая. Он помогает понять, когда плоды можно употреблять в пищу после применения средства защиты растений."}
+        },
+        {
+          "@type":"Question",
+          "name":"Что такое «зелёные окна» и как они помогают?",
+          "acceptedAnswer":{"@type":"Answer","text":"«Зелёные окна» — подход к выбору времени обработки по погоде: без дождя после опрыскивания, при подходящем ветре и температуре. Это повышает эффективность обработки и снижает риск смыва."}
+        },
+        {
+          "@type":"Question",
+          "name":"Как начать пользоваться ботом?",
+          "acceptedAnswer":{"@type":"Answer","text":"Нажмите кнопку «Открыть Telegram-бота», отправьте фото растения и кратко опишите проблему. Бот задаст уточняющие вопросы и предложит план."}
+        },
+        {
+          "@type":"Question",
+          "name":"Какие тарифы и ограничения в бесплатной версии?",
+          "acceptedAnswer":{"@type":"Answer","text":"На лендинге указаны условия Free и Pro. Free подходит для пробного использования и ограничен по кейсам/периоду. Pro (199 ₽/мес) открывает безлимит кейсов, напоминания и дополнительные возможности."}
+        },
+        {
+          "@type":"Question",
+          "name":"Чем «Карманный агроном» отличается от приложений-распознавалок?",
+          "acceptedAnswer":{"@type":"Answer","text":"Если коротко: важнее не только «узнать болезнь по фото», но и получить план лечения (дозировки), PHI и напоминания. «Карманный Агроном» это Telegram-бот для диагностики растений по фото: без установки приложения, быстро и с понятным планом."}
+        },
+        {
+          "@type":"Question",
+          "name":"Что я получу в ответ после фото?",
+          "acceptedAnswer":{"@type":"Answer","text":"Отправьте фото растения в Telegram-бот. В ответ вы получите: (1) диагноз и причины, (2) план лечения, (3) напоминания. Если уверенность низкая, бот попросит переснять кадры."}
+        }
+      ]
+    }
+  </script>
+</head>
+<body class="font-sans text-earth-800 antialiased">
+
+  <!-- Hero Section -->
+  <section class="hero-gradient pattern-overlay min-h-screen flex items-center relative overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-b from-transparent to-white/50 pointer-events-none"></div>
+    
+    <div class="container mx-auto px-4 py-16 md:py-24 relative z-10">
+      <div class="max-w-4xl mx-auto text-center">
+        <!-- Badge -->
+        <div class="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 mb-8 shadow-sm" data-animate>
+          <span class="w-2 h-2 bg-leaf-500 rounded-full animate-pulse"></span>
+          <span class="text-sm font-medium text-leaf-700">Бесплатный Telegram-бот</span>
+        </div>
+        
+        <!-- Headline -->
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-earth-900 mb-6 leading-tight" data-animate>
+          Карманный Агроном
+          <span class="block text-leaf-700">диагностика болезней растений по фото</span>
+        </h1>
+        
+        <!-- Subheadline -->
+        <p class="text-xl md:text-2xl text-earth-600 mb-8 max-w-2xl mx-auto" data-animate>
+          Telegram-бот для диагностики растений. Фото → диагноз → план действий + напоминания.
+        </p>
+        
+        <p class="text-base md:text-lg text-earth-600 mb-10 max-w-2xl mx-auto" data-animate>
+          Ключевые функции: диагностика по фото, план лечения с PHI (pre-harvest interval) для безопасного сбора урожая, календарь обработок и «зелёные окна» по погоде.
+        </p>
+        
+        <!-- CTA Button -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center" data-animate>
+          <a href="https://t.me/AgronommAI_bot" 
+             data-cta="telegram" 
+             data-position="hero"
+             class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 hover:shadow-xl hover:shadow-leaf-600/40 transition-all duration-300 hover:-translate-y-0.5">
+            <!-- Telegram icon -->
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.44-.751-.245-1.349-.374-1.297-.789.027-.216.324-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.015 3.333-1.386 4.025-1.627 4.477-1.635.099-.002.321.023.465.141.121.1.155.234.17.331.015.098.034.32.019.494z"/>
+            </svg>
+            Открыть бота
+          </a>
+          
+          <span class="text-earth-500 text-sm">Бесплатно • Без регистрации</span>
+        </div>
+        
+        <!-- Trust indicators -->
+        <div class="mt-12 flex flex-wrap justify-center gap-6 text-sm text-earth-500" data-animate>
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-leaf-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>Официальные препараты РФ</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-leaf-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>Ответ за 5 секунд</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-leaf-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+            </svg>
+            <span>Учитывает погоду</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TL;DR / Pillar Pages -->
+  <section class="py-20 bg-white" data-track-view="pilot_feature_view" id="tldr">
+    <div class="container mx-auto px-4">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">TL;DR: быстрые ответы на частые вопросы</h2>
+        <p class="text-earth-600 text-lg max-w-3xl mx-auto">
+          Эти блоки сделаны для людей и для AI: коротко, структурировано, с примерами и CTA.
+        </p>
+      </div>
+      
+      <div class="grid lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
+        <a href="/best-plant-disease-apps/" data-track-click="pillar_open" class="block bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="text-xl font-semibold text-earth-900">Лучшие приложения для диагностики растений</h3>
+            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-leaf-100 text-leaf-700">гайд</span>
+          </div>
+          <ul class="mt-3 list-disc pl-5 text-earth-700 text-sm space-y-1">
+            <li>Что важнее распознавания: план лечения, PHI, напоминания.</li>
+            <li>Почему Telegram-бот удобнее установки приложения.</li>
+            <li>Чеклист: фото, точность, безопасность, «зелёные окна».</li>
+          </ul>
+        </a>
+        
+        <a href="/plant-disease-photo/" data-track-click="pillar_open" class="block bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="text-xl font-semibold text-earth-900">Бот для определения болезни по фото</h3>
+            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-leaf-100 text-leaf-700">как работает</span>
+          </div>
+          <ul class="mt-3 list-disc pl-5 text-earth-700 text-sm space-y-1">
+            <li>Минимум кадров: общий вид, лист лицевая, лист изнанка.</li>
+            <li>Что вы получаете: диагноз, причины, шаги лечения.</li>
+            <li>Если «low confidence»: пересъём и лимит не списывается.</li>
+          </ul>
+        </a>
+        
+        <a href="/phi/" data-track-click="pillar_open" class="block bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="text-xl font-semibold text-earth-900">PHI и безопасный сбор урожая</h3>
+            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-leaf-100 text-leaf-700">безопасность</span>
+          </div>
+          <ul class="mt-3 list-disc pl-5 text-earth-700 text-sm space-y-1">
+            <li>PHI (pre-harvest interval): зачем и как соблюдать.</li>
+            <li>Что бот показывает в плане: PHI, меры защиты, дозировки.</li>
+            <li>Подходит для дачи и теплиц: «бот для ухода за садом».</li>
+          </ul>
+        </a>
+        
+        <a href="/green-windows/" data-track-click="green_window_click" class="block bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300">
+          <div class="flex items-start justify-between gap-4">
+            <h3 class="text-xl font-semibold text-earth-900">Зелёные окна: когда лучше обрабатывать</h3>
+            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-leaf-100 text-leaf-700">погода</span>
+          </div>
+          <ul class="mt-3 list-disc pl-5 text-earth-700 text-sm space-y-1">
+            <li>Окна по погоде: дождь, ветер, температура, влажность.</li>
+            <li>Как бот учитывает погоду и сдвигает обработку.</li>
+            <li>Календарь и напоминания: не пропустить курс обработок.</li>
+          </ul>
+        </a>
+      </div>
+      
+      <div class="mt-10 text-center">
+        <a href="https://t.me/AgronommAI_bot"
+           data-cta="telegram"
+           data-position="tldr"
+           class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 hover:shadow-xl hover:shadow-leaf-600/40 transition-all duration-300 hover:-translate-y-0.5">
+          Открыть бота и сделать диагноз
+        </a>
+        <div class="mt-3 text-sm text-earth-500">Карманный Агроном — приложение для диагностики болезней растений по фото (в формате Telegram-бота).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features (AI-friendly) -->
+  <section class="py-20 bg-leaf-50">
+    <div class="container mx-auto px-4">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">Что умеет «Карманный агроном»</h2>
+        <p class="text-earth-600 text-lg max-w-3xl mx-auto">
+          Структурировано и кратко: удобно читать и удобно цитировать AI.
+        </p>
+      </div>
+      
+      <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-start">
+        <div class="bg-white rounded-3xl shadow-lg overflow-hidden">
+          <div class="p-6 md:p-8 border-b border-earth-100">
+            <h3 class="text-xl font-semibold text-earth-900">Функции и результат</h3>
+            <p class="text-earth-600 mt-2 text-sm">Telegram-бот для диагностики растений, ухода за садом и планирования обработок.</p>
+          </div>
+          <div class="p-6 md:p-8 overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="text-earth-600">
+                  <th class="py-2 pr-4 font-semibold">Функция</th>
+                  <th class="py-2 font-semibold">Что получаете</th>
+                </tr>
+              </thead>
+              <tbody class="text-earth-800">
+                <tr class="border-t border-earth-100">
+                  <td class="py-3 pr-4 font-medium">Диагностика по фото</td>
+                  <td class="py-3">Вероятный диагноз, причины, уточняющие вопросы при необходимости</td>
+                </tr>
+                <tr class="border-t border-earth-100">
+                  <td class="py-3 pr-4 font-medium">План лечения с PHI</td>
+                  <td class="py-3">Шаги, дозировки, меры безопасности, PHI для безопасного сбора урожая</td>
+                </tr>
+                <tr class="border-t border-earth-100">
+                  <td class="py-3 pr-4 font-medium">Напоминания и календарь</td>
+                  <td class="py-3">График обработок, автоперенос при погодных рисках (зелёные окна)</td>
+                </tr>
+                <tr class="border-t border-earth-100">
+                  <td class="py-3 pr-4 font-medium">Повторная проверка</td>
+                  <td class="py-3">Контроль «до/после» и продолжение кейса без лишних шагов</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="space-y-6">
+          <div class="bg-white rounded-3xl shadow-lg p-6 md:p-8">
+            <h3 class="text-xl font-semibold text-earth-900">Минимальный набор фото</h3>
+            <ul class="mt-3 list-disc pl-5 text-earth-700 text-sm space-y-1">
+              <li>Общий вид растения (контекст).</li>
+              <li>Лист, лицевая сторона (симптомы).</li>
+              <li>Лист, изнанка (часто там вредители).</li>
+              <li>Опционально: плод, цветок, корень (если есть проблема).</li>
+            </ul>
+          </div>
+          
+          <div class="bg-white rounded-3xl shadow-lg p-6 md:p-8">
+            <h3 class="text-xl font-semibold text-earth-900">Превью результата (пример)</h3>
+            <div class="mt-4 grid sm:grid-cols-2 gap-4">
+              <div class="rounded-2xl border border-earth-100 bg-gradient-to-br from-earth-50 to-white p-4">
+                <div class="text-xs text-earth-500 mb-1">Диагноз</div>
+                <div class="font-semibold text-earth-900">Пятнистость листьев</div>
+                <div class="text-sm text-earth-600 mt-2">Причины, рекомендации по уходу, что проверить</div>
+              </div>
+              <div class="rounded-2xl border border-earth-100 bg-gradient-to-br from-leaf-50 to-white p-4">
+                <div class="text-xs text-earth-500 mb-1">План лечения</div>
+                <div class="font-semibold text-earth-900">Шаги 1–3 + PHI</div>
+                <div class="text-sm text-earth-600 mt-2">Дозировки, меры безопасности, напоминания</div>
+              </div>
+            </div>
+            <div class="mt-4">
+              <a href="https://t.me/AgronommAI_bot" data-cta="telegram" data-position="features_preview" class="text-leaf-700 hover:text-leaf-800 font-semibold">
+                Открыть Telegram-бот для диагностики растений →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Problems Section -->
+  <section class="py-20 bg-white">
+    <div class="container mx-auto px-4">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">4 частые проблемы, которые мы решаем</h2>
+        <p class="text-earth-600 text-lg max-w-2xl mx-auto">Загрузи фото — бот определит проблему и подскажет, что делать</p>
+      </div>
+      
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+        <!-- Problem 1 -->
+        <div class="bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300" data-animate>
+          <div class="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-earth-900 mb-2">Пятна и налёт</h3>
+          <p class="text-earth-600 text-sm">Грибковые и бактериальные заболевания листьев и плодов</p>
+        </div>
+        
+        <!-- Problem 2 -->
+        <div class="bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300" data-animate>
+          <div class="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-earth-900 mb-2">Вредители</h3>
+          <p class="text-earth-600 text-sm">Тля, клещи, гусеницы и другие насекомые-вредители</p>
+        </div>
+        
+        <!-- Problem 3 -->
+        <div class="bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300" data-animate>
+          <div class="w-14 h-14 bg-yellow-100 rounded-xl flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-earth-900 mb-2">Желтеют и сохнут</h3>
+          <p class="text-earth-600 text-sm">Хлороз, увядание, проблемы с корневой системой</p>
+        </div>
+        
+        <!-- Problem 4 -->
+        <div class="bg-earth-50 rounded-2xl p-6 hover:shadow-lg transition-shadow duration-300" data-animate>
+          <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-earth-900 mb-2">Перелив и дефициты</h3>
+          <p class="text-earth-600 text-sm">Ожоги, переувлажнение, нехватка питательных веществ</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="py-20 bg-leaf-50">
+    <div class="container mx-auto px-4">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">Как это работает</h2>
+        <p class="text-earth-600 text-lg">3 простых шага до здорового растения</p>
+      </div>
+      
+      <div class="max-w-4xl mx-auto">
+        <div class="grid md:grid-cols-3 gap-8 relative">
+          <!-- Connector line (desktop only) -->
+          <div class="hidden md:block absolute top-16 left-1/6 right-1/6 h-0.5 bg-leaf-200"></div>
+          
+          <!-- Step 1 -->
+          <div class="text-center relative" data-animate>
+            <div class="w-32 h-32 bg-white rounded-3xl shadow-lg flex items-center justify-center mx-auto mb-6 relative z-10">
+              <svg class="w-16 h-16 text-leaf-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-8 bg-leaf-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-20">1</div>
+            <h3 class="text-xl font-semibold text-earth-900 mb-2">Сфотографируй</h3>
+            <p class="text-earth-600">Отправь фото листа, стебля или плода в бот</p>
+          </div>
+          
+          <!-- Step 2 -->
+          <div class="text-center relative" data-animate>
+            <div class="w-32 h-32 bg-white rounded-3xl shadow-lg flex items-center justify-center mx-auto mb-6 relative z-10">
+              <svg class="w-16 h-16 text-leaf-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+            </div>
+            <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-8 bg-leaf-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-20">2</div>
+            <h3 class="text-xl font-semibold text-earth-900 mb-2">Получи диагноз</h3>
+            <p class="text-earth-600">AI определит болезнь и объяснит причины</p>
+          </div>
+          
+          <!-- Step 3 -->
+          <div class="text-center relative" data-animate>
+            <div class="w-32 h-32 bg-white rounded-3xl shadow-lg flex items-center justify-center mx-auto mb-6 relative z-10">
+              <svg class="w-16 h-16 text-leaf-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+              </svg>
+            </div>
+            <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-8 h-8 bg-leaf-600 text-white rounded-full flex items-center justify-center font-bold text-sm z-20">3</div>
+            <h3 class="text-xl font-semibold text-earth-900 mb-2">Следуй плану</h3>
+            <p class="text-earth-600">Препараты, дозировки и напоминания — всё готово</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Section -->
+  <section id="pricing" class="py-20 bg-white">
+    <div class="container mx-auto px-4">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">Тарифы</h2>
+        <p class="text-earth-600 text-lg">Начни бесплатно — переходи на Pro когда нужно больше</p>
+      </div>
+      
+      <div class="max-w-5xl mx-auto">
+        <!-- Pricing Table -->
+        <div class="bg-earth-50 rounded-3xl overflow-hidden shadow-lg">
+          <!-- Header -->
+          <div class="grid grid-cols-4 bg-earth-100">
+            <div class="p-4 md:p-6"></div>
+            <div class="p-4 md:p-6 text-center border-l border-earth-200">
+              <div class="font-semibold text-earth-900">Free</div>
+              <div class="text-sm text-earth-600">первые 24 часа</div>
+            </div>
+            <div class="p-4 md:p-6 text-center border-l border-earth-200">
+              <div class="font-semibold text-earth-900">Free</div>
+              <div class="text-sm text-earth-600">после 24 часов</div>
+            </div>
+            <div class="p-4 md:p-6 text-center border-l border-earth-200 bg-leaf-600 text-white">
+              <div class="font-semibold">Pro</div>
+              <div class="text-2xl font-bold">199 ₽<span class="text-sm font-normal">/мес</span></div>
+            </div>
+          </div>
+          
+          <!-- Rows -->
+          <div class="divide-y divide-earth-200">
+            <!-- Row: Cases -->
+            <div class="grid grid-cols-4">
+              <div class="p-4 md:p-6 font-medium text-earth-900">Кейсы диагностики</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-700">1 кейс<br><span class="text-sm text-earth-500">до 10 фото</span></div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-700">1 кейс / 7 дней<br><span class="text-sm text-earth-500">до 8 фото</span></div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 bg-leaf-50 text-leaf-700 font-semibold">Безлимит</div>
+            </div>
+            
+            <!-- Row: Recheck -->
+            <div class="grid grid-cols-4">
+              <div class="p-4 md:p-6 font-medium text-earth-900">Повторная проверка</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-700">—</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-700">До 10 дней<br><span class="text-sm text-earth-500">= тот же кейс</span></div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 bg-leaf-50 text-leaf-700">
+                <svg class="w-6 h-6 mx-auto text-leaf-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+            </div>
+            
+            <!-- Row: Reminders -->
+            <div class="grid grid-cols-4">
+              <div class="p-4 md:p-6 font-medium text-earth-900">Напоминания</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-700">1</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-700">1</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 bg-leaf-50 text-leaf-700 font-semibold">Безлимит</div>
+            </div>
+            
+            <!-- Row: Assistant -->
+            <div class="grid grid-cols-4">
+              <div class="p-4 md:p-6 font-medium text-earth-900">Чат-ассистент</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-400">—</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-400">—</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 bg-leaf-50 text-leaf-700">
+                <svg class="w-6 h-6 mx-auto text-leaf-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+            </div>
+            
+            <!-- Row: History -->
+            <div class="grid grid-cols-4">
+              <div class="p-4 md:p-6 font-medium text-earth-900">История и прогресс</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-400">—</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 text-earth-400">—</div>
+              <div class="p-4 md:p-6 text-center border-l border-earth-200 bg-leaf-50 text-leaf-700">
+                <span class="text-sm">До/после + дневник</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Footnote -->
+        <p class="text-center text-sm text-earth-500 mt-6">
+          * Low confidence фото не списывается — если бот не смог дать финальный диагноз/план, попытка не считается
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="py-20 bg-earth-50">
+    <div class="container mx-auto px-4">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">Частые вопросы</h2>
+      </div>
+      
+      <div class="max-w-3xl mx-auto space-y-4">
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="what-is" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Что такое «Карманный агроном»?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              «Карманный агроном» — Telegram-бот для диагностики болезней растений по фото: вы отправляете фото, получаете диагноз, понятный план действий, сроки ожидания (PHI) и рекомендации по времени обработки с учётом погоды.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="how-photo" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Как правильно сделать фото для диагностики?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              Сделайте 2–3 фото: 1) общий вид растения, 2) крупно повреждённый лист (лицевая сторона), 3) тот же лист с изнанки. Снимайте при хорошем освещении, без сильных бликов и размытия.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="low-confidence" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Что значит «низкая уверенность» (low confidence) в результате?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              Иногда симптомы похожи у разных проблем (болезнь/вредители/дефицит питания). Если уверенность низкая, бот попросит дополнительные фото или уточнения, чтобы повысить точность и не дать ошибочный план.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="safety" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Можно ли доверять рекомендациям по препаратам?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              Бот даёт практические рекомендации и подсказывает безопасные шаги, но итоговое решение остаётся за пользователем. Для обработки растений важно соблюдать инструкцию производителя и нормы применения, особенно по срокам ожидания (PHI).
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="phi" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Что такое PHI и зачем он нужен?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              PHI (pre-harvest interval) — срок ожидания от обработки до сбора урожая. Он помогает понять, когда плоды можно употреблять в пищу после применения средства защиты растений.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="green-windows" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Что такое «зелёные окна» и как они помогают?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              «Зелёные окна» — подход к выбору времени обработки по погоде: без дождя после опрыскивания, при подходящем ветре и температуре. Это повышает эффективность обработки и снижает риск смыва.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="how-start" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Как начать пользоваться ботом?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              Нажмите кнопку «Открыть Telegram-бота», отправьте фото растения и кратко опишите проблему. Бот задаст уточняющие вопросы и предложит план.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="pricing" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Какие тарифы и ограничения в бесплатной версии?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              На лендинге указаны условия Free и Pro. Free подходит для пробного использования и ограничен по кейсам/периоду. Pro (199 ₽/мес) открывает безлимит кейсов, напоминания и дополнительные возможности.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="best-apps" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Чем «Карманный агроном» отличается от приложений-распознавалок?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              Если коротко: важнее не только «узнать болезнь по фото», но и получить план лечения (дозировки), PHI и напоминания. «Карманный Агроном» это Telegram-бот для диагностики растений по фото: без установки приложения, быстро и с понятным планом.
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-2xl shadow-sm" data-animate>
+          <button class="w-full p-6 text-left flex items-center justify-between" data-faq="photo-bot" onclick="this.parentElement.classList.toggle('open')">
+            <span class="font-semibold text-earth-900 pr-4">Что я получу в ответ после фото?</span>
+            <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div class="faq-content">
+            <div class="px-6 pb-6 text-earth-600">
+              Отправьте фото растения в Telegram-бот. В ответ вы получите: (1) диагноз и причины, (2) план лечения, (3) напоминания. Если уверенность низкая, бот попросит переснять кадры.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="py-20 bg-gradient-to-br from-leaf-600 to-leaf-700 relative overflow-hidden">
+    <!-- Decorative elements -->
+    <div class="absolute inset-0 opacity-10">
+      <div class="absolute top-10 left-10 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+      <div class="absolute bottom-10 right-10 w-60 h-60 bg-white rounded-full blur-3xl"></div>
+    </div>
+    
+    <div class="container mx-auto px-4 relative z-10">
+      <div class="max-w-3xl mx-auto text-center">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">
+          Попробуй прямо сейчас — бесплатно
+        </h2>
+        <p class="text-leaf-100 text-lg mb-10">
+          Сфотографируй своё растение и получи диагноз за 5 секунд. Без регистрации, без карты.
+        </p>
+        
+        <a href="https://t.me/AgronommAI_bot" 
+           data-cta="telegram" 
+           data-position="footer"
+           class="inline-flex items-center gap-3 bg-white hover:bg-leaf-50 text-leaf-700 font-semibold text-lg px-10 py-5 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.44-.751-.245-1.349-.374-1.297-.789.027-.216.324-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.015 3.333-1.386 4.025-1.627 4.477-1.635.099-.002.321.023.465.141.121.1.155.234.17.331.015.098.034.32.019.494z"/>
+          </svg>
+          Открыть бота в Telegram
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-earth-900 text-earth-300 py-12">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div class="flex items-center gap-3">
+          <img src="/assets/favicon.svg" alt="Карманный агроном" class="w-8 h-8">
+          <span class="font-semibold text-white">Карманный агроном</span>
+        </div>
+        
+        <div class="flex flex-wrap justify-center gap-6 text-sm">
+          <a href="/privacy/" class="hover:text-white transition-colors">Политика конфиденциальности</a>
+          <a href="/offer/" class="hover:text-white transition-colors">Публичная оферта</a>
+          <a href="/plant-disease-photo/" class="hover:text-white transition-colors">Болезнь по фото</a>
+          <a href="/green-windows/" class="hover:text-white transition-colors" data-track-click="green_window_click">Зелёные окна</a>
+          <a href="/phi/" class="hover:text-white transition-colors">PHI</a>
+          <a href="/best-plant-disease-apps/" class="hover:text-white transition-colors">Лучшие приложения</a>
+          <a href="https://t.me/agronom_ai" class="hover:text-white transition-colors">Канал @agronom_ai</a>
+          <a href="https://t.me/AgronommAI_bot" class="hover:text-white transition-colors" data-cta="telegram" data-position="footer_support">Поддержка</a>
+        </div>
+        
+        <div class="text-sm text-earth-500">
+          © 2025 ООО «МАСТЕР-МОБАЙЛ»
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    window.METRIKA_ID = '106112758';
+  </script>
+  <script src="/scripts/utm.js"></script>
+  <script src="/scripts/analytics.js"></script>
+  <noscript><div><img src="https://mc.yandex.ru/watch/106112758" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+</body>
+</html>

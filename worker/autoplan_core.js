@@ -91,6 +91,7 @@ async function processAutoplanContext(context, deps = {}) {
       minHoursAhead: context.run?.min_hours_ahead,
       horizonHours: context.run?.horizon_hours,
       rules: stageRules,
+      preferences: deps.preferences || null,
     });
     if (!slot) {
       await db.updateAutoplanRun(runId, {

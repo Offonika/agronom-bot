@@ -83,6 +83,56 @@ function createDb(poolInstance) {
     return rows[0];
   }
 
+  async function getConsentStatus(userId, docType) {
+    if (!userId || !docType) return null;
+    const sql = `
+      SELECT user_id, doc_type, doc_version, status, source, updated_at
+      FROM user_consents
+      WHERE user_id = $1 AND doc_type = $2
+      LIMIT 1;
+    `;
+    const { rows } = await exec(sql, [userId, docType]);
+    return rows[0] || null;
+  }
+
+  async function acceptConsent(
+    userId,
+    docType,
+    docVersion,
+    source = 'bot',
+    meta = {},
+  ) {
+    if (!userId || !docType || !docVersion) return null;
+    return withTransaction(pool, async (client) => {
+      await exec(
+        `
+          INSERT INTO consent_events
+            (user_id, doc_type, doc_version, action, source, meta)
+          VALUES ($1, $2, $3, $4, $5, $6);
+        `,
+        [userId, docType, docVersion, 'accept', source, json(meta)],
+        client,
+      );
+      const sql = `
+        INSERT INTO user_consents
+          (user_id, doc_type, doc_version, status, source, updated_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        ON CONFLICT (user_id, doc_type)
+        DO UPDATE SET doc_version = EXCLUDED.doc_version,
+                      status = EXCLUDED.status,
+                      source = EXCLUDED.source,
+                      updated_at = EXCLUDED.updated_at
+        RETURNING *;
+      `;
+      const { rows } = await exec(
+        sql,
+        [userId, docType, docVersion, true, source],
+        client,
+      );
+      return rows[0] || null;
+    });
+  }
+
   async function getUserByTgId(tgId) {
     const { rows } = await exec('SELECT * FROM users WHERE tg_id = $1', [tgId]);
     return rows[0] || null;
@@ -129,16 +179,12 @@ function createDb(poolInstance) {
       throw new Error('invalid merge params');
     }
     return withTransaction(pool, async (client) => {
-      const [source, target] = await Promise.all([
-        withClient(client, (c) => c),
-        withClient(client, (c) => c),
-      ]).then(async ([c1, c2]) => {
-        const [sRows, tRows] = await Promise.all([
-          exec('SELECT * FROM objects WHERE id = $1', [sourceId], c1),
-          exec('SELECT * FROM objects WHERE id = $1', [targetId], c2),
-        ]);
-        return [sRows[0] || null, tRows[0] || null];
-      });
+      const [sourceRes, targetRes] = await Promise.all([
+        exec('SELECT * FROM objects WHERE id = $1', [sourceId], client),
+        exec('SELECT * FROM objects WHERE id = $1', [targetId], client),
+      ]);
+      const source = sourceRes?.rows?.[0] || null;
+      const target = targetRes?.rows?.[0] || null;
       if (!source || !target) {
         throw new Error('object not found');
       }
@@ -229,6 +275,45 @@ function createDb(poolInstance) {
     return rows[0] || null;
   }
 
+  async function deleteObject(userId, objectId) {
+    if (!userId || !objectId) return null;
+    const sql = `
+      DELETE FROM objects
+      WHERE id = $1 AND user_id = $2
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, [objectId, userId]);
+    return rows[0] || null;
+  }
+
+  async function deleteObjectById(objectId) {
+    if (!objectId) return null;
+    const sql = `
+      DELETE FROM objects
+      WHERE id = $1
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, [objectId]);
+    return rows[0] || null;
+  }
+
+  async function deletePlansForObject(userId, objectId) {
+    if (!userId || !objectId) return [];
+    // Delete events first (foreign key)
+    await exec('DELETE FROM plan_events WHERE plan_id IN (SELECT id FROM plans WHERE object_id = $1 AND user_id = $2)', [objectId, userId]);
+    // Delete stages
+    await exec('DELETE FROM plan_stages WHERE plan_id IN (SELECT id FROM plans WHERE object_id = $1 AND user_id = $2)', [objectId, userId]);
+    // Delete plans
+    const { rows } = await exec('DELETE FROM plans WHERE object_id = $1 AND user_id = $2 RETURNING *', [objectId, userId]);
+    return rows;
+  }
+
+  async function countPlansByObject(objectId) {
+    if (!objectId) return 0;
+    const { rows } = await exec('SELECT COUNT(*)::int AS count FROM plans WHERE object_id = $1', [objectId]);
+    return rows[0]?.count || 0;
+  }
+
   async function createCase(data) {
     const sql = `
       INSERT INTO cases (user_id, object_id, crop, disease, confidence, raw_ai)
@@ -245,6 +330,12 @@ function createDb(poolInstance) {
     ];
     const { rows } = await exec(sql, params);
     return rows[0];
+  }
+
+  async function getCaseById(caseId) {
+    if (!caseId) return null;
+    const { rows } = await exec('SELECT * FROM cases WHERE id = $1 LIMIT 1', [caseId]);
+    return rows[0] || null;
   }
 
   async function createPlan(plan) {
@@ -312,6 +403,32 @@ function createDb(poolInstance) {
       LIMIT $2;
     `;
     const { rows } = await exec(sql, [objectId, limit]);
+    return rows;
+  }
+
+  async function listPlansByUser(userId, limit = 10, objectId = null) {
+    const params = [userId, limit];
+    let filterClause = '';
+    if (objectId) {
+      filterClause = ' AND p.object_id = $3';
+      params.push(objectId);
+    }
+    const sql = `
+      SELECT
+        p.*,
+        o.name AS object_name,
+        (
+          SELECT COUNT(*) FROM events e
+          WHERE e.plan_id = p.id AND e.status = 'scheduled'
+        ) AS scheduled_events
+      FROM plans p
+      JOIN objects o ON o.id = p.object_id
+      WHERE p.user_id = $1
+        ${filterClause}
+      ORDER BY p.created_at DESC
+      LIMIT $2;
+    `;
+    const { rows } = await exec(sql, params);
     return rows;
   }
 
@@ -1324,6 +1441,64 @@ function createDb(poolInstance) {
     return rows;
   }
 
+  async function countActiveReminders(userId) {
+    if (!userId) return 0;
+    const sql = `
+      SELECT COUNT(*)::int AS count
+      FROM reminders r
+      JOIN events e ON e.id = r.event_id
+      JOIN plans p ON p.id = e.plan_id
+      WHERE p.user_id = $1
+        AND r.sent_at IS NULL;
+    `;
+    const { rows } = await exec(sql, [userId]);
+    return rows[0]?.count || 0;
+  }
+
+  async function upsertPaywallReminder(userId, fireAt) {
+    if (!userId || !fireAt) return null;
+    const sql = `
+      INSERT INTO paywall_reminders (user_id, fire_at)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id) DO UPDATE
+      SET fire_at = EXCLUDED.fire_at,
+          updated_at = NOW(),
+          sent_at = NULL
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, [userId, fireAt]);
+    return rows[0] || null;
+  }
+
+  async function listDuePaywallReminders(now = new Date(), limit = 100) {
+    const sql = `
+      SELECT
+        pr.user_id,
+        pr.fire_at,
+        u.tg_id
+      FROM paywall_reminders pr
+      JOIN users u ON u.id = pr.user_id
+      WHERE pr.sent_at IS NULL
+        AND pr.fire_at <= $1
+      ORDER BY pr.fire_at ASC
+      LIMIT $2;
+    `;
+    const { rows } = await exec(sql, [now, limit]);
+    return rows;
+  }
+
+  async function markPaywallReminderSent(userId) {
+    if (!userId) return null;
+    const sql = `
+      UPDATE paywall_reminders
+      SET sent_at = NOW(), updated_at = NOW()
+      WHERE user_id = $1
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, [userId]);
+    return rows[0] || null;
+  }
+
   async function markReminderSent(reminderId, messageId = null) {
     const sql = `
       UPDATE reminders
@@ -1402,6 +1577,30 @@ function createDb(poolInstance) {
     return rows[0] || null;
   }
 
+  async function logAnalyticsEvent({
+    event,
+    userId,
+    utmSource = null,
+    utmMedium = null,
+    utmCampaign = null,
+  } = {}) {
+    if (!event || !userId) return null;
+    const sql = `
+      INSERT INTO analytics_events (user_id, event, utm_source, utm_medium, utm_campaign)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *;
+    `;
+    const params = [
+      userId,
+      event,
+      utmSource || null,
+      utmMedium || null,
+      utmCampaign || null,
+    ];
+    const { rows } = await exec(sql, params);
+    return rows[0] || null;
+  }
+
   async function getTopCrops(limit = 5, days = 30) {
     const sql = `
       SELECT
@@ -1436,8 +1635,133 @@ function createDb(poolInstance) {
     return rows || [];
   }
 
+  // Marketing plan v2.4: 24h trial period for new users
+  async function setTrialPeriod(userId) {
+    if (!userId) return null;
+    const sql = `
+      UPDATE users
+      SET trial_ends_at = NOW() + INTERVAL '24 hours'
+      WHERE id = $1 AND trial_ends_at IS NULL
+      RETURNING trial_ends_at;
+    `;
+    const { rows } = await exec(sql, [userId]);
+    return rows[0]?.trial_ends_at || null;
+  }
+
+  // Marketing plan v2.4: UTM tracking
+  async function saveUtm(userId, { source = null, medium = null, campaign = null } = {}) {
+    if (!userId) return;
+    if (!source && !medium && !campaign) return;
+    const sql = `
+      UPDATE users SET
+        utm_source = COALESCE(utm_source, $2),
+        utm_medium = COALESCE(utm_medium, $3),
+        utm_campaign = COALESCE(utm_campaign, $4)
+      WHERE id = $1;
+    `;
+    await exec(sql, [userId, source, medium, campaign]);
+  }
+
+  // Marketing plan v2.4: Get case usage for current week
+  function getIsoWeekKey(date = new Date()) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+  }
+
+  async function getCaseUsage(userId) {
+    if (!userId) return null;
+    const week = getIsoWeekKey();
+    const sql = `
+      SELECT
+        cu.cases_used,
+        cu.last_case_id,
+        u.trial_ends_at,
+        u.pro_expires_at,
+        u.is_beta
+      FROM users u
+      LEFT JOIN case_usage cu ON cu.user_id = u.id AND cu.week = $2
+      WHERE u.id = $1;
+    `;
+    const { rows } = await exec(sql, [userId, week]);
+    if (!rows.length) return null;
+    const row = rows[0];
+    const now = new Date();
+    return {
+      casesUsed: row.cases_used || 0,
+      lastCaseId: row.last_case_id,
+      weekKey: week,
+      isTrial: row.trial_ends_at ? new Date(row.trial_ends_at) > now : false,
+      trialEndsAt: row.trial_ends_at,
+      isPro: row.pro_expires_at ? new Date(row.pro_expires_at) > now : false,
+      isBeta: Boolean(row.is_beta),
+    };
+  }
+
+  async function incrementCaseUsage(userId, caseId = null) {
+    if (!userId) return 0;
+    const week = getIsoWeekKey();
+    const sql = `
+      INSERT INTO case_usage (user_id, week, cases_used, last_case_id, updated_at)
+      VALUES ($1, $2, 1, $3, NOW())
+      ON CONFLICT (user_id, week) DO UPDATE
+      SET cases_used = case_usage.cases_used + 1,
+          last_case_id = COALESCE($3, case_usage.last_case_id),
+          updated_at = NOW()
+      RETURNING cases_used;
+    `;
+    const { rows } = await exec(sql, [userId, week, caseId]);
+    return rows[0]?.cases_used || 0;
+  }
+
+  // Check if user can make diagnosis (pre-check)
+  async function checkCaseLimit(userId, freeWeeklyCases = 1) {
+    const usage = await getCaseUsage(userId);
+    if (!usage) return { allowed: true, reason: 'user_not_found' };
+    if (usage.isPro) return { allowed: true, reason: 'pro' };
+    if (usage.isBeta) return { allowed: true, reason: 'beta' };
+    if (usage.isTrial) return { allowed: true, reason: 'trial' };
+    if (usage.casesUsed >= freeWeeklyCases) {
+      return {
+        allowed: false,
+        reason: 'limit_reached',
+        casesUsed: usage.casesUsed,
+        limit: freeWeeklyCases,
+        weekKey: usage.weekKey,
+      };
+    }
+    return { allowed: true, reason: 'free', casesUsed: usage.casesUsed };
+  }
+
+  // Marketing: Get recent case for "same plant?" check
+  async function getRecentCaseForSamePlantCheck(userId, maxAgeDays = 10) {
+    if (!userId) return null;
+    const sql = `
+      SELECT id, object_id, crop, disease, confidence, created_at
+      FROM cases
+      WHERE user_id = $1 AND created_at >= NOW() - ($2 || ' days')::INTERVAL
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const { rows } = await exec(sql, [userId, maxAgeDays]);
+    if (!rows.length) return null;
+    const row = rows[0];
+    return {
+      caseId: row.id,
+      objectId: row.object_id,
+      crop: row.crop,
+      disease: row.disease,
+      confidence: row.confidence,
+      createdAt: row.created_at,
+    };
+  }
+
   return {
     ensureUser,
+    getConsentStatus,
+    acceptConsent,
     getUserByTgId,
     updateUserLastObject,
     listObjects,
@@ -1445,11 +1769,17 @@ function createDb(poolInstance) {
     getObjectById,
     mergeObjects,
     updateObjectMeta,
+    deleteObject,
+    deleteObjectById,
+    deletePlansForObject,
+    countPlansByObject,
     createCase,
+    getCaseById,
     createPlan,
     getPlanById,
     getPlanForUser,
     listPlansByObject,
+    listPlansByUser,
     createPlanStages,
     createStageOptions,
     createStagesWithOptions,
@@ -1482,13 +1812,24 @@ function createDb(poolInstance) {
     createReminders,
     dueReminders,
     pendingReminders,
+    countActiveReminders,
     markReminderSent,
     updateEventStatus,
     getNextScheduledEvent,
     getEventByIdForUser,
     logFunnelEvent,
+    logAnalyticsEvent,
     getTopCrops,
     getTopDiseases,
+    setTrialPeriod,
+    saveUtm,
+    getCaseUsage,
+    incrementCaseUsage,
+    checkCaseLimit,
+    getRecentCaseForSamePlantCheck,
+    upsertPaywallReminder,
+    listDuePaywallReminders,
+    markPaywallReminderSent,
     createAutoplanRun,
     updateAutoplanRun,
     listPendingAutoplanRuns,

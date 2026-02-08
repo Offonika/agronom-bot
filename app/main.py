@@ -6,9 +6,11 @@ import os
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.config import Settings
+from app.dependencies import close_redis
 from app.db import init_db
 from app.services.storage import init_storage, close_client
 from app.logger import setup_logging
@@ -47,6 +49,7 @@ async def lifespan(app: FastAPI):
     await _to_thread(init_db, settings)
     yield
     await close_client()
+    await close_redis()
 
 if sys.version_info[:2] < (3, 11):
     if os.getenv("ALLOW_OLD_PYTHON", "0") != "1":
@@ -60,6 +63,20 @@ app = FastAPI(
 )
 
 app.include_router(v1.router)
+
+# Protect /metrics when a token is configured.
+if settings.metrics_token:
+    @app.middleware("http")
+    async def metrics_guard(request: Request, call_next):
+        if request.url.path == "/metrics":
+            token = request.headers.get("X-Metrics-Token")
+            if not token:
+                auth = request.headers.get("Authorization", "")
+                if auth.lower().startswith("bearer "):
+                    token = auth.split(" ", 1)[1].strip()
+            if token != settings.metrics_token:
+                return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        return await call_next(request)
 
 # 👇 Добавляем метрики
 Instrumentator().instrument(app).expose(app)

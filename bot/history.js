@@ -1,14 +1,24 @@
 const { msg } = require('./utils');
 const { logEvent } = require('./payments');
+const { buildApiHeaders } = require('./apiAuth');
+const { createDb } = require('../services/db');
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8010';
-const API_KEY = process.env.API_KEY || 'test-api-key';
-const API_VER = process.env.API_VER || 'v1';
 
 async function historyHandler(ctx, cursor = '', pool) {
   if (!ctx.from) {
     await ctx.reply(msg('history_error'));
     return;
+  }
+  let db = null;
+  if (pool?.ensureUser) {
+    db = pool;
+  } else if (pool) {
+    try {
+      db = createDb(pool);
+    } catch (err) {
+      console.error('history createDb failed', err);
+    }
   }
   if (pool) {
     if (!cursor) {
@@ -25,12 +35,56 @@ async function historyHandler(ctx, cursor = '', pool) {
     }
   }
   try {
-    const headers = {
-      'X-API-Key': API_KEY,
-      'X-API-Ver': API_VER,
-    };
-    if (ctx.from) headers['X-User-ID'] = ctx.from.id;
+    if (!db?.ensureUser) {
+      await ctx.reply(msg('history_error'));
+      return;
+    }
+    const user = await db.ensureUser(ctx.from.id);
+    if (!user?.api_key) {
+      await ctx.reply(msg('history_error'));
+      return;
+    }
+    const usage = typeof db.getCaseUsage === 'function' ? await db.getCaseUsage(user.id) : null;
+    const isPro = Boolean(usage?.isPro || usage?.isBeta);
+    if (!isPro) {
+      if (typeof db.getLatestRecentDiagnosis !== 'function') {
+        await ctx.reply(msg('history_error'));
+        return;
+      }
+      const recent = await db.getLatestRecentDiagnosis(user.id);
+      if (!recent) {
+        await ctx.reply(msg('history_free_empty') || msg('history_empty'));
+        return;
+      }
+      let payload = recent.diagnosis_payload;
+      if (payload && typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch (err) {
+          payload = null;
+        }
+      }
+      const crop = payload?.crop || '';
+      const disease = payload?.disease || '';
+      const dt = new Date(recent.created_at || Date.now());
+      const date = dt.toLocaleDateString('ru-RU');
+      const text = msg('history_free_current', { date, crop, disease }) ||
+        `Текущий кейс: ${date}, ${crop}, ${disease}\n\nПолная история доступна в Pro.`;
+      await ctx.reply(text, {
+        reply_markup: {
+          inline_keyboard: [[{ text: msg('paywall_try_pro_button') || '✨ Попробовать Pro', callback_data: 'buy_pro' }]],
+        },
+      });
+      return;
+    }
     const url = `${API_BASE}/v1/photos?limit=10${cursor ? `&cursor=${cursor}` : ''}`;
+    const headers = buildApiHeaders({
+      apiKey: user.api_key,
+      userId: user.id,
+      method: 'GET',
+      path: '/v1/photos',
+      query: url.split('?')[1] || '',
+    });
     const resp = await fetch(url, { headers });
     if (!resp.ok) {
       await ctx.reply(msg('history_error'));

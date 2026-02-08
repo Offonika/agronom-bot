@@ -6,11 +6,7 @@ import pytest
 from sqlalchemy import text
 
 from app.db import SessionLocal
-
-API_HEADERS = {
-    "X-API-Key": "test-api-key",
-    "X-API-Ver": "v1",
-}
+from tests.utils.auth import build_auth_headers
 
 
 def insert_plan_fixture():
@@ -140,16 +136,22 @@ def plan_fixture():
     return insert_plan_fixture()
 
 
-def auth_headers(user_id):
-    headers = API_HEADERS.copy()
-    headers["X-User-ID"] = str(user_id)
-    return headers
+def auth_headers(
+    method: str, path: str, user_id: int, *, body: object | None = None
+) -> dict[str, str]:
+    return build_auth_headers(
+        method, path, user_id=user_id, api_key="test-api-key", body=body
+    )
 
 
 def test_get_plan_returns_structure(client, plan_fixture):
     resp = client.get(
         f"/v1/plans/{plan_fixture['plan_id']}",
-        headers=auth_headers(plan_fixture["user_id"]),
+        headers=auth_headers(
+            "GET",
+            f"/v1/plans/{plan_fixture['plan_id']}",
+            plan_fixture["user_id"],
+        ),
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -166,7 +168,12 @@ def test_select_option_updates_choice(client, plan_fixture):
     new_option_id = plan_fixture["option_id"] + 1
     resp = client.post(
         f"/v1/plans/{plan_fixture['plan_id']}/select-option",
-        headers=auth_headers(plan_fixture["user_id"]),
+        headers=auth_headers(
+            "POST",
+            f"/v1/plans/{plan_fixture['plan_id']}/select-option",
+            plan_fixture["user_id"],
+            body={"stage_option_id": new_option_id},
+        ),
         json={"stage_option_id": new_option_id},
     )
     assert resp.status_code == 200
@@ -178,7 +185,12 @@ def test_select_option_updates_choice(client, plan_fixture):
 def test_accept_plan_updates_status(client, plan_fixture):
     resp = client.post(
         f"/v1/plans/{plan_fixture['plan_id']}/accept",
-        headers=auth_headers(plan_fixture["user_id"]),
+        headers=auth_headers(
+            "POST",
+            f"/v1/plans/{plan_fixture['plan_id']}/accept",
+            plan_fixture["user_id"],
+            body={"stage_option_ids": [plan_fixture["option_id"]]},
+        ),
         json={"stage_option_ids": [plan_fixture["option_id"]]},
     )
     assert resp.status_code == 200
@@ -190,7 +202,11 @@ def test_accept_plan_updates_status(client, plan_fixture):
 def test_reject_plan(client, plan_fixture):
     resp = client.post(
         f"/v1/plans/{plan_fixture['plan_id']}/reject",
-        headers=auth_headers(plan_fixture["user_id"]),
+        headers=auth_headers(
+            "POST",
+            f"/v1/plans/{plan_fixture['plan_id']}/reject",
+            plan_fixture["user_id"],
+        ),
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "rejected"

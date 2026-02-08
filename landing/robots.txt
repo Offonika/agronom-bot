@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Разрешаем индексировать для AI-поиска.
+# Если не хотите обучение, GPTBot можно запретить отдельно.
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: YandexGPT
+Allow: /
+
+Sitemap: https://agronom.offonika.ru/sitemap.xml

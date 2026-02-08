@@ -1,0 +1,23 @@
+# Карманный агроном - Telegram-бот для диагностики растений по фото (Россия)
+
+## Основное
+- Главная: https://agronom.offonika.ru/
+  Описание продукта, тарифы, FAQ.
+
+## Ключевые страницы (для цитирования)
+- Диагностика по фото: https://agronom.offonika.ru/plant-disease-photo/
+  Как фотографировать, что влияет на точность, что делать при low confidence.
+
+- PHI (срок ожидания): https://agronom.offonika.ru/phi/
+  Что такое PHI, почему важно соблюдать сроки ожидания.
+
+- "Зелёные окна" по погоде: https://agronom.offonika.ru/green-windows/
+  Как выбрать время обработки с учётом дождя/ветра/температуры.
+
+- Лучшие приложения для диагностики: https://agronom.offonika.ru/best-plant-disease-apps/
+  Критерии выбора и сравнение подходов.
+
+## Юридические документы
+- Политика: https://agronom.offonika.ru/privacy/
+- Оферта: https://agronom.offonika.ru/offer/
+

@@ -1,6 +1,7 @@
 Data Contract – «Карманный агроном» (Bot‑Phase)
 
-Version 1.17 — 21 November 2025(v1.16 → v1.17: variety в диагнозе, привязка recent_diagnosis к объекту)
+Version 1.19 — 24 November 2025 (v1.18 → v1.19: sync with OpenAPI v1.10.0)
+API: v1.10.0
 
 0 · Scope
 
@@ -9,6 +10,7 @@ Version 1.17 — 21 November 2025(v1.16 → v1.17: variety в диагн�
 Мастер диагностики собирает медиагруппу 3–8 фото с подсказками «Как сфоткать» (общий вид, лист лицевая, лист изнанка, плод/цветок/корень опционально). Анализ запускается после базового минимума: общий + лицевая + изнанка листа; остальное предлагается дослать или пропустить. Подборка чистится по таймауту 30 мин.
 
 Объекты хранят координаты в meta.lat/meta.lon (числа, диапазон lat −90..90, lon −180..180); частичные апдейты не затирают существующий meta. Координаты можно обновить через /location, geo-point или адрес (геокодер + кеш).
+Сорт и метка участка/ряда сохраняются в meta.variety и meta.note; бот просит уточнить их после создания объекта и показывает в чипах/«Мои планы».
 
 При автодетекте локации бот показывает карточку «Нашли участок возле…?» с кнопкой карты (OSM) и подтверждением/изменением. Автопросы не спамят: TTL 12 ч на подтверждение, повторный запрос не чаще 30 мин. Геокодер кешируется в Redis, ограничивается per-user rate‑limit и логирует таймауты/ошибки.
 
@@ -29,7 +31,7 @@ ML‑датасет (ml-dataset/) — копия снимков status=ok > 90
 users 1—n photos
 users 1—n payments
 users 1—n partner_orders
-users 1—n events
+users 1—n analytics_events
 photos 1—1 protocols
 catalogs 1—n catalog_items
 shops (external) 1—1 runs(run_date) — executor привязан по Telegram tg_id (username опционален)
@@ -70,6 +72,12 @@ tg_id
 
 BIGINT UNIQUE NOT NULL
 
+api_key
+
+VARCHAR(64) UNIQUE
+
+per-user API key for internal requests
+
 pro_expires_at
 
 TIMESTAMP
@@ -78,9 +86,51 @@ autopay_enabled
 
 BOOLEAN DEFAULT FALSE
 
+autopay_rebill_id
+
+VARCHAR NULL
+
+Tinkoff RebillId для автосписаний
+
 opt_in
 
 BOOLEAN DEFAULT FALSE
+
+is_beta
+
+BOOLEAN DEFAULT FALSE
+
+beta_onboarded_at
+
+TIMESTAMP NULL
+
+beta_survey_completed_at
+
+TIMESTAMP NULL
+
+trial_ends_at
+
+TIMESTAMP NULL
+
+Marketing v2.4: конец 24ч пробного периода
+
+utm_source
+
+VARCHAR(50) NULL
+
+Marketing: источник трафика
+
+utm_medium
+
+VARCHAR(50) NULL
+
+Marketing: канал
+
+utm_campaign
+
+VARCHAR(100) NULL
+
+Marketing: кампания
 
 created_at
 
@@ -202,6 +252,30 @@ TEXT
 
 invoice/charge id
 
+idempotency_key
+
+TEXT
+
+idempotency key for /payments/create
+
+payment_url
+
+TEXT
+
+payment link returned by provider
+
+sbp_url
+
+TEXT
+
+SBP QR link (optional)
+
+provider_payment_id
+
+TEXT
+
+payment id in provider (Tinkoff PaymentId)
+
 autopay
 
 BOOLEAN DEFAULT FALSE
@@ -211,6 +285,24 @@ autopay_binding_id
 TEXT
 
 binding identifier
+
+autopay_cycle_key
+
+TEXT
+
+YYYYMMDD (дата продления)
+
+autopay_attempt
+
+INT
+
+номер попытки автосписания
+
+autopay_next_retry_at
+
+TIMESTAMP
+
+когда запускать следующую попытку
 
 prolong_months
 
@@ -268,7 +360,7 @@ created_at
 
 TIMESTAMP DEFAULT now()
 
-3.6 photo_usage
+3.6 photo_usage (legacy)
 
 Column
 
@@ -296,7 +388,102 @@ updated_at
 
 TIMESTAMP
 
-3.7 events
+3.6.1 case_usage (Marketing Plan v2.4)
+
+Заменяет photo_usage для подсчёта кейсов (неделя вместо месяца).
+
+Column
+
+Type
+
+PK
+
+Notes
+
+user_id
+
+BIGINT
+
+✓
+
+FK → users.id
+
+week
+
+CHAR(8)
+
+✓
+
+YYYY‑Www (ISO week)
+
+cases_used
+
+INT
+
+Кол-во использованных кейсов за неделю
+
+last_case_id
+
+BIGINT
+
+FK → cases.id, последний кейс
+
+updated_at
+
+TIMESTAMP
+
+Бизнес-логика:
+- Free: 1 кейс/неделю, сброс в понедельник
+- Pro (199₽/мес): безлимит
+- Trial (24ч): безлимит
+- Low confidence (<0.6): кейс не списывается
+- Повторная проверка того же растения в течение 10 дней не списывает кейс
+
+3.6.2 paywall_reminders
+
+Хранит напоминания о доступности нового бесплатного разбора.
+
+Column
+
+Type
+
+PK
+
+Notes
+
+user_id
+
+BIGINT
+
+✓
+
+FK → users.id
+
+fire_at
+
+TIMESTAMP
+
+Когда отправлять
+
+created_at
+
+TIMESTAMP
+
+По умолчанию now()
+
+updated_at
+
+TIMESTAMP
+
+Обновление при повторном запросе
+
+sent_at
+
+TIMESTAMP
+
+NULL, если не отправлено
+
+3.7 analytics_events
 
 Column
 
@@ -317,6 +504,18 @@ event
 TEXT
 
 e.g. payment_success, autopay_fail
+
+utm_source
+
+TEXT
+
+utm_medium
+
+TEXT
+
+utm_campaign
+
+TEXT
 
 ts
 
@@ -448,6 +647,134 @@ TEXT
 
 `open` / `done`; синхронизируется при закрытии чек-листа
 
+3.11 diagnosis_feedback
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+user_id
+
+BIGINT → users.id
+
+case_id
+
+BIGINT → cases.id
+
+q1_confidence_score
+
+INT (1–5)
+
+q2_clarity_score
+
+INT (1–4), NULL пока опрос не завершён
+
+q3_comment
+
+TEXT NULL
+
+created_at
+
+TIMESTAMP DEFAULT now()
+
+updated_at
+
+TIMESTAMP DEFAULT now()
+
+3.12 followup_feedback
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+user_id
+
+BIGINT → users.id
+
+case_id
+
+BIGINT → cases.id
+
+due_at
+
+TIMESTAMP NULL
+
+retry_at
+
+TIMESTAMP NULL
+
+sent_at
+
+TIMESTAMP NULL
+
+answered_at
+
+TIMESTAMP NULL
+
+attempts
+
+INT DEFAULT 0
+
+status
+
+TEXT (pending/waiting_result/answered/blocked)
+
+action_choice
+
+TEXT (none/bot_plan/own_way/human_expert)
+
+result_choice
+
+TEXT (better/same/worse) NULL
+
+created_at
+
+TIMESTAMP DEFAULT now()
+
+updated_at
+
+TIMESTAMP DEFAULT now()
+
+3.13 beta_events
+
+Column
+
+Type
+
+Notes
+
+id
+
+SERIAL PK
+
+user_id
+
+BIGINT → users.id
+
+event_type
+
+TEXT (beta_entered/beta_photo_sent/beta_first_diagnosis/beta_survey_completed/beta_followup_answered)
+
+payload
+
+JSON
+
+created_at
+
+TIMESTAMP DEFAULT now()
+
 4 · Enum Definitions
 
 CREATE TYPE payment_status AS ENUM ('success','fail','cancel','bank_error');
@@ -488,6 +815,22 @@ GET  /v1/limits
 
 SELECT photo_usage + count photos
 
+GET  /v1/users/{id}/export
+
+SELECT photos/payments/analytics_events (streamed ZIP)
+
+GET  /v1/users/{id}/consents
+
+SELECT user_consents
+
+POST /v1/users/{id}/consents/accept
+
+INSERT consent_events + UPSERT user_consents
+
+POST /v1/users/{id}/consents/revoke
+
+INSERT consent_events + UPSERT user_consents
+
 POST /v1/payments/sbp/webhook
 
 INSERT → payments (invoice)
@@ -502,7 +845,7 @@ UPDATE users.autopay_enabled=false
 
 POST /v1/ask_expert
 
-INSERT → events (ask_expert)
+INSERT → analytics_events (ask_expert)
 
 POST /v1/partner/orders
 
@@ -529,6 +872,14 @@ ML‑датасет — только при Opt‑In, TTL 2 года.
 Платежи: storage 5 лет (ФЗ‑402).
 
 DSR: POST /v1/dsr/delete_user — каскадное удаление по user_id ≤ 30 дн.
+
+Consent audit:
+
+consent_events: append‑only журнал (user_id, doc_type, doc_version, action, source, occurred_at, meta).
+
+user_consents: текущее состояние согласий (PK: user_id + doc_type, status, doc_version, source, updated_at).
+
+meta (consent_events): tg_chat_id, message_id, callback_data (для бот‑согласий).
 
 9 · Change Management
 

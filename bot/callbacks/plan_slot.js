@@ -4,6 +4,7 @@ const { msg } = require('../utils');
 const { replyUserError } = require('../userErrors');
 const { logFunnelEvent } = require('../funnel');
 const { buildTreatmentEvents, buildReminderPayloads } = require('../../services/plan_events');
+const { limitRemindersForUser } = require('../reminderLimits');
 
 const SLOT_TZ = process.env.AUTOPLAN_TIMEZONE || 'Europe/Moscow';
 const DEFAULT_AUTOPLAN_MIN_H = Number(process.env.AUTOPLAN_MIN_HOURS_AHEAD || '2');
@@ -35,9 +36,15 @@ function createPlanSlotHandlers({ db, reminderScheduler, autoplanQueue }) {
       );
       const reminders = buildReminderPayloads(events);
       if (reminders.length) {
-        const createdReminders = await db.createReminders(reminders);
-        if (reminderScheduler) {
-          reminderScheduler.scheduleMany(createdReminders);
+        const { allowed, limited } = await limitRemindersForUser(db, context.user.id, reminders);
+        if (allowed.length) {
+          const createdReminders = await db.createReminders(allowed);
+          if (reminderScheduler) {
+            reminderScheduler.scheduleMany(createdReminders);
+          }
+        }
+        if (limited) {
+          await ctx.reply(msg('reminder_limit_reached'));
         }
       }
       await db.updateTreatmentSlot(context.slot.id, { status: 'accepted' });

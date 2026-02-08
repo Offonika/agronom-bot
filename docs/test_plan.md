@@ -1,18 +1,18 @@
 # QA Test Plan – «Карманный агроном» (Telegram‑бот)
 
-**Версия 1.8 — 5 августа 2025 г.**
-*(v1.7 → v1.8: SRS v1.7, Autopay SBP flow, новые security‑checks)*
+**Версия 1.9 — 24 ноября 2025 г.**
+*(v1.8 → v1.9: SRS v1.19, актуальные SBP/Autopay эндпойнты и security‑checks)*
 
 ---
 
 ## 1. Цели тестирования
 
-* Проверить соответствие **SRS v1.7**.
+* Проверить соответствие **SRS v1.19**.
 * Проверить соблюдение **SLO** (см. §3) для фаз β и GA.
 * Проверить поведение при превышении лимита **5 фото/мес**.
 * Проверить валидацию **HMAC‑подписей** (invoice & autopay).
-* Проверить обязательность заголовков **X-API-Ver: v1** и **X-User-ID**.
-* Валидировать новые эндпойнты Autopay (`/sbp/autopay/webhook`, `/sbp/autopay/cancel`).
+* Проверить обязательность заголовков **X-API-Ver: v1**, **X-User-ID**, **X-Req-Ts**, **X-Req-Nonce**, **X-Req-Sign**.
+* Валидировать новые эндпойнты Autopay (`/v1/payments/sbp/autopay/webhook`, `/v1/payments/sbp/autopay/cancel`).
 
 ---
 

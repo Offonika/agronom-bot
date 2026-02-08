@@ -8,12 +8,14 @@ from app.config import Settings
 from app.db import SessionLocal
 from app.dependencies import compute_signature
 from app.models import Event, Payment, Photo, PhotoUsage, User
+from tests.utils.auth import build_auth_headers
 
-HEADERS = {
-    "X-API-Key": "test-api-key",
-    "X-API-Ver": "v1",
-    "X-User-ID": "1",
-}
+def _headers(
+    method: str, path: str, *, user_id: int = 1, body: object | None = None
+) -> dict[str, str]:
+    return build_auth_headers(
+        method, path, user_id=user_id, api_key="test-api-key", body=body
+    )
 
 HMAC_SECRET = Settings().hmac_secret
 
@@ -25,7 +27,7 @@ def _prepare_db():
         db.query(Event).filter_by(user_id=1).delete()
         db.query(PhotoUsage).filter_by(user_id=1).delete()
         db.query(User).filter_by(id=1).delete()
-        db.add(User(id=1, tg_id=1))
+        db.add(User(id=1, tg_id=1, api_key="test-api-key"))
         db.add(Photo(user_id=1, file_id="f1"))
         db.add(
             Payment(
@@ -47,7 +49,7 @@ def _prepare_db_many(n: int):
         db.query(Payment).filter_by(user_id=1).delete()
         db.query(Event).filter_by(user_id=1).delete()
         db.query(User).filter_by(id=1).delete()
-        db.add(User(id=1, tg_id=1))
+        db.add(User(id=1, tg_id=1, api_key="test-api-key"))
         for i in range(n):
             db.add(Photo(user_id=1, file_id=f"f{i}"))
             db.add(
@@ -67,7 +69,8 @@ def test_export_user_data(client):
     _prepare_db()
     sig = compute_signature(HMAC_SECRET, {"user_id": 1})
     resp = client.get(
-        "/v1/users/1/export", headers=HEADERS | {"X-Sign": sig}
+        "/v1/users/1/export",
+        headers=_headers("GET", "/v1/users/1/export") | {"X-Sign": sig},
     )
     assert resp.status_code == 200
     zf = zipfile.ZipFile(io.BytesIO(resp.content))
@@ -111,7 +114,8 @@ def test_export_user_data(client):
 def test_export_bad_signature(client):
     _prepare_db()
     resp = client.get(
-        "/v1/users/1/export", headers=HEADERS | {"X-Sign": "bad"}
+        "/v1/users/1/export",
+        headers=_headers("GET", "/v1/users/1/export") | {"X-Sign": "bad"},
     )
     assert resp.status_code == 401
 
@@ -123,7 +127,9 @@ def test_export_large_dataset_streaming(client):
 
     tracemalloc.start()
     with client.stream(
-        "GET", "/v1/users/1/export", headers=HEADERS | {"X-Sign": sig}
+        "GET",
+        "/v1/users/1/export",
+        headers=_headers("GET", "/v1/users/1/export") | {"X-Sign": sig},
     ) as resp:
         assert resp.status_code == 200
         for _ in resp.iter_bytes():
@@ -138,7 +144,12 @@ def test_delete_user_cascade(client):
     sig = compute_signature(HMAC_SECRET, {"user_id": 1})
     resp = client.post(
         "/v1/dsr/delete_user",
-        headers=HEADERS | {"X-Sign": sig},
+        headers=_headers(
+            "POST",
+            "/v1/dsr/delete_user",
+            body={"user_id": 1},
+        )
+        | {"X-Sign": sig},
         json={"user_id": 1},
     )
     assert resp.status_code == 200
@@ -154,7 +165,12 @@ def test_delete_user_bad_signature(client):
     _prepare_db()
     resp = client.post(
         "/v1/dsr/delete_user",
-        headers=HEADERS | {"X-Sign": "bad"},
+        headers=_headers(
+            "POST",
+            "/v1/dsr/delete_user",
+            body={"user_id": 1},
+        )
+        | {"X-Sign": "bad"},
         json={"user_id": 1},
     )
     assert resp.status_code == 401
@@ -163,7 +179,12 @@ def test_delete_user_bad_signature(client):
 def test_delete_user_forbidden(client):
     _prepare_db()
     sig = compute_signature(HMAC_SECRET, {"user_id": 1})
-    headers = HEADERS | {"X-User-ID": "2", "X-Sign": sig}
+    headers = _headers(
+        "POST",
+        "/v1/dsr/delete_user",
+        user_id=2,
+        body={"user_id": 1},
+    ) | {"X-Sign": sig}
     resp = client.post(
         "/v1/dsr/delete_user", headers=headers, json={"user_id": 1}
     )
@@ -177,7 +198,12 @@ def test_delete_user_invalid_user_id_type(client, user_id):
     sig = compute_signature(HMAC_SECRET, {"user_id": user_id})
     resp = client.post(
         "/v1/dsr/delete_user",
-        headers=HEADERS | {"X-Sign": sig},
+        headers=_headers(
+            "POST",
+            "/v1/dsr/delete_user",
+            body={"user_id": user_id},
+        )
+        | {"X-Sign": sig},
         json={"user_id": user_id},
     )
     assert resp.status_code == 400
@@ -188,7 +214,12 @@ def test_delete_user_success_int_id(client):
     sig = compute_signature(HMAC_SECRET, {"user_id": 1})
     resp = client.post(
         "/v1/dsr/delete_user",
-        headers=HEADERS | {"X-Sign": sig},
+        headers=_headers(
+            "POST",
+            "/v1/dsr/delete_user",
+            body={"user_id": 1},
+        )
+        | {"X-Sign": sig},
         json={"user_id": 1},
     )
     assert resp.status_code == 200

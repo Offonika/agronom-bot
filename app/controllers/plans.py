@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timezone
-from typing import Any, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -13,6 +14,7 @@ from app import db as db_module
 from app.dependencies import ErrorResponse, rate_limit
 from app.models import ErrorCode, PlanSession
 from app.services.plan_payload import PlanPayloadError, normalize_plan_payload
+from app.services.plan_pdf import build_plan_pdf_bytes, fetch_plan_pdf_data
 from app.services.plan_service import (
     PlanCreateResult,
     create_plan_from_payload,
@@ -33,6 +35,7 @@ from app.services.plan_session import (
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 autoplan_queue = AutoplanQueue()
+logger = logging.getLogger(__name__)
 
 plan_create_counter = Counter("plans_create_total", "Create plan requests", ["status"])
 plan_event_counter = Counter("plans_event_create_total", "Create plan event requests", ["status"])
@@ -259,7 +262,7 @@ async def create_plan_endpoint(
     body: PlanCreateRequest,
     user_id: int = Depends(rate_limit),
 ):
-    if not is_object_owned(user_id, body.object_id):
+    if not await asyncio.to_thread(is_object_owned, user_id, body.object_id):
         err = ErrorResponse(code=ErrorCode.FORBIDDEN, message="OBJECT_NOT_OWNED")
         plan_create_counter.labels(status="forbidden").inc()
         raise HTTPException(status_code=403, detail=err.model_dump())
@@ -274,18 +277,19 @@ async def create_plan_endpoint(
         plan_create_counter.labels(status="bad_request").inc()
         raise HTTPException(status_code=400, detail=err.model_dump())
 
-    result: PlanCreateResult = create_plan_from_payload(
+    result: PlanCreateResult = await asyncio.to_thread(
+        create_plan_from_payload,
         user_id=user_id,
         object_id=body.object_id,
         normalized=normalized,
         raw_payload=body.plan_payload,
     )
+    plan_create_counter.labels(status="ok").inc()
     return PlanCreateResponse(
         plan_id=result.plan_id,
         stages=[PlanCreateStage(stage_id=s.stage_id, option_ids=s.option_ids) for s in result.stages],
         errors=normalized.errors,
     )
-    plan_create_counter.labels(status="ok").inc()
 
 
 @router.post("/{plan_id}/events", response_model=EventCreateResponse)
@@ -303,7 +307,8 @@ async def create_event_endpoint(
         plan_event_counter.labels(status="bad_request").inc()
         raise HTTPException(status_code=400, detail=err.model_dump())
 
-    event_ids, reminder_ids = create_event_with_reminder(
+    event_ids, reminder_ids = await asyncio.to_thread(
+        create_event_with_reminder,
         user_id=user_id,
         plan_id=plan_id,
         stage_id=body.stage_id,
@@ -323,7 +328,8 @@ async def enqueue_autoplan_endpoint(
     body: AutoplanRequest,
     user_id: int = Depends(rate_limit),
 ):
-    run_id = enqueue_autoplan(
+    run_id = await asyncio.to_thread(
+        enqueue_autoplan,
         user_id=user_id,
         plan_id=plan_id,
         stage_id=body.stage_id,
@@ -354,6 +360,13 @@ async def get_plan(
     return await asyncio.to_thread(
         _load_plan_response, plan_id, user_id, include_payload, diff_against
     )
+
+
+@router.get("/{plan_id}/pdf")
+async def export_plan_pdf(plan_id: int, user_id: int = Depends(rate_limit)):
+    pdf_bytes = await asyncio.to_thread(_export_plan_pdf, plan_id, user_id)
+    headers = {"Content-Disposition": f'attachment; filename="plan-{plan_id}.pdf"'}
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
 @router.post("/{plan_id}/accept", response_model=PlanAcceptResponse)
@@ -466,6 +479,14 @@ def _load_plan_response(
         ],
         diff=_build_diff_placeholder(diff_against),
     )
+
+
+def _export_plan_pdf(plan_id: int, user_id: int) -> bytes:
+    with db_module.SessionLocal() as session:
+        data = fetch_plan_pdf_data(session, plan_id, user_id)
+        if not data:
+            _raise_not_found("plan_not_found")
+        return build_plan_pdf_bytes(data)
 
 
 def _accept_plan(plan_id: int, user_id: int) -> PlanAcceptResponse:

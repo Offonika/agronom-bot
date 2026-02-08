@@ -12,6 +12,7 @@ from app.metrics import queue_size_pending
 
 # Reuse upload stubs from main API tests
 from tests.test_api import stub_upload  # noqa: F401
+from tests.utils.auth import build_auth_headers
 
 settings = Settings()
 HEADERS = {
@@ -20,6 +21,11 @@ HEADERS = {
     "X-User-ID": "1",
 }
 HMAC_SECRET = settings.hmac_secret
+METRICS_HEADERS = (
+    {"X-Metrics-Token": settings.metrics_token}
+    if settings.metrics_token
+    else {}
+)
 
 
 def test_diag_metrics(client):
@@ -29,7 +35,7 @@ def test_diag_metrics(client):
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert resp.status_code in {200, 202}
-    metrics = client.get("/metrics")
+    metrics = client.get("/metrics", headers=METRICS_HEADERS)
     assert metrics.status_code == 200
     body = metrics.text
     assert "diag_requests_total" in body
@@ -47,7 +53,7 @@ def test_autopay_metrics(client, monkeypatch):
         "autopay_charge_id": "CHG-metric",
         "binding_id": "BND-metric",
         "user_id": 1,
-        "amount": 100,
+        "amount": settings.pro_month_price_cents,
         "status": "fail",
         "charged_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -58,12 +64,19 @@ def test_autopay_metrics(client, monkeypatch):
 
     resp = client.post(
         "/v1/payments/sbp/autopay/webhook",
-        headers=HEADERS | {"X-Sign": header_sig, "Content-Type": "application/json"},
+        headers=build_auth_headers(
+            "POST",
+            "/v1/payments/sbp/autopay/webhook",
+            user_id=1,
+            api_key=settings.api_key,
+            body=body,
+        )
+        | {"X-Sign": header_sig, "Content-Type": "application/json"},
         content=raw,
     )
     assert resp.status_code == 200
 
-    metrics = client.get("/metrics")
+    metrics = client.get("/metrics", headers=METRICS_HEADERS)
     assert metrics.status_code == 200
     body = metrics.text
     assert "autopay_charge_seconds_bucket" in body
@@ -71,7 +84,12 @@ def test_autopay_metrics(client, monkeypatch):
 
 
 def test_queue_pending_metric_balance(client, monkeypatch):
-    async def _pending_stub(contents: bytes, user_id: int, crop_hint: str | None = None):
+    async def _pending_stub(
+        contents: bytes,
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ):
         return {
             "file_id": "key",
             "crop": "",
@@ -98,7 +116,7 @@ def test_queue_pending_metric_balance(client, monkeypatch):
     assert resp.status_code == 202
     pid = resp.json()["id"]
 
-    metrics = client.get("/metrics")
+    metrics = client.get("/metrics", headers=METRICS_HEADERS)
     assert metrics.status_code == 200
     assert "queue_size_pending 1.0" in metrics.text
 
@@ -111,6 +129,6 @@ def test_queue_pending_metric_balance(client, monkeypatch):
         session.commit()
 
     queue_size_pending.dec()
-    metrics_after = client.get("/metrics")
+    metrics_after = client.get("/metrics", headers=METRICS_HEADERS)
     assert metrics_after.status_code == 200
     assert "queue_size_pending 0.0" in metrics_after.text

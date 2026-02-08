@@ -1,18 +1,22 @@
 Partner Integration Brief
 AgroStore × «Карманный агроном»
-Версия 1.1 — 20 июля 2025 г.
-(v1.0 → v1.1: уточнён Order Webhook, добавлены ссылки на OpenAPI и QA-тесты)
+Версия 1.2 — 24 ноября 2025 г.
+(v1.1 → v1.2: актуализация кодов ответов и версии OpenAPI)
 
 §4. Order Webhook
 4.0 Описание
 Метод: POST /v1/partner/orders
 
-Схема: см. OpenAPI v1.4 (openapi.yaml, раздел paths).
+Схема: см. OpenAPI v1.10.0 (openapi.yaml, раздел paths).
 
 Код	HTTP	Описание	Примечание
 202	POST	Queued — заказ принят	Обрабатывается асинхронно
+200	POST	OK	Дубликат order_id, статус уже есть
 400	POST	Bad Request	Ошибка JSON-схемы / отсутствуют поля
 401	POST	Unauthorized	Неверная подпись HMAC-SHA256
+403	POST	Forbidden	IP не в allowlist
+429	POST	Too Many Requests	Rate limit (30 req/min на IP)
+503	POST	Service Unavailable	Redis недоступен для rate-limit
 
 4.1 Аутентификация
 Заголовок X-Sign содержит HMAC-SHA256 подпись от «сырого» тела запроса.
@@ -113,7 +117,6 @@ Telegram	@gromov_agro
 §12. Sign-off
 Документ хранится: /docs/partner_agrostore.md
 Для новых партнёров — копировать и адаптировать шаблон.
-
 
 
 

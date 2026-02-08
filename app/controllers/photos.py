@@ -29,7 +29,7 @@ from app.metrics import (
     queue_size_pending,
     roi_calc_seconds,
 )
-from app.models import Event, Photo, ErrorCode, RecentDiagnosis
+from app.models import Photo, ErrorCode, RecentDiagnosis
 from app.services.gpt import call_gpt_vision
 from app.services.plan_payload import (
     PlanPayloadError,
@@ -43,67 +43,104 @@ from app.services.recent_diagnosis import (
     get_recent_diagnosis_by_id,
     save_recent_diagnosis,
 )
+from app.services.case_usage import (
+    get_case_usage_sync,
+    get_recent_case_for_same_plant_sync,
+    increment_case_usage_sync,
+    update_last_case_id_sync,
+    CaseUsageInfo,
+)
 
 settings = Settings()
 logger = logging.getLogger(__name__)
 
 OPTIONAL_FILE = File(None)
 FREE_MONTHLY_LIMIT = settings.free_monthly_limit
+FREE_WEEKLY_CASES = settings.free_weekly_cases
 PAYWALL_ENABLED = settings.paywall_enabled
+
+# Low confidence threshold (diagnoses below this don't consume a case)
+LOW_CONFIDENCE_THRESHOLD = 0.6
 
 router = APIRouter()
 
 
-async def _enforce_paywall(user_id: int) -> JSONResponse | None:
-    """Increment usage counter and enforce paywall limits."""
+async def _check_paywall(
+    user_id: int,
+    same_case_id: int | None = None,
+) -> tuple[JSONResponse | None, CaseUsageInfo | None]:
+    """
+    Check if user can make a diagnosis (pre-check, doesn't increment usage).
 
-    def _db() -> tuple[int, datetime | None]:
-        with db_module.SessionLocal() as db:
-            moscow_tz = ZoneInfo("Europe/Moscow")
-            month_key = datetime.now(moscow_tz).strftime("%Y-%m")
-            params = {"uid": user_id, "month": month_key}
-            stmt = text(
-                "INSERT INTO photo_usage (user_id, month, used, updated_at) "
-                "VALUES (:uid, :month, 1, CURRENT_TIMESTAMP) "
-                "ON CONFLICT(user_id, month) DO UPDATE "
-                "SET used = photo_usage.used + 1, "
-                "updated_at = CURRENT_TIMESTAMP"
-            )
-            db.execute(stmt, params)
-            db.commit()
-            used = db.execute(
-                text(
-                    "SELECT used FROM photo_usage WHERE user_id=:uid AND month=:month"
-                ),
-                params,
-            ).scalar_one()
+    Marketing plan v2.4 changes:
+    - Week-based case limits (1 case/week) instead of monthly photo limits
+    - 24h trial period for new users (no limits during trial)
+    - Low confidence diagnoses don't consume a case (handled separately)
 
-            pro = db.execute(
-                text("SELECT pro_expires_at FROM users WHERE id=:uid"),
-                {"uid": user_id},
-            ).scalar()
-            if isinstance(pro, str):
-                pro = datetime.fromisoformat(pro)
-            if pro and getattr(pro, "tzinfo", None) is None:
-                pro = pro.replace(tzinfo=timezone.utc)
-            return used, pro
+    Returns:
+        (error_response, usage_info) - error if blocked, None if allowed
+    """
+    usage = await asyncio.to_thread(get_case_usage_sync, user_id)
 
-    used, pro = await asyncio.to_thread(_db)
-    now_utc = datetime.now(timezone.utc)
-    if PAYWALL_ENABLED and used > FREE_MONTHLY_LIMIT and (not pro or pro < now_utc):
-        if pro and pro < now_utc:
-            def _log() -> None:
-                with db_module.SessionLocal() as db:
-                    db.add(Event(user_id=user_id, event="pro_expired"))
-                    db.commit()
+    # Same case re-check: allow without blocking (case id validated by caller)
+    if same_case_id:
+        return None, usage
 
-            await asyncio.to_thread(_log)
+    # Pro users: no limits
+    if usage.is_pro:
+        return None, usage
+
+    # Beta testers: no limits (but track usage)
+    if settings.beta_houseplants_enabled and usage.is_beta:
+        return None, usage
+
+    # Trial period: no limits for first 24 hours
+    if usage.is_trial:
+        return None, usage
+
+    # Free user: check weekly case limit
+    if not PAYWALL_ENABLED:
+        return None, usage
+
+    if usage.cases_used >= FREE_WEEKLY_CASES:
         quota_reject_total.inc()
+
+        # Calculate days until next week reset
+        now = datetime.now(timezone.utc)
+        days_until_monday = (7 - now.weekday()) % 7
+        if days_until_monday == 0:
+            days_until_monday = 7
+
         return JSONResponse(
             status_code=402,
-            content={"error": "limit_reached", "limit": FREE_MONTHLY_LIMIT},
-        )
-    return None
+            content={
+                "error": "limit_reached",
+                "limit": FREE_WEEKLY_CASES,
+                "limit_type": "weekly_cases",
+                "cases_used": usage.cases_used,
+                "reset_in_days": days_until_monday,
+            },
+        ), usage
+
+    return None, usage
+
+
+async def _increment_case_usage(user_id: int, case_id: int | None = None) -> int:
+    """
+    Increment case usage after successful diagnosis.
+    Only called when confidence >= LOW_CONFIDENCE_THRESHOLD.
+    """
+    return await asyncio.to_thread(increment_case_usage_sync, user_id, case_id)
+
+
+# Legacy function for backwards compatibility
+async def _enforce_paywall(
+    user_id: int,
+    same_case_id: int | None = None,
+) -> JSONResponse | None:
+    """Legacy paywall check. Use _check_paywall for new code."""
+    error, _ = await _check_paywall(user_id, same_case_id=same_case_id)
+    return error
 
 
 class _ProcessImageError(Exception):
@@ -112,7 +149,10 @@ class _ProcessImageError(Exception):
 
 
 async def _process_image(
-    contents: bytes, user_id: int, crop_hint: str | None = None
+    contents: bytes,
+    user_id: int,
+    crop_hint: str | None = None,
+    same_case_id: int | None = None,
 ) -> dict[str, Any]:
     if len(contents) > 2 * 1024 * 1024:
         err = ErrorResponse(
@@ -122,7 +162,7 @@ async def _process_image(
             JSONResponse(status_code=413, content=err.model_dump())
         )
 
-    if resp := await _enforce_paywall(user_id):
+    if resp := await _enforce_paywall(user_id, same_case_id=same_case_id):
         raise _ProcessImageError(resp)
 
     key = await upload_photo(user_id, contents)
@@ -184,7 +224,11 @@ async def _process_image(
     }
 
 
-def _persist_recent_diagnosis(user_id: int, payload: dict[str, Any]) -> None:
+def _persist_recent_diagnosis(
+    user_id: int,
+    payload: dict[str, Any],
+    case_id: int | None = None,
+) -> None:
     if not payload:
         return
     object_id = payload.get("object_id")
@@ -193,6 +237,7 @@ def _persist_recent_diagnosis(user_id: int, payload: dict[str, Any]) -> None:
             db,
             user_id=user_id,
             object_id=object_id,
+            case_id=case_id,
             payload=payload,
             ttl_hours=settings.recent_diag_ttl_h,
             max_age_hours=settings.recent_diag_max_age_h,
@@ -205,12 +250,22 @@ class DiagnoseRequestBase64(BaseModel):
     image_base64: str
     prompt_id: str
     crop_hint: str | None = None
+    case_id: int | None = None
 
     @field_validator("prompt_id")
     @classmethod
     def validate_prompt_id(cls, v: str) -> str:
         if v != "v1":
             raise ValueError("prompt_id must be 'v1'")
+        return v
+
+    @field_validator("case_id")
+    @classmethod
+    def validate_case_id(cls, v: int | None) -> int | None:
+        if v is None:
+            return None
+        if v <= 0:
+            raise ValueError("case_id must be positive")
         return v
 
 
@@ -247,6 +302,8 @@ class NextSteps(BaseModel):
 class DiagnoseResponse(BaseModel):
     crop: str
     crop_ru: str | None = None
+    object_id: int | None = None
+    case_id: int | None = None
     variety: str | None = None
     variety_ru: str | None = None
     disease: str
@@ -272,8 +329,18 @@ class DiagnoseResponse(BaseModel):
 
 
 class LimitsResponse(BaseModel):
+    """User limits response with both legacy (monthly photos) and new (weekly cases) info."""
+    # Legacy fields (kept for backwards compatibility)
     limit_monthly_free: int
     used_this_month: int
+
+    # Marketing plan v2.4: weekly case limits
+    limit_weekly_cases: int | None = None
+    cases_used_this_week: int | None = None
+    week_key: str | None = None
+    is_trial: bool | None = None
+    trial_ends_at: datetime | None = None
+    reset_in_days: int | None = None
 
 
 class PhotoItem(DiagnoseResponse):
@@ -401,9 +468,11 @@ async def diagnose(
     image: UploadFile | None = OPTIONAL_FILE,
     prompt_id: str | None = Form(None),
     crop_hint: str | None = Form(None),
+    case_id: int | None = Form(None),
 ):
     limit = 2 * 1024 * 1024
     hint_value: str | None = None
+    case_id_value: int | None = None
     if image:
         if prompt_id not in (None, "v1"):
             err = ErrorResponse(
@@ -422,6 +491,8 @@ async def diagnose(
             )
             return JSONResponse(status_code=413, content=err.model_dump())
         hint_value = (crop_hint or "").strip() or None
+        if case_id and case_id > 0:
+            case_id_value = case_id
     else:
         try:
             json_data = await request.json()
@@ -457,10 +528,27 @@ async def diagnose(
             )
             return JSONResponse(status_code=413, content=err.model_dump())
         hint_value = (body.crop_hint or "").strip() or None
+        if body.case_id and body.case_id > 0:
+            case_id_value = body.case_id
+    if case_id_value:
+        try:
+            recent_case = await asyncio.to_thread(
+                get_recent_case_for_same_plant_sync, user_id
+            )
+        except Exception:
+            recent_case = None
+        if not recent_case or recent_case.get("case_id") != case_id_value:
+            case_id_value = None
+
     diag_requests_total.inc()
     start_time = time.perf_counter()
     try:
-        result = await _process_image(contents, user_id, crop_hint=hint_value)
+        result = await _process_image(
+            contents,
+            user_id,
+            crop_hint=hint_value,
+            same_case_id=case_id_value,
+        )
         file_id = result["file_id"]
         crop = result.get("crop", "")
         disease = result.get("disease", "")
@@ -594,6 +682,14 @@ async def diagnose(
 
     disease_name_ru = str(result.get("disease_name_ru") or "").strip() or None
     crop_ru = str(result.get("crop_ru") or "").strip() or None
+    raw_object_id = result.get("object_id")
+    object_id: int | None = None
+    try:
+        object_id_val = int(raw_object_id)
+        if object_id_val > 0:
+            object_id = object_id_val
+    except (TypeError, ValueError):
+        object_id = None
     variety = str(result.get("variety") or "").strip() or None
     variety_ru = str(result.get("variety_ru") or "").strip() or None
     need_reshoot = bool(result.get("need_reshoot")) if status == "ok" else None
@@ -642,6 +738,8 @@ async def diagnose(
         reshoot_tips=reshoot_tips,
         assistant_ru=assistant_ru,
         assistant_followups_ru=assistant_followups,
+        object_id=object_id,
+        case_id=case_id_value,
         need_clarify_crop=need_clarify_crop if status == "ok" else None,
         clarify_crop_variants=clarify_crop_variants if need_clarify_crop else None,
         plan_missing_reason=plan_missing_reason,
@@ -651,9 +749,20 @@ async def diagnose(
     if status == "ok":
         payload_dict = response_payload.model_dump()
         try:
-            await asyncio.to_thread(_persist_recent_diagnosis, user_id, payload_dict)
+            await asyncio.to_thread(_persist_recent_diagnosis, user_id, payload_dict, case_id_value)
         except Exception:
             logger.exception("recent_diagnosis persist failed")
+
+        # Marketing plan v2.4: Only increment case usage for successful diagnoses
+        # Low confidence diagnoses don't consume a case
+        if conf >= LOW_CONFIDENCE_THRESHOLD:
+            try:
+                if case_id_value:
+                    await asyncio.to_thread(update_last_case_id_sync, user_id, case_id_value)
+                else:
+                    await _increment_case_usage(user_id, case_id=None)
+            except Exception:
+                logger.exception("case_usage increment failed")
 
     return response_payload
 
@@ -764,7 +873,10 @@ async def list_photos_history(
     responses={401: {"model": ErrorResponse}},
 )
 async def get_limits(user_id: int = Depends(rate_limit)):
-    def _db_call() -> int:
+    """Get user limits (both legacy monthly photos and new weekly cases)."""
+
+    def _db_call_legacy() -> int:
+        """Legacy monthly photo usage."""
         with db_module.SessionLocal() as db:
             moscow_tz = ZoneInfo("Europe/Moscow")
             month_key = datetime.now(moscow_tz).strftime("%Y-%m")
@@ -776,8 +888,28 @@ async def get_limits(user_id: int = Depends(rate_limit)):
                 or 0
             )
 
-    used = await asyncio.to_thread(_db_call)
-    return LimitsResponse(limit_monthly_free=FREE_MONTHLY_LIMIT, used_this_month=used)
+    # Get both legacy and new usage info
+    used_photos = await asyncio.to_thread(_db_call_legacy)
+    case_usage = await asyncio.to_thread(get_case_usage_sync, user_id)
+
+    # Calculate days until next week reset
+    now = datetime.now(timezone.utc)
+    days_until_monday = (7 - now.weekday()) % 7
+    if days_until_monday == 0:
+        days_until_monday = 7
+
+    return LimitsResponse(
+        # Legacy
+        limit_monthly_free=FREE_MONTHLY_LIMIT,
+        used_this_month=used_photos,
+        # New weekly cases
+        limit_weekly_cases=FREE_WEEKLY_CASES,
+        cases_used_this_week=case_usage.cases_used,
+        week_key=case_usage.week_key,
+        is_trial=case_usage.is_trial,
+        trial_ends_at=case_usage.trial_ends_at,
+        reset_in_days=days_until_monday,
+    )
 
 
 @router.get(

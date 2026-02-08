@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import imghdr
 from asyncio import Lock
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -131,9 +130,25 @@ async def init_storage(cfg: Settings) -> None:
     await close_client()
 
 
+def detect_image_type(data: bytes) -> str | None:
+    if len(data) < 12:
+        return None
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif"
+    if data.startswith(b"BM"):
+        return "bmp"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
 async def upload_photo(user_id: int, data: bytes) -> str:
     """Upload bytes to S3 and return the object key."""
-    img_type = imghdr.what(None, data)
+    img_type = detect_image_type(data)
     if img_type is None:
         raise HTTPException(status_code=400, detail="Unsupported image type")
 

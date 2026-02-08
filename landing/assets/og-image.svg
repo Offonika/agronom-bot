@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0fdf4"/>
+      <stop offset="50%" style="stop-color:#dcfce7"/>
+      <stop offset="100%" style="stop-color:#faf8f5"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- Pattern -->
+  <pattern id="pattern" width="60" height="60" patternUnits="userSpaceOnUse">
+    <path d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z" fill="#22c55e" fill-opacity="0.08"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#pattern)"/>
+  
+  <!-- Logo icon -->
+  <circle cx="600" cy="200" r="80" fill="url(#leaf)"/>
+  <path d="M600 140c-12 24-36 48-36 72 0 24 18 36 36 36s36-12 36-36c0-24-24-48-36-72z" fill="#fff" opacity="0.9"/>
+  <path d="M600 160c0 0 12 24 12 48" stroke="#16a34a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  
+  <!-- Title -->
+  <text x="600" y="350" text-anchor="middle" font-family="system-ui, sans-serif" font-size="56" font-weight="700" fill="#14532d">Карманный агроном</text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="420" text-anchor="middle" font-family="system-ui, sans-serif" font-size="32" fill="#166534">Фото → диагноз → план действий</text>
+  
+  <!-- Badge -->
+  <rect x="450" y="480" width="300" height="50" rx="25" fill="#16a34a"/>
+  <text x="600" y="513" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" font-weight="600" fill="#fff">Бесплатный Telegram-бот</text>
+</svg>
+
+
+
+
+
+
+
+
+
+

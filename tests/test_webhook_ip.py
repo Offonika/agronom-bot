@@ -9,26 +9,46 @@ from app.config import Settings
 from app.dependencies import compute_signature
 from app.main import app
 from app.models import Payment
+from tests.utils.auth import build_auth_headers
+from sqlalchemy import text
 
 
 settings = Settings()
 
 
-def _auth_headers():
-    return {
-        "X-API-Key": settings.api_key,
-        "X-API-Ver": "v1",
-        "X-User-ID": "1",
-    }
+def _auth_headers(
+    method: str = "POST",
+    path: str = "/v1/payments/sbp/webhook",
+    user_id: int = 1,
+    body: object | None = None,
+) -> dict[str, str]:
+    return build_auth_headers(
+        method, path, user_id=user_id, api_key=settings.api_key, body=body
+    )
+
+
+def _ensure_user(user_id: int = 1) -> None:
+    with db_module.SessionLocal() as db:
+        db.execute(
+            text(
+                "INSERT OR IGNORE INTO users (id, tg_id, api_key) "
+                "VALUES (:uid, :tg, :api_key)"
+            ),
+            {"uid": user_id, "tg": user_id, "api_key": settings.api_key},
+        )
+        db.commit()
 
 
 def test_payments_webhook_forbidden_ip(caplog):
     bad_ip = "10.0.0.1"
+    _ensure_user(1)
     with TestClient(app, client=(bad_ip, 5000)) as client, caplog.at_level(
         logging.WARNING
     ):
         resp = client.post(
-            "/v1/payments/sbp/webhook", headers=_auth_headers(), json={}
+            "/v1/payments/sbp/webhook",
+            headers=_auth_headers(body={}),
+            json={},
         )
     assert resp.status_code == 403
     assert f"forbidden ip {bad_ip}" in caplog.text
@@ -37,6 +57,7 @@ def test_payments_webhook_forbidden_ip(caplog):
 def test_payments_webhook_allowed_ip(apply_migrations):
     allowed_ip = settings.tinkoff_ips[0]
     external_id = "ext123"
+    _ensure_user(1)
     with db_module.SessionLocal() as db:
         payment = Payment(
             user_id=1,
@@ -58,7 +79,9 @@ def test_payments_webhook_allowed_ip(apply_migrations):
     payload["signature"] = compute_signature(settings.hmac_secret, payload.copy())
     with TestClient(app, client=(allowed_ip, 5000)) as client:
         resp = client.post(
-            "/v1/payments/sbp/webhook", headers=_auth_headers(), json=payload
+            "/v1/payments/sbp/webhook",
+            headers=_auth_headers(body=payload),
+            json=payload,
         )
     assert resp.status_code == 200
 
@@ -67,6 +90,7 @@ def test_payments_webhook_x_forwarded_for(apply_migrations):
     allowed_ip = settings.tinkoff_ips[0]
     bad_ip = "10.0.0.1"
     external_id = "ext123fwd"
+    _ensure_user(1)
     with db_module.SessionLocal() as db:
         payment = Payment(
             user_id=1,
@@ -86,13 +110,13 @@ def test_payments_webhook_x_forwarded_for(apply_migrations):
         "paid_at": datetime.now(timezone.utc).isoformat(),
     }
     payload["signature"] = compute_signature(settings.hmac_secret, payload.copy())
-    headers = _auth_headers()
+    headers = _auth_headers(body=payload)
     headers["X-Forwarded-For"] = f"{allowed_ip}, {bad_ip}"
     with TestClient(app, client=(bad_ip, 5000)) as client:
         resp = client.post(
             "/v1/payments/sbp/webhook", headers=headers, json=payload
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 403
 
 
 def test_partner_orders_forbidden_ip(caplog):
@@ -136,7 +160,7 @@ def test_partner_orders_x_forwarded_for():
     headers = {"X-Sign": sign, "X-Forwarded-For": f"{allowed_ip}, {bad_ip}"}
     with TestClient(app, client=(bad_ip, 5000)) as client:
         resp = client.post("/v1/partner/orders", headers=headers, json=payload)
-    assert resp.status_code == 202
+    assert resp.status_code == 403
 
 
 def test_partner_orders_rate_limit():

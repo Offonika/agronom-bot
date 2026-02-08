@@ -23,7 +23,7 @@
 
 ### plans
 - Версионируемые планы.
-- Поля: `id`, `case_id` (FK cases), `object_id`, `version`, `status` (draft/proposed/accepted/scheduled/superseded/rejected), `source` (PLAN_NEW | PLAN_UPDATE), `hash` (SHA-1 канонического JSON), `payload` (JSONB оригинального пакета), `created_at`, `accepted_at`, `scheduled_at`, `superseded_by`.
+- Поля: `id`, `case_id` (FK cases), `object_id`, `version`, `status` (draft/proposed/accepted/scheduled/superseded/rejected/cancelled), `source` (PLAN_NEW | PLAN_UPDATE), `hash` (SHA-1 канонического JSON), `payload` (JSONB оригинального пакета), `created_at`, `accepted_at`, `scheduled_at`, `superseded_by`.
 - Уникальный ключ: `(case_id, version)`.
 - Индекс: `plans_object_case_idx (object_id, case_id, status)`.
 
@@ -39,14 +39,20 @@
 
 ### events
 - Конкретные действия (обработка, контроль дождя, PHI).
-- Поля: `id`, `plan_id`, `plan_stage_id`, `stage_option_id`, `user_id`, `object_id`, `type` (treatment|rain_check|phi|custom), `status` (scheduled|done|skipped|expired), `slot_start`, `slot_end`, `reason`, `created_at`, `updated_at`.
+- Поля: `id`, `plan_id`, `plan_stage_id`, `stage_option_id`, `user_id`, `object_id`, `type` (treatment|rain_check|phi|custom), `status` (scheduled|done|skipped), `slot_start`, `slot_end`, `reason`, `created_at`, `updated_at`.
 - Индекс: `events_user_due_idx (user_id, slot_start) WHERE status='scheduled'`.
 - Уникальность автоплана: `(stage_option_id, slot_start)` — не допускает дубликат слотов.
+- Отмена события пользователем помечается как `skipped` (без отдельного статуса `cancelled`).
 
 ### reminders
 - Push/бот-уведомления.
 - Поля: `id`, `event_id` (FK events), `user_id`, `fire_at`, `sent_at`, `channel`, `payload` (JSONB), `status` (pending|sent|cancelled|failed).
 - Индекс: `reminders_pending_idx (fire_at) WHERE sent_at IS NULL`.
+
+### paywall_reminders
+- Напоминания о доступности бесплатного разбора.
+- Поля: `user_id` (PK, FK users), `fire_at`, `sent_at`, `created_at`, `updated_at`.
+- Индекс: `ix_paywall_reminders_fire_at (fire_at)`.
 
 ### products
 - Нормализованный справочник препаратов.
@@ -61,11 +67,11 @@
 
 ### autoplan_runs
 - История запусков автопланировщика (source координат фиксируется в событии `autoplan_location`, данные содержат lat/lon/label/warned).
-- `id`, `plan_id`, `stage_option_id`, `treatment_id`, `status` (pending|window_found|awaiting_window|failed), `reason`, `forecast_version`, `started_at`, `finished_at`.
+- `id`, `plan_id`, `stage_option_id`, `treatment_id`, `status` (pending|in_progress|awaiting_window|awaiting_confirmation|accepted|rejected|cancelled|failed), `reason`, `forecast_version`, `started_at`, `finished_at`.
 
 ### treatment_slots
 - Результат автоплана.
-- `id`, `plan_id`, `stage_option_id`, `slot_start`, `slot_end`, `reason`, `score`, `status` (proposed|accepted|rejected).
+- `id`, `plan_id`, `stage_option_id`, `slot_start`, `slot_end`, `reason`, `score`, `status` (proposed|accepted|rejected|cancelled).
 - Уникальный ключ: `(stage_option_id, slot_start)`.
 
 ## 2. Идемпотентность

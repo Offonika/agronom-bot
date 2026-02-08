@@ -1,12 +1,23 @@
 'use strict';
 
-const { msg } = require('./utils');
+const { msg, sanitizeObjectName } = require('./utils');
 const {
   rememberLocationRequest,
   consumeLocationRequest,
   peekLocationRequest,
   clearLocationRequest,
 } = require('./locationSession');
+
+const OBJECT_EDIT_LIMIT = Number(process.env.OBJECT_CHIPS_LIMIT || '6');
+const OBJECT_EDIT_ROW_SIZE = Math.max(1, Number(process.env.OBJECT_CHIPS_ROW_SIZE || '1'));
+
+function chunk(items, size) {
+  const rows = [];
+  for (let i = 0; i < items.length; i += size) {
+    rows.push(items.slice(i, i + size));
+  }
+  return rows;
+}
 
 function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
   if (!db || !planWizard) throw new Error('planCommands requires db and planWizard');
@@ -54,6 +65,14 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     return `${coords.lat.toFixed(4)}, ${coords.lon.toFixed(4)}`;
   }
 
+  function looksLikeLocationInput(text) {
+    if (!text) return false;
+    const trimmed = text.trim();
+    const coordPattern = /^-?\d{1,3}(?:[.,]\d+)?\s*[ ,]\s*-?\d{1,3}(?:[.,]\d+)?$/;
+    if (coordPattern.test(trimmed)) return true;
+    return /\d/.test(trimmed) && /,/.test(trimmed);
+  }
+
   async function updateObjectCoordinates(object, coords, source = 'manual') {
     if (!object?.id || !coords) return null;
     const patch = {
@@ -79,11 +98,12 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
       }
       const lines = objects.map((obj) => {
         const marker = obj.id === user.last_object_id ? '✅' : '▫️';
+        const baseName = sanitizeObjectName(obj?.name, msg('object.default_name'));
         const extras = [];
         if (obj.meta?.variety) extras.push(obj.meta.variety);
         if (obj.meta?.note) extras.push(obj.meta.note);
         const suffix = extras.length ? ` — ${extras.join(' / ')}` : '';
-        return `${marker} ${obj.name}${suffix} (#${obj.id})`;
+        return `${marker} ${baseName}${suffix} (#${obj.id})`;
       });
       await ctx.reply(msg('objects_list', { list: lines.join('\n') }));
       if (objectChips) {
@@ -111,7 +131,8 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         return;
       }
       await db.updateUserLastObject(user.id, target.id);
-      await ctx.reply(msg('objects_switched', { name: target.name }));
+      const name = sanitizeObjectName(target?.name, msg('object.default_name'));
+      await ctx.reply(msg('objects_switched', { name }));
       if (objectChips) {
         await objectChips.send(ctx);
       }
@@ -119,6 +140,48 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
       console.error('use command error', err);
       await ctx.reply(msg('objects_error'));
     }
+  }
+
+  function formatObjectLabel(object) {
+    if (!object) return msg('object.default_name');
+    const parts = [];
+    if (object.meta?.variety) parts.push(object.meta.variety);
+    if (object.meta?.note) parts.push(object.meta.note);
+    const baseName = sanitizeObjectName(object?.name, msg('object.default_name'));
+    if (!parts.length) return baseName;
+    return `${baseName} • ${parts.join(' / ')}`;
+  }
+
+  function buildEditKeyboard(target, objectCount) {
+    const rows = [
+      [{ text: msg('object_details_button_rename'), callback_data: `obj_detail|rename|${target.id}` }],
+      [{ text: msg('object_details_button_variety'), callback_data: `obj_detail|variety|${target.id}` }],
+      [{ text: msg('object_details_button_note'), callback_data: `obj_detail|note|${target.id}` }],
+    ];
+    if (objectCount > 1) {
+      rows.push([{ text: msg('object_details_button_switch'), callback_data: 'obj_edit_pick' }]);
+    }
+    rows.push([{ text: msg('object_details_button_delete'), callback_data: `obj_delete_confirm|${target.id}` }]);
+    rows.push([{ text: msg('object_details_skip'), callback_data: `obj_detail_skip|${target.id}` }]);
+    return { inline_keyboard: rows };
+  }
+
+  function buildEditSwitchKeyboard(objects, activeId) {
+    if (!objects?.length) return null;
+    const chips = objects.slice(0, OBJECT_EDIT_LIMIT).map((obj) => {
+      const label = formatObjectLabel(obj);
+      return {
+        text: obj.id === activeId ? `✅ ${label}` : label,
+        callback_data: `obj_edit_select|${obj.id}`,
+      };
+    });
+    return { inline_keyboard: chunk(chips, OBJECT_EDIT_ROW_SIZE) };
+  }
+
+  async function sendEditMenu(ctx, target, objectCount) {
+    const displayName = sanitizeObjectName(target?.name, msg('object.default_name'));
+    const kb = buildEditKeyboard(target, objectCount);
+    await ctx.reply(msg('object_edit_prompt', { name: displayName }), { reply_markup: kb });
   }
 
   async function handleEdit(ctx) {
@@ -135,16 +198,53 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         await ctx.reply(msg('objects_not_found'));
         return;
       }
-      const kb = {
-        inline_keyboard: [
-          [{ text: msg('object_details_button_variety'), callback_data: `obj_detail|variety|${target.id}` }],
-          [{ text: msg('object_details_button_note'), callback_data: `obj_detail|note|${target.id}` }],
-          [{ text: msg('object_details_skip'), callback_data: `obj_detail_skip|${target.id}` }],
-        ],
-      };
-      await ctx.reply(msg('object_edit_prompt', { name: target.name }), { reply_markup: kb });
+      await sendEditMenu(ctx, target, objects.length);
     } catch (err) {
       console.error('objects edit error', err);
+      await ctx.reply(msg('objects_error'));
+    }
+  }
+
+  async function handleEditPick(ctx) {
+    try {
+      const user = await ensureUser(ctx);
+      const objects = (await db.listObjects(user.id)) || [];
+      if (!objects.length) {
+        await ctx.reply(msg('objects_not_found'));
+        return;
+      }
+      const keyboard = buildEditSwitchKeyboard(objects, user.last_object_id);
+      if (!keyboard) {
+        await ctx.reply(msg('objects_not_found'));
+        return;
+      }
+      await ctx.reply(msg('object_edit_pick_prompt'), { reply_markup: keyboard });
+    } catch (err) {
+      console.error('objects edit pick error', err);
+      await ctx.reply(msg('objects_error'));
+    }
+  }
+
+  async function handleEditSelect(ctx, objectId) {
+    const targetId = Number(objectId);
+    if (!targetId) {
+      await ctx.reply(msg('objects_not_found'));
+      return;
+    }
+    try {
+      const user = await ensureUser(ctx);
+      const objects = (await db.listObjects(user.id)) || [];
+      const target = objects.find((obj) => Number(obj.id) === targetId);
+      if (!target) {
+        await ctx.reply(msg('objects_not_found'));
+        return;
+      }
+      if (typeof db.updateUserLastObject === 'function') {
+        await db.updateUserLastObject(user.id, target.id);
+      }
+      await sendEditMenu(ctx, target, objects.length);
+    } catch (err) {
+      console.error('objects edit select error', err);
       await ctx.reply(msg('objects_error'));
     }
   }
@@ -190,12 +290,34 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         cursorPayload,
       );
       if (!events.length) {
-        const emptyKey = selectedObjectId ? 'plans_empty_filtered' : 'plans_empty_overview';
-        await ctx.reply(
-          msg(emptyKey, {
-            name: selectedObjectId ? findObjectName(objects, selectedObjectId) : null,
-          }),
-        );
+        let fallbackPlans = [];
+        if (typeof db.listPlansByUser === 'function') {
+          fallbackPlans = await db.listPlansByUser(user.id, 5, selectedObjectId);
+        }
+        if (fallbackPlans.length) {
+          const lines = fallbackPlans.map((plan) => `#${plan.id} • ${plan.title}`);
+          const key = selectedObjectId ? 'plans_empty_with_plans_filtered' : 'plans_empty_with_plans';
+          const openButtons = fallbackPlans.slice(0, 5).map((plan) => [
+            {
+              text: `${msg('plans_action_open')} #${plan.id}`,
+              callback_data: `plan_plan_open|${plan.id}`,
+            },
+          ]);
+          await ctx.reply(
+            msg(key, {
+              list: lines.join('\n'),
+              name: selectedObjectId ? findObjectName(objects, selectedObjectId) : null,
+            }),
+            openButtons.length ? { reply_markup: { inline_keyboard: openButtons } } : undefined,
+          );
+        } else {
+          const emptyKey = selectedObjectId ? 'plans_empty_filtered' : 'plans_empty_overview';
+          await ctx.reply(
+            msg(emptyKey, {
+              name: selectedObjectId ? findObjectName(objects, selectedObjectId) : null,
+            }),
+          );
+        }
         return;
       }
       const hasMore = events.length > pageSize;
@@ -291,27 +413,33 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
 
   async function handleLocation(ctx) {
     try {
+      const rawText = ctx.message?.text || '';
+      const isCommand = rawText.trim().startsWith('/location');
       const user = await ensureUser(ctx);
       const object = await ensureActiveObject(user);
+      const displayName = sanitizeObjectName(object?.name, msg('object.default_name'));
       const args = ctx.message?.text?.split(' ').slice(1).filter(Boolean) ?? [];
-    if (args.length >= 2) {
-      clearLocationRequest(user.id);
-      const coords = parseCoordinates(args);
-      if (!coords) {
-        await ctx.reply(msg('location_invalid_format'));
+      if (args.length >= 2) {
+        clearLocationRequest(user.id);
+        const coords = parseCoordinates(args);
+        if (!coords) {
+          if (isCommand) {
+            await ctx.reply(msg('location_invalid_format'));
+            return;
+          }
+        } else {
+          await updateObjectCoordinates(object, coords, 'manual_input');
+          await ctx.reply(
+            msg('location_updated', {
+              name: displayName,
+              coords: formatCoords(coords),
+            }),
+          );
+          if (objectChips) {
+            await objectChips.send(ctx);
+          }
           return;
         }
-        await updateObjectCoordinates(object, coords, 'manual_input');
-        await ctx.reply(
-          msg('location_updated', {
-            name: object.name,
-            coords: formatCoords(coords),
-          }),
-        );
-        if (objectChips) {
-          await objectChips.send(ctx);
-        }
-        return;
       }
       const ok = rememberLocationRequest(user.id, object.id);
       if (!ok) {
@@ -320,7 +448,7 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
       }
       await ctx.reply(
         msg('location_prompt', {
-          name: object.name,
+          name: displayName,
         }),
       );
       await ctx.reply(msg('location_pending'));
@@ -360,7 +488,7 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
           object = fetched;
         }
       }
-      if (!object || object.user_id !== user.id) {
+      if (!object || String(object.user_id) !== String(user.id)) {
         await ctx.reply(msg('location_object_missing'));
         return;
       }
@@ -377,9 +505,10 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         return;
       }
       await updateObjectCoordinates(object, coords, 'manual_location');
+      const displayName = sanitizeObjectName(object?.name, msg('object.default_name'));
       await ctx.reply(
         msg('location_updated', {
-          name: object.name,
+          name: displayName,
           coords: formatCoords(coords),
         }),
       );
@@ -394,15 +523,15 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     const text = ctx.message?.text?.trim();
     if (!userId || !text) return false;
     try {
-      const user = await ensureUser(ctx);
       const { entry, expired } = peekLocationRequest(userId);
       if (!entry) {
-        if (expired) {
+        if (expired && looksLikeLocationInput(text)) {
           await ctx.reply(msg('location_request_expired'));
           return true;
         }
         return false;
       }
+      const user = await ensureUser(ctx);
       if (entry.mode !== 'address') {
         if (!text.startsWith('/')) {
           await ctx.reply(msg('location_pending'));
@@ -422,14 +551,15 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         return true;
       }
       const object = await db.getObjectById(entry.objectId);
-      if (!object || object.user_id !== user.id) {
+      if (!object || String(object.user_id) !== String(user.id)) {
         await ctx.reply(msg('location_object_missing'));
         return true;
       }
       await updateObjectCoordinates(object, { lat: geo.lat, lon: geo.lon }, 'manual_address');
+      const displayName = sanitizeObjectName(object?.name, msg('object.default_name'));
       await ctx.reply(
         msg('location_updated', {
-          name: object.name,
+          name: displayName,
           coords: formatCoords({ lat: geo.lat, lon: geo.lon }),
         }),
       );
@@ -456,6 +586,9 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
       if (!plan) {
         await ctx.reply(msg('plan_not_found'));
         return;
+      }
+      if (plan.object_id && plan.object_id !== user.last_object_id) {
+        await db.updateUserLastObject(user.id, plan.object_id);
       }
       await ctx.reply(msg('plan_show_intro', { title: plan.title }));
       await planWizard.showPlanTable(ctx.chat.id, plan.id, {
@@ -495,7 +628,7 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         await db.updateEventStatus(event.id, 'done', new Date());
         await ctx.reply(msg('event_marked_done', { stage: stageName, plan: planName }));
       } else if (action === 'cancel') {
-        await db.updateEventStatus(event.id, 'cancelled', new Date());
+        await db.updateEventStatus(event.id, 'skipped', new Date());
         await ctx.reply(msg('event_marked_cancelled', { stage: stageName, plan: planName }));
     } else if (action === 'reschedule') {
       const keyboard = buildManualStartKeyboard(event);
@@ -503,7 +636,7 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         await ctx.reply(msg('plans_event_missing'));
         return;
       }
-      await db.updateEventStatus(event.id, 'cancelled', new Date());
+      await db.updateEventStatus(event.id, 'skipped', new Date());
       await ctx.reply(
         msg('plans_reschedule_pick_time', {
           stage: stageName,
@@ -549,13 +682,13 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
         await ctx.reply(msg('events_none'));
         return;
       }
-      const targetStatus = status === 'cancel' ? 'cancelled' : status;
+      const targetStatus = status === 'cancel' ? 'skipped' : status;
       const stageName = event.stage_title || msg('reminder_stage_fallback');
       await db.updateEventStatus(event.id, targetStatus, new Date());
       const key =
         targetStatus === 'done'
           ? 'event_marked_done'
-          : targetStatus === 'cancelled'
+          : status === 'cancel'
             ? 'event_marked_cancelled'
             : 'event_marked_skipped';
       await ctx.reply(msg(key, { stage: stageName, plan: event.plan_title || '' }));
@@ -574,6 +707,9 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     if (!plan) {
       await ctx.reply(msg('plan_not_found'));
       return;
+    }
+    if (plan.object_id && plan.object_id !== user.last_object_id) {
+      await db.updateUserLastObject(user.id, plan.object_id);
     }
     await ctx.reply(msg('plan_show_intro', { title: plan.title }));
     await planWizard.showPlanTable(ctx.chat.id, plan.id, {
@@ -607,7 +743,7 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
   function findObjectName(objects, objectId) {
     if (!objectId) return '';
     const target = objects.find((obj) => Number(obj.id) === Number(objectId));
-    return target?.name || '';
+    return sanitizeObjectName(target?.name, '');
   }
 
   function buildPlanFilters(objects, activeId) {
@@ -616,8 +752,10 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     const buttons = entries.map((entry) => {
       const label =
         entry.label ||
-        entry.name ||
-        (typeof msg === 'function' ? msg('object.default_name') : 'Моё растение');
+        sanitizeObjectName(
+          entry.name,
+          typeof msg === 'function' ? msg('object.default_name') : 'Моё растение',
+        );
       const isActive = entry.id == null ? !activeId : Number(entry.id) === Number(activeId);
       const text = isActive ? `✅ ${label}` : label;
       const value = entry.id == null ? 'all' : entry.id;
@@ -749,6 +887,8 @@ function createPlanCommands({ db, planWizard, objectChips, geocoder = null }) {
     handleObjects,
     handleUse,
     handleEdit,
+    handleEditPick,
+    handleEditSelect,
     handleMerge,
     handlePlans,
     handlePlansFilter: (ctx, objectId) => handlePlans(ctx, { objectId }),

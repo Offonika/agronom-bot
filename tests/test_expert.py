@@ -72,7 +72,8 @@ def test_ask_expert_invalid_json(client):
     )
     assert resp.status_code == 400
     assert resp.json() == {
-        "code": "BAD_REQUEST",
-        "message": "Invalid JSON payload",
+        "detail": {
+            "code": "BAD_REQUEST",
+            "message": "Invalid JSON payload",
+        }
     }
-    assert "detail" not in resp.json()

@@ -9,7 +9,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20251121_add_object_lat_lon_checks"
-down_revision = "ccb57d510742_expand_photos_user_id_to_bigint"
+down_revision = "ccb57d510742"
 branch_labels = None
 depends_on = None
 

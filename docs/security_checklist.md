@@ -12,15 +12,19 @@ Implementation
 
 Authentication
 
-X-API-Key, X-User-ID (headers) — валидируются per‑request; key хранится в Vault
+X-API-Key (per-user), X-User-ID, X-Req-Ts, X-Req-Nonce, X-Req-Sign, X-Req-Body-Sha256 (headers) — валидируются per‑request; key хранится в Vault
 
+Metrics
+
+GET /metrics (API + Bot) — защищён X-Metrics-Token или Authorization: Bearer при включении METRICS_TOKEN/BOT_METRICS_TOKEN
 Versioning
 
 X-API-Ver: v1 — обязательный, иначе 426
 
 HMAC Integrity
 
-X-Sign + signature в body (SHA‑256) для:• /payments/sbp/webhook (Invoice)• /payments/sbp/autopay/webhook• /v1/partner/orders
+API: X-Req-Sign (HMAC‑SHA256) по payload user_id/ts/nonce/method/path/query/body_sha256, с анти‑replay через Redis TTL.
+Webhooks: X-Sign + signature в body (SHA‑256) для:• /v1/payments/sbp/webhook (Invoice)• /v1/payments/sbp/autopay/webhook• /v1/partner/orders
 
 IP Allowlist
 
@@ -112,4 +116,3 @@ Pen‑test scope yearly; last scan 2025‑07‑10 (no critical vulns).
 Проверьте race‑condition при параллельной загрузке 2+ фото: используйте row‑level lock (FOR UPDATE) на photo_usage.
 
 Следить за ростом QPS > 300 — включить Redis + rate‑limit offload.
-

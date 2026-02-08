@@ -4,7 +4,8 @@ WORKDIR /usr/src/app
 ENV NODE_PATH=/usr/src/app/node_modules
 
 COPY package*.json ./
-RUN npm ci
+# Production image: do not ship devDependencies (spectral/ts-node/etc).
+RUN npm ci --omit=dev
 
 COPY worker ./worker
 COPY services ./services

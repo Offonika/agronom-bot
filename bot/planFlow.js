@@ -1,6 +1,6 @@
 'use strict';
 
-const { msg } = require('./utils');
+const { msg, sanitizeObjectName } = require('./utils');
 const { logFunnelEvent } = require('./funnel');
 const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessage');
 const { replyUserError } = require('./userErrors');
@@ -8,7 +8,7 @@ const { remember: rememberLocationPrompt } = require('./locationThrottler');
 const { rememberLocationRequest } = require('./locationSession');
 
 const PLAN_KIND_DEFAULT = 'PLAN_NEW';
-const ROW_SIZE = 3;
+const ROW_SIZE = Math.max(1, Number(process.env.OBJECT_CHIPS_ROW_SIZE || '1'));
 const PLAN_KIND_SKIP = new Set(['QNA', 'FAQ']);
 const PLAN_KIND_ALLOWED = new Set(['PLAN_NEW', 'PLAN_UPDATE']);
 const LOCATION_PROMPT_TTL_MS = 30 * 60 * 1000; // 30 min prompt timeout
@@ -16,6 +16,29 @@ const LOCATION_AUTO_CONFIRM_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 const LOCATION_EXPIRE_MS = 30 * 60 * 1000; // 30 min for pending prompts
 const DEFAULT_MAP_ZOOM = 15;
 const STRING_MIN_MATCH = 3;
+const PLAN_START_THROTTLE_MS = Number(process.env.PLAN_START_THROTTLE_MS || 2000);
+const planStartGuards = new Map();
+
+function buildPlanStartKey(diagnosis) {
+  if (!diagnosis) return null;
+  return (
+    diagnosis.recent_diagnosis_id ||
+    diagnosis.plan_hash ||
+    [diagnosis.crop, diagnosis.disease, diagnosis.confidence].map((v) => String(v ?? '')).join('|')
+  );
+}
+
+function isPlanStartDuplicate(userId, key) {
+  if (!userId || !key) return false;
+  const state = planStartGuards.get(userId);
+  if (!state) return false;
+  return state.key === key && Date.now() - state.ts < PLAN_START_THROTTLE_MS;
+}
+
+function markPlanStart(userId, key) {
+  if (!userId || !key) return;
+  planStartGuards.set(userId, { key, ts: Date.now() });
+}
 
 function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions = null }) {
   if (!db || !catalog || !planWizard) {
@@ -39,7 +62,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     const session = await sessionStore.fetchByToken(userId, token);
     if (!session) return false;
     await sessionStore.deleteSession(session);
-    await start(ctx, session.diagnosis_payload, { skipAutoFinalize: true });
+    await start(ctx, session.diagnosis_payload, { skipAutoFinalize: true, skipThrottle: true });
     return true;
   }
 
@@ -74,10 +97,15 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
 
   function buildChooseKeyboard(objects, token) {
     if (!objects.length) return [];
-    const buttons = objects.slice(0, 6).map((obj) => [
-      { text: obj.name, callback_data: buildPickData(obj.id, token) },
-    ]);
-    return buttons.concat(buildStepControls(token));
+    const buttons = objects.slice(0, 6).map((obj) => {
+      const name = sanitizeObjectName(obj?.name, msg('object.default_name'));
+      return [{ text: name, callback_data: buildPickData(obj.id, token) }];
+    });
+    const rows = buttons;
+    if (token) {
+      rows.push([{ text: msg('plan_object_create'), callback_data: buildCreateData(token) }]);
+    }
+    return rows.concat(buildStepControls(token));
   }
 
   function buildStepControls(token) {
@@ -159,13 +187,17 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     return { diagnosis, session, user, expired: false };
   }
 
-  async function ensurePrimaryObject(user, diagnosis) {
+  async function ensurePrimaryObject(user, diagnosis, options = {}) {
+    const shouldUpdateLastObject = options.updateLastObject !== false;
+    let allowCreate = options.allowCreate !== false;
     let objects = await db.listObjects(user.id);
+    if (!objects.length) {
+      allowCreate = true;
+    }
     const cropKey = normalizeCrop(diagnosis?.crop || diagnosis?.crop_ru);
+    const locationTag = normalizeLocationTag(diagnosis?.region || diagnosis?.location_tag);
     const requestedObjectId = diagnosis?.object_id ? Number(diagnosis.object_id) : null;
-    let primary =
-      (requestedObjectId ? objects.find((obj) => Number(obj.id) === requestedObjectId) : null) ||
-      findObjectByCrop(objects, cropKey);
+    let primary = requestedObjectId ? objects.find((obj) => Number(obj.id) === requestedObjectId) : null;
     if (!primary && requestedObjectId && typeof db.getObjectById === 'function') {
       try {
         const fetched = await db.getObjectById(requestedObjectId);
@@ -177,7 +209,17 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         console.error('plan_flow.fetch_object_failed', err);
       }
     }
-    if (!primary && cropKey && typeof db.createObject === 'function') {
+    if (!primary && cropKey) {
+      primary =
+        (locationTag
+          ? objects.find(
+              (obj) =>
+                normalizeCrop(obj.type) === cropKey &&
+                normalizeLocationTag(obj.location_tag) === locationTag,
+            )
+          : null) || findObjectByCrop(objects, cropKey);
+    }
+    if (!primary && cropKey && allowCreate && typeof db.createObject === 'function') {
       const created = await db.createObject(user.id, {
         name: deriveObjectName(diagnosis),
         type: diagnosis?.crop || null,
@@ -189,7 +231,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         objects = [created, ...objects];
       }
     }
-    if (!primary && typeof db.createObject === 'function') {
+    if (!primary && allowCreate && typeof db.createObject === 'function') {
       const created = await db.createObject(user.id, {
         name: deriveObjectName(diagnosis),
         type: diagnosis?.crop || null,
@@ -204,7 +246,12 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     if (!primary) {
       primary = objects.find((obj) => obj.id === user.last_object_id) || objects[0];
     }
-    await db.updateUserLastObject(user.id, primary.id);
+    if (requestedObjectId && primary && Number(primary.id) === requestedObjectId) {
+      objects = [primary];
+    }
+    if (shouldUpdateLastObject) {
+      await db.updateUserLastObject(user.id, primary.id);
+    }
     if (primary && (diagnosis?.variety || diagnosis?.variety_ru) && typeof db.updateObjectMeta === 'function') {
       const variety = cleanText(diagnosis.variety_ru || diagnosis.variety);
       const currentVariety = cleanText(primary.meta?.variety);
@@ -297,7 +344,8 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       }
     }
     try {
-      await ctx.reply(msg('location_manual_prompt', { name: object.name }), {
+      const name = sanitizeObjectName(object?.name, msg('object.default_name'));
+      await ctx.reply(msg('location_manual_prompt', { name }), {
         reply_markup: {
           inline_keyboard: [
             [
@@ -389,17 +437,73 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       console.info('plan_flow.start.skipped_kind', { userId: tgUserId, planKind });
       return;
     }
-    const payload = { ...diagnosis, plan_kind: planKind };
+    if (!opts.skipThrottle) {
+      const dedupKey = buildPlanStartKey(diagnosis);
+      if (isPlanStartDuplicate(tgUserId, dedupKey)) {
+        console.info('plan_flow.start.throttled', {
+          userId: tgUserId,
+          recentId: diagnosis.recent_diagnosis_id || null,
+        });
+        return;
+      }
+      markPlanStart(tgUserId, dedupKey);
+    }
+    let user = null;
     try {
-      const user = await db.ensureUser(tgUserId);
-      const { primary, objects } = await ensurePrimaryObject(user, payload);
+      user = await db.ensureUser(tgUserId);
+    } catch (err) {
+      console.error('plan_flow.start.ensure_user_failed', err);
+      return;
+    }
+    const payload = { ...diagnosis, plan_kind: planKind };
+    const sessionUserId = user?.id || tgUserId;
+    const existingSession = await sessionStore.fetchLatest(sessionUserId);
+    const sessionActive = existingSession && !isSessionExpired(existingSession);
+    const existingDiag = existingSession?.diagnosis_payload || {};
+    const sameRecent =
+      sessionActive &&
+      payload.recent_diagnosis_id &&
+      Number(existingSession.recent_diagnosis_id) === Number(payload.recent_diagnosis_id);
+    const sameHash =
+      sessionActive &&
+      payload.plan_hash &&
+      existingDiag?.plan_hash &&
+      String(existingDiag.plan_hash) === String(payload.plan_hash);
+    if (sameRecent || sameHash) {
+      console.info('plan_flow.start.dedup', {
+        userId: tgUserId,
+        recentId: payload.recent_diagnosis_id || null,
+        planHash: payload.plan_hash || null,
+        token: existingSession.token,
+      });
+      await choose(ctx, existingSession.token);
+      return;
+    }
+    try {
+      const hadExplicitObject = Boolean(payload?.object_id);
+      const { primary, objects } = await ensurePrimaryObject(user, payload, {
+        updateLastObject: hadExplicitObject,
+        allowCreate: hadExplicitObject,
+      });
       if (primary?.id) {
         payload.object_id = primary.id;
       }
-      if (needsManualLocation(primary.meta || {})) {
-        await promptManualLocation(ctx, primary);
-      } else {
-        await maybePromptLocationConfirmation(ctx, primary, user);
+      const primaryName = sanitizeObjectName(primary?.name, msg('object.default_name'));
+      // Location prompt is deferred until after plan confirmation.
+      if (!hadExplicitObject && Array.isArray(objects) && objects.length > 1) {
+        const token = generateToken();
+        const session = await createPlanSessionRecord(user, payload, token, 'choose_object', primary.id);
+        if (!session) return;
+        console.info('plan_flow.start.choose_required', {
+          userId: user.id,
+          tgUserId,
+          token,
+          objectId: primary.id,
+        });
+        await ctx.reply(formatStepPrompt('plan_step_choose_object', msg('plan_object_choose_prompt')), {
+          reply_markup: { inline_keyboard: buildChooseKeyboard(objects, token) },
+        });
+        return;
       }
       if (Array.isArray(objects) && objects.length === 1) {
         if (opts.skipAutoFinalize) {
@@ -409,14 +513,14 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
           await ctx.reply(
             formatStepPrompt(
               'plan_step_choose_object',
-              msg('plan_object_prompt', { name: primary.name }),
+              msg('plan_object_prompt', { name: primaryName }),
             ),
             {
               reply_markup: { inline_keyboard: buildPromptKeyboard(primary.id, token) },
             },
           );
         } else {
-          await ctx.reply(msg('plan_single_auto', { name: primary.name }), {
+          await ctx.reply(msg('plan_single_auto', { name: primaryName }), {
             reply_markup: {
               inline_keyboard: [
                 [
@@ -465,7 +569,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         await ctx.reply(msg('plan_step_choose_object'), { reply_markup: inline });
         return;
       }
-      await ctx.reply(formatStepPrompt('plan_step_choose_object', msg('plan_object_prompt', { name: primary.name })), {
+      await ctx.reply(formatStepPrompt('plan_step_choose_object', msg('plan_object_prompt', { name: primaryName })), {
         reply_markup: { inline_keyboard: buildPromptKeyboard(primary.id, token) },
       });
     } catch (err) {
@@ -523,7 +627,10 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         hasDiagnosis: true,
       });
       const user = await db.ensureUser(tgUserId);
-      const { objects } = await ensurePrimaryObject(user, diagnosis);
+      const { objects } = await ensurePrimaryObject(user, diagnosis, {
+        updateLastObject: false,
+        allowCreate: false,
+      });
       const keyboard = buildChooseKeyboard(objects, session.token);
       if (!keyboard.length) {
         await ctx.reply(msg('plan_object_no_objects'));
@@ -532,7 +639,9 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       await ctx.reply(formatStepPrompt('plan_step_choose_object', msg('plan_object_choose_prompt')), {
         reply_markup: { inline_keyboard: keyboard },
       });
-      await ctx.answerCbQuery();
+      if (typeof ctx.answerCbQuery === 'function') {
+        await ctx.answerCbQuery();
+      }
     } catch (err) {
       console.error('plan_flow choose error', err);
       await safeAnswer(ctx, 'plan_object_error', true);
@@ -596,7 +705,8 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         currentStep: 'confirm_object',
         state: { ...(session.state || {}), selected_object_id: object.id },
       });
-      const prompt = await ctx.reply(msg('plan_step_choose_selected', { name: object.name }), {
+      const name = sanitizeObjectName(object?.name, msg('object.default_name'));
+      const prompt = await ctx.reply(msg('plan_step_choose_selected', { name }), {
         reply_markup: {
           inline_keyboard: [
             [
@@ -695,14 +805,33 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         await safeAnswer(ctx, 'plan_object_error', true);
         return;
       }
-      const caseRow = await db.createCase({
-        user_id: user.id,
-        object_id: object.id,
-        crop: diagnosis.crop,
-        disease: diagnosis.disease,
-        confidence: diagnosis.confidence,
-        raw_ai: diagnosis,
-      });
+      let caseRow = null;
+      const existingCaseId = diagnosis?.case_id || null;
+      if (existingCaseId && typeof db.getCaseById === 'function') {
+        try {
+          const fetched = await db.getCaseById(existingCaseId);
+          if (fetched && Number(fetched.user_id) === Number(user.id)) {
+            if (!fetched.object_id || Number(fetched.object_id) === Number(object.id)) {
+              caseRow = fetched;
+            }
+          }
+        } catch (err) {
+          console.error('plan_flow.case_fetch_failed', err);
+        }
+      }
+      if (!caseRow) {
+        caseRow = await db.createCase({
+          user_id: user.id,
+          object_id: object.id,
+          crop: diagnosis.crop,
+          disease: diagnosis.disease,
+          confidence: diagnosis.confidence,
+          raw_ai: diagnosis,
+        });
+      }
+      if (caseRow?.id) {
+        diagnosis.case_id = caseRow.id;
+      }
       const planKind = normalizePlanKind(diagnosis?.plan_kind);
       diagnosis.plan_kind = planKind;
       const duplicatePlan =
@@ -720,7 +849,8 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
           objectId: object.id,
         });
         await safeAnswer(ctx, 'plan_object_duplicate');
-        await ctx.reply(msg('plan_step_plan_intro', { name: object.name }));
+        const name = sanitizeObjectName(object?.name, msg('object.default_name'));
+        await ctx.reply(msg('plan_step_plan_intro', { name }));
         await planWizard.showPlanTable(chatId, duplicatePlan.id, {
           userId: user.id,
           diffAgainst: planKind === 'PLAN_UPDATE' ? 'accepted' : null,
@@ -825,7 +955,8 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         diagnosis,
       });
       const nav = buildStepControls(planSession?.token);
-      await ctx.reply(msg('plan_step_plan_intro', { name: object.name }), {
+      const name = sanitizeObjectName(object?.name, msg('object.default_name'));
+      await ctx.reply(msg('plan_step_plan_intro', { name }), {
         reply_markup: nav.length ? { inline_keyboard: nav } : undefined,
       });
       await planWizard.showPlanTable(chatId, plan.id, {
@@ -840,6 +971,11 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
         objectId: object.id,
         chatId,
       });
+      if (needsManualLocation(object.meta || {})) {
+        await promptManualLocation(ctx, object);
+      } else {
+        await maybePromptLocationConfirmation(ctx, object, user);
+      }
     } catch (err) {
       console.error('plan_flow finalize error', err);
       await ctx.reply(msg('plan_object_error'));
@@ -907,6 +1043,10 @@ function cleanText(value) {
   return String(value).trim();
 }
 
+function normalizeLocationTag(tag) {
+  return (tag || '').trim().toLowerCase();
+}
+
 function findObjectByCrop(objects, cropKey) {
   if (!cropKey) return null;
   return (
@@ -969,7 +1109,10 @@ function chunkChips(items, size) {
 }
 
 function buildPlanTitle(object, data) {
-  const crop = data?.crop_ru || data?.crop || object?.name || msg('object.default_name');
+  const crop =
+    data?.crop_ru ||
+    data?.crop ||
+    sanitizeObjectName(object?.name, msg('object.default_name'));
   const disease = data?.disease_name_ru || data?.disease || msg('diagnosis.fallback_disease');
   return `${crop} — ${disease}`;
 }
@@ -1163,10 +1306,13 @@ function normalizeUserKey(value) {
 
 function buildChipsInlineKeyboard(objects, activeId, token) {
   if (!objects?.length) return null;
-  const chips = objects.slice(0, 6).map((obj) => ({
-    text: obj.id === activeId ? `• ${obj.name}` : obj.name,
-    callback_data: buildPickData(obj.id, token || null),
-  }));
+  const chips = objects.slice(0, 6).map((obj) => {
+    const name = sanitizeObjectName(obj?.name, msg('object.default_name'));
+    return {
+      text: obj.id === activeId ? `✅ ${name}` : name,
+      callback_data: buildPickData(obj.id, token || null),
+    };
+  });
   const rows = chunkChips(chips, ROW_SIZE);
   rows.push([{ text: msg('plan_object_create'), callback_data: buildCreateData(token) }]);
   rows.push([{ text: msg('plan_step_cancel'), callback_data: buildCancelData(token) }]);
@@ -1215,11 +1361,20 @@ function createSessionStore({ db, planSessions }) {
     return {};
   }
 
+  async function resolveApiKey(userId, user) {
+    if (user?.api_key) return user.api_key;
+    if (!userId || typeof db?.getUserById !== 'function') return null;
+    const record = await db.getUserById(userId);
+    return record?.api_key || null;
+  }
+
   async function deleteForUser(userId) {
     if (!userId) return;
     try {
       if (hasApi) {
-        await planSessions.deleteAll(userId);
+        const apiKey = await resolveApiKey(userId);
+        if (!apiKey) return;
+        await planSessions.deleteAll(userId, apiKey);
       } else if (typeof db.deletePlanSessionsForUser === 'function') {
         await db.deletePlanSessionsForUser(userId);
       }
@@ -1232,7 +1387,9 @@ function createSessionStore({ db, planSessions }) {
     if (!user?.id || !payload?.token) return null;
     try {
       if (hasApi) {
-        const record = await planSessions.upsert(user.id, {
+        const apiKey = await resolveApiKey(user.id, user);
+        if (!apiKey) return null;
+        const record = await planSessions.upsert(user.id, apiKey, {
           token: payload.token,
           diagnosis: payload.diagnosisPayload,
           current_step: payload.currentStep,
@@ -1267,7 +1424,9 @@ function createSessionStore({ db, planSessions }) {
     if (!userId) return null;
     try {
       if (hasApi) {
-        const record = await planSessions.fetchLatest(userId, { includeExpired: true });
+        const apiKey = await resolveApiKey(userId);
+        if (!apiKey) return null;
+        const record = await planSessions.fetchLatest(userId, apiKey, { includeExpired: true });
         return normalizeSession(record);
       }
       if (typeof db.getLatestPlanSessionForUser !== 'function') return null;
@@ -1284,7 +1443,9 @@ function createSessionStore({ db, planSessions }) {
     if (!token) return null;
     try {
       if (hasApi) {
-        const record = await planSessions.fetchByToken(userId, token, { includeExpired: true });
+        const apiKey = await resolveApiKey(userId);
+        if (!apiKey) return null;
+        const record = await planSessions.fetchByToken(userId, apiKey, token, { includeExpired: true });
         return normalizeSession(record);
       }
       if (typeof db.getPlanSessionByToken !== 'function') return null;
@@ -1300,7 +1461,9 @@ function createSessionStore({ db, planSessions }) {
     if (!session?.token || !session?.user_id) return;
     try {
       if (hasApi) {
-        await planSessions.deleteByToken(session.user_id, session.token);
+        const apiKey = await resolveApiKey(session.user_id);
+        if (!apiKey) return;
+        await planSessions.deleteByToken(session.user_id, apiKey, session.token);
       } else if (typeof db.deletePlanSession === 'function') {
         await db.deletePlanSession(session.id);
       }
@@ -1322,7 +1485,9 @@ function createSessionStore({ db, planSessions }) {
     };
     try {
       if (hasApi) {
-        await planSessions.patch(session.user_id, session.id, {
+        const apiKey = await resolveApiKey(session.user_id);
+        if (!apiKey) return;
+        await planSessions.patch(session.user_id, apiKey, session.id, {
           current_step: payload.currentStep,
           state: payload.state,
           plan_id: payload.planId,
@@ -1351,7 +1516,9 @@ function createSessionStore({ db, planSessions }) {
     if (!userId || !planId) return;
     try {
       if (hasApi) {
-        await planSessions.deleteByPlan(userId, planId);
+        const apiKey = await resolveApiKey(userId);
+        if (!apiKey) return;
+        await planSessions.deleteByPlan(userId, apiKey, planId);
       } else if (typeof db.deletePlanSessionsByPlan === 'function') {
         await db.deletePlanSessionsByPlan(planId);
       }

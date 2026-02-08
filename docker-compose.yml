@@ -1,5 +1,14 @@
+x-service-defaults: &service_defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
 services:
   api:
+    <<: *service_defaults
     build: .
     env_file: .env
     environment:
@@ -8,26 +17,45 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
+      METRICS_TOKEN: ${METRICS_TOKEN}
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
       no_proxy: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - ./openapi/openapi.yaml:/app/openapi/openapi.yaml
     depends_on:
-      - db
-      - redis
-      - minio
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     ports:
-      - "8010:8010"
+      - "127.0.0.1:8010:8010"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/docs', timeout=2).read()\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - agronet
 
   bot:
+    <<: *service_defaults
     build:
       context: .
       dockerfile: bot/Dockerfile
     volumes:
       - ./bot:/usr/src/app
       - ./locales:/usr/src/locales
+      - ./services:/usr/src/services
     env_file: .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -36,14 +64,22 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT}
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
       no_proxy: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
-      - api
-      - db
-      - redis
-      - minio
+      api:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     networks:
       - agronet
   autoplan:
+    <<: *service_defaults
     build:
       context: .
       dockerfile: worker/Dockerfile
@@ -55,9 +91,58 @@ services:
       BOT_TOKEN_DEV: ${BOT_TOKEN_DEV}
       WEATHER_LAT: ${WEATHER_LAT:-55.751244}
       WEATHER_LON: ${WEATHER_LON:-37.618423}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agronet
+  autopay:
+    <<: *service_defaults
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BOT_TOKEN_DEV: ${BOT_TOKEN_DEV}
+      BOT_TOKEN_PROD: ${BOT_TOKEN_PROD:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,api,bot,db,redis,minio,prometheus,loki,grafana}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "while true; do
+      python -m scripts.autopay_runner;
+      sleep $${AUTOPAY_RUN_INTERVAL_MINUTES:-60}m;
+      done"
+    networks:
+      - agronet
+  usage_reset:
+    <<: *service_defaults
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    entrypoint: ["node", "worker/usage_reset.js"]
+    env_file: .env
+    environment:
+      # usage_reset.js reads DATABASE_URL directly.
+      DATABASE_URL: ${BOT_DATABASE_URL:-${DATABASE_URL}}
+      REDIS_URL: ${REDIS_URL}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - agronet
   db:
@@ -70,9 +155,24 @@ services:
       - POSTGRES_DB=agronom_bot
 
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     env_file: .env
     ports:
       - 5433:5432
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - agronet
     volumes:
@@ -80,11 +180,23 @@ services:
   redis:
     image: redis:7
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
     networks:
       - agronet
   minio:
+    <<: *service_defaults
     image: minio/minio
     command: server /data --console-address ":9001"
     env_file: .env
@@ -94,31 +206,51 @@ services:
     volumes:
       - minio-data:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:9000/minio/health/ready >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     networks:
       - agronet
   prometheus:
+    <<: *service_defaults
     image: prom/prometheus
+    profiles: ["monitoring"]
     volumes:
       - prometheus-data:/prometheus
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
+    secrets:
+      - metrics_token
     ports:
-          - "9090:9090"   # ⬅️ Добавь этот проброс
+      # Bind to localhost only. Keep it away from host services (host :9090 and :9091 are often already used).
+      - "127.0.0.1:19090:9090"
     networks:
       - agronet
 
   loki:
+    <<: *service_defaults
     image: grafana/loki:2.9.7
+    profiles: ["monitoring"]
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - loki-data:/loki
     networks:
       - agronet
   grafana:
+    <<: *service_defaults
     image: grafana/grafana
+    profiles: ["monitoring"]
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
@@ -139,3 +271,7 @@ volumes:
 
 networks:
   agronet:
+
+secrets:
+  metrics_token:
+    file: ./.secrets/metrics_token

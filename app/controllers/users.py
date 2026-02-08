@@ -10,11 +10,12 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import text
 
 from app import db as db_module
 from app.config import Settings
 from app.dependencies import ErrorResponse, compute_signature, rate_limit
-from app.models import Event, Payment, Photo, PhotoUsage, User, ErrorCode
+from app.models import ConsentEvent, UserConsent, Event, Payment, Photo, PhotoUsage, User, ErrorCode
 
 settings = Settings()
 HMAC_SECRET = settings.hmac_secret
@@ -52,6 +53,21 @@ class PaymentExport(BaseModel):
 class EventExport(BaseModel):
     event: str
     ts: datetime
+
+
+class ConsentStatus(BaseModel):
+    doc_type: str
+    doc_version: str
+    status: bool
+    updated_at: datetime
+    source: str
+
+
+class ConsentRequest(BaseModel):
+    doc_type: str
+    doc_version: str
+    source: str | None = None
+    meta: dict | None = None
 
 
 BATCH_SIZE = 100
@@ -171,6 +187,108 @@ async def export_user(
         "Content-Disposition": f'attachment; filename="user_{user_id}_export.zip"'
     }
     return StreamingResponse(_stream(), media_type="application/zip", headers=headers)
+
+
+@router.get(
+    "/users/{user_id}/consents",
+    response_model=list[ConsentStatus],
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def list_consents(
+    user_id: int,
+    auth_user: int = Depends(rate_limit),
+):
+    if auth_user != user_id:
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Cannot access other user"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
+
+    with db_module.SessionLocal() as db:
+        rows = db.query(UserConsent).filter_by(user_id=user_id).all()
+        return [
+            ConsentStatus.model_validate(row, from_attributes=True) for row in rows
+        ]
+
+
+def _apply_consent(
+    user_id: int,
+    payload: ConsentRequest,
+    action: str,
+    status: bool,
+) -> None:
+    source = payload.source or "api"
+    meta = payload.meta or {}
+    with db_module.SessionLocal() as db:
+        db.add(
+            ConsentEvent(
+                user_id=user_id,
+                doc_type=payload.doc_type,
+                doc_version=payload.doc_version,
+                action=action,
+                source=source,
+                meta=meta,
+            )
+        )
+        db.execute(
+            text(
+                """
+                INSERT INTO user_consents
+                    (user_id, doc_type, doc_version, status, source, updated_at)
+                VALUES
+                    (:user_id, :doc_type, :doc_version, :status, :source, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, doc_type)
+                DO UPDATE SET doc_version = EXCLUDED.doc_version,
+                              status = EXCLUDED.status,
+                              source = EXCLUDED.source,
+                              updated_at = EXCLUDED.updated_at
+                """
+            ),
+            {
+                "user_id": user_id,
+                "doc_type": payload.doc_type,
+                "doc_version": payload.doc_version,
+                "status": status,
+                "source": source,
+            },
+        )
+        db.commit()
+
+
+@router.post(
+    "/users/{user_id}/consents/accept",
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def accept_consent(
+    user_id: int,
+    payload: ConsentRequest,
+    auth_user: int = Depends(rate_limit),
+):
+    if auth_user != user_id:
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Cannot access other user"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
+    _apply_consent(user_id, payload, action="accept", status=True)
+    return {"status": "ok"}
+
+
+@router.post(
+    "/users/{user_id}/consents/revoke",
+    responses={401: {"model": ErrorResponse}, 403: {"model": ErrorResponse}},
+)
+async def revoke_consent(
+    user_id: int,
+    payload: ConsentRequest,
+    auth_user: int = Depends(rate_limit),
+):
+    if auth_user != user_id:
+        err = ErrorResponse(
+            code=ErrorCode.FORBIDDEN, message="Cannot access other user"
+        )
+        raise HTTPException(status_code=403, detail=err.model_dump())
+    _apply_consent(user_id, payload, action="revoke", status=False)
+    return {"status": "ok"}
 
 
 @router.post(

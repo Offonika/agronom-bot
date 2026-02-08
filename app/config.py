@@ -15,11 +15,9 @@ DEFAULT_CATALOG_URL = (
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 
-    hmac_secret: str = "test-hmac-secret"
-    jwt_secret: str = Field("test-jwt-secret", alias="JWT_SECRET")
-    hmac_secret_partner: str = Field(
-        "test-hmac-partner", alias="HMAC_SECRET_PARTNER"
-    )
+    hmac_secret: str = Field(..., alias="HMAC_SECRET")
+    jwt_secret: str = Field(..., alias="JWT_SECRET")
+    hmac_secret_partner: str = Field(..., alias="HMAC_SECRET_PARTNER")
     tinkoff_ips: list[str] = Field(
         default_factory=lambda: ["127.0.0.1", "testclient"]
     )
@@ -31,10 +29,34 @@ class Settings(BaseSettings):
     )
     tinkoff_terminal_key: str = "tinkoff-terminal-key"
     tinkoff_secret_key: str = "tinkoff-secret-key"
-    free_monthly_limit: int = 5
-    paywall_enabled: bool = Field(True, alias="PAYWALL_ENABLED")
 
-    api_key: str = "test-api-key"
+    # Legacy: photos per month (deprecated, kept for backwards compat)
+    free_monthly_limit: int = 5
+
+    # Marketing plan v2.4: cases per week
+    free_weekly_cases: int = Field(1, alias="FREE_WEEKLY_CASES")
+
+    # Marketing plan v2.4: same plant check window (days)
+    same_plant_check_days: int = Field(10, alias="SAME_PLANT_CHECK_DAYS")
+
+    paywall_enabled: bool = Field(True, alias="PAYWALL_ENABLED")
+    pro_month_price_cents: int = Field(19900, alias="PRO_MONTH_PRICE_CENTS")
+    privacy_version: str = Field("1.0", alias="PRIVACY_VERSION")
+    offer_version: str = Field("1.0", alias="OFFER_VERSION")
+    autopay_version: str = Field("1.0", alias="AUTOPAY_VERSION")
+    marketing_version: str = Field("1.0", alias="MARKETING_VERSION")
+
+    api_key: str = Field(..., alias="API_KEY")
+    request_signature_ttl_seconds: int = Field(
+        300,
+        alias="REQUEST_SIGNATURE_TTL_SECONDS",
+        description="Allowed clock skew for request signatures (seconds).",
+    )
+    metrics_token: str | None = Field(
+        None,
+        alias="METRICS_TOKEN",
+        description="Optional token to protect /metrics endpoint.",
+    )
 
     database_url: str = Field("sqlite:////tmp/agronom_test.db", alias="DATABASE_URL")
     db_create_all: bool = Field(False, alias="DB_CREATE_ALL")
@@ -69,6 +91,21 @@ class Settings(BaseSettings):
         None,
         alias="CATALOG_CA_BUNDLE",
         description="Path to a custom CA bundle for catalog requests",
+    )
+    beta_houseplants_enabled: bool = Field(
+        False,
+        alias="BETA_HOUSEPLANTS_ENABLED",
+        description="Enable beta mode for indoor plants testers",
+    )
+    beta_tester_ids: list[int] = Field(
+        default_factory=list,
+        alias="BETA_TESTER_IDS",
+        description="Comma-separated or JSON list of tester user IDs (tg_id or internal id)",
+    )
+    beta_followup_days: int = Field(
+        3,
+        alias="BETA_FOLLOWUP_DAYS",
+        description="Default delay in days before sending beta follow-up prompt",
     )
     recent_diag_ttl_h: int = Field(24, alias="RECENT_DIAG_TTL_H")
     recent_diag_max_age_h: int = Field(72, alias="RECENT_DIAG_MAX_AGE_H")

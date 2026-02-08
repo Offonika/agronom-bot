@@ -64,6 +64,21 @@ payment_fail_total = Counter(
     "payment_fail_total", "Total payment failures"
 )
 
+# Webhook rejects (IP or signature)
+webhook_forbidden_total = Counter(
+    "webhook_forbidden_total", "Total forbidden webhook requests"
+)
+
+# Payment amount mismatches (payload amount != expected amount)
+payment_amount_mismatch_total = Counter(
+    "payment_amount_mismatch_total", "Total payment amount mismatches"
+)
+
+# Autopay amount mismatches
+autopay_amount_mismatch_total = Counter(
+    "autopay_amount_mismatch_total", "Total autopay amount mismatches"
+)
+
 # Gauge for queue size pending (photos awaiting processing)
 queue_size_pending = Gauge(
     "queue_size_pending", "Number of pending photos awaiting diagnosis"
@@ -77,5 +92,8 @@ __all__ = [
     "gpt_timeout_total",
     "autopay_charge_seconds",
     "payment_fail_total",
+    "webhook_forbidden_total",
+    "payment_amount_mismatch_total",
+    "autopay_amount_mismatch_total",
     "queue_size_pending",
 ]

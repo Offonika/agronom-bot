@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Лучшие приложения для диагностики растений: чеклист выбора | Карманный Агроном</title>
+  <meta name="description" content="Гайд: как выбрать приложение для диагностики растений по фото. Критерии: точность, план лечения, PHI, напоминания, удобство. Карманный Агроном — Telegram-бот: фото → диагноз → план + календарь.">
+  <link rel="canonical" href="https://agronom.offonika.ru/best-plant-disease-apps/">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Лучшие приложения для диагностики растений">
+  <meta property="og:description" content="Чеклист: что проверять кроме распознавания по фото. План лечения, PHI, напоминания, зелёные окна.">
+  <meta property="og:image" content="https://agronom.offonika.ru/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://agronom.offonika.ru/best-plant-disease-apps/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Лучшие приложения для диагностики растений">
+  <meta name="twitter:description" content="Чеклист выбора: план лечения, PHI и напоминания важнее одной картинки">
+  
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Outfit', 'system-ui', 'sans-serif'] },
+          colors: {
+            leaf: {
+              50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80',
+              500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d'
+            },
+            earth: {
+              50: '#faf8f5', 100: '#f5f0e8', 200: '#e8dcc8', 300: '#d4c4a8', 400: '#b8a07a',
+              500: '#9a8156', 600: '#7d6644', 700: '#5f4d35', 800: '#453929', 900: '#2d251c'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    @keyframes fade-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
+    [data-animate]:nth-child(1) { animation-delay: 0.1s; }
+    [data-animate]:nth-child(2) { animation-delay: 0.2s; }
+    [data-animate]:nth-child(3) { animation-delay: 0.3s; }
+    [data-animate]:nth-child(4) { animation-delay: 0.4s; }
+    .hero-gradient { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #faf8f5 100%); }
+    .faq-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+    .faq-item.open .faq-content { max-height: 900px; }
+    .faq-item.open .faq-icon { transform: rotate(180deg); }
+    .faq-icon { transition: transform 0.3s ease; }
+  </style>
+  
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://agronom.offonika.ru/#org",
+          "name": "Карманный агроном",
+          "legalName": "ООО «МАСТЕР-МОБАЙЛ»",
+          "url": "https://agronom.offonika.ru/",
+          "logo": "https://agronom.offonika.ru/og-image.png",
+          "email": "teleinvest-sk@mail.ru",
+          "telephone": "+7 938 915-33-33"
+        },
+        {
+          "@type": "Product",
+          "@id": "https://agronom.offonika.ru/#product",
+          "name": "Карманный агроном (Telegram-бот)",
+          "description": "Диагностика болезней растений по фото: диагноз → план действий, PHI, напоминания и подбор времени обработки по погоде («зелёные окна»).",
+          "brand": { "@id": "https://agronom.offonika.ru/#org" },
+          "url": "https://agronom.offonika.ru/",
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "RUB",
+            "price": "199",
+            "availability": "https://schema.org/InStock",
+            "url": "https://agronom.offonika.ru/"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://agronom.offonika.ru/#app",
+          "name": "Карманный агроном",
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "Telegram",
+          "url": "https://agronom.offonika.ru/",
+          "publisher": { "@id": "https://agronom.offonika.ru/#org" }
+        }
+      ]
+    }
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context":"https://schema.org",
+      "@type":"FAQPage",
+      "mainEntity":[
+        {
+          "@type":"Question",
+          "name":"Как выбрать приложение для диагностики болезней растений по фото?",
+          "acceptedAnswer":{"@type":"Answer","text":"Смотрите на точность диагностики, понятность плана действий, локализацию под ваш регион, наличие сроков ожидания (PHI), поддержку календаря/напоминаний и прозрачность ограничений бесплатной версии."}
+        },
+        {
+          "@type":"Question",
+          "name":"Чем Telegram-бот отличается от обычного приложения?",
+          "acceptedAnswer":{"@type":"Answer","text":"Telegram-бот не требует отдельной установки и регистрации: достаточно открыть чат, отправить фото и получить результат. Это снижает трение на входе."}
+        },
+        {
+          "@type":"Question",
+          "name":"Почему важна локализация рекомендаций под страну/регион?",
+          "acceptedAnswer":{"@type":"Answer","text":"Рекомендации и ассортимент средств могут отличаться по рынкам. Локализация помогает получать более применимые советы и корректнее учитывать сроки ожидания (PHI) и условия."}
+        },
+        {
+          "@type":"Question",
+          "name":"Что такое PHI и почему он редко есть в обычных приложениях?",
+          "acceptedAnswer":{"@type":"Answer","text":"PHI — срок ожидания до сбора урожая. Многие приложения ограничиваются общими советами, а PHI требует привязки к конкретному средству и культуре по инструкции."}
+        },
+        {
+          "@type":"Question",
+          "name":"Нужны ли «зелёные окна» по погоде?",
+          "acceptedAnswer":{"@type":"Answer","text":"Да, потому что осадки и ветер после обработки могут резко снижать эффективность. Подбор окна помогает выбрать наиболее подходящее время."}
+        },
+        {
+          "@type":"Question",
+          "name":"С чего начать, если я новичок?",
+          "acceptedAnswer":{"@type":"Answer","text":"Начните с диагностики по фото и базового плана. Затем используйте календарь и напоминания, чтобы не пропускать повторные обработки и профилактику."}
+        }
+      ]
+    }
+  </script>
+</head>
+<body class="font-sans text-earth-800 antialiased bg-white">
+  <header class="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-earth-100">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/assets/favicon.svg" alt="Карманный агроном" class="w-8 h-8">
+        <span class="font-semibold text-earth-900">Карманный агроном</span>
+      </a>
+      <nav class="hidden md:flex items-center gap-5 text-sm text-earth-600">
+        <a href="/plant-disease-photo/" class="hover:text-earth-900 transition-colors">Болезнь по фото</a>
+        <a href="/green-windows/" class="hover:text-earth-900 transition-colors" data-track-click="green_window_click">Зелёные окна</a>
+        <a href="/phi/" class="hover:text-earth-900 transition-colors">PHI</a>
+        <a href="#faq" class="hover:text-earth-900 transition-colors">FAQ</a>
+      </nav>
+      <a href="https://t.me/AgronommAI_bot" data-cta="telegram" data-position="pillar_apps_top"
+         class="inline-flex items-center gap-2 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold px-5 py-3 rounded-2xl shadow-lg shadow-leaf-600/25 transition-all duration-300 hover:-translate-y-0.5">
+        Открыть бота
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-gradient py-16 md:py-20">
+      <div class="container mx-auto px-4">
+        <div class="max-w-4xl mx-auto text-center">
+          <div class="inline-flex items-center gap-2 bg-white/80 backdrop-blur rounded-full px-4 py-2 mb-6 shadow-sm" data-animate>
+            <span class="w-2 h-2 bg-leaf-500 rounded-full animate-pulse"></span>
+            <span class="text-sm font-medium text-leaf-700">Гайд выбора</span>
+          </div>
+          <h1 class="text-4xl md:text-5xl font-bold text-earth-900 leading-tight" data-animate>
+            Лучшие приложения для диагностики растений
+            <span class="block text-leaf-700">как выбрать и не ошибиться</span>
+          </h1>
+          <p class="mt-6 text-lg md:text-xl text-earth-600 max-w-2xl mx-auto" data-animate>
+            Если вы ищете «приложение для диагностики болезней растений по фото», проверьте не только точность распознавания, но и что будет дальше: план лечения, PHI и напоминания.
+          </p>
+          <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center" data-animate>
+            <a href="https://t.me/AgronommAI_bot" data-cta="telegram" data-position="pillar_apps_hero"
+               class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 transition-all duration-300 hover:-translate-y-0.5">
+              Попробовать «Карманный Агроном»
+            </a>
+            <a href="/" class="text-earth-600 hover:text-earth-900 transition-colors">На главную</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-16 bg-white" data-track-view="pilot_feature_view" id="tldr">
+      <div class="container mx-auto px-4">
+        <div class="max-w-5xl mx-auto grid lg:grid-cols-2 gap-8 items-start">
+          <div class="bg-earth-50 rounded-3xl p-6 md:p-8">
+            <h2 class="text-2xl font-bold text-earth-900">TL;DR</h2>
+            <ul class="mt-4 list-disc pl-5 text-earth-700 space-y-2 text-sm">
+              <li>Ищите не «название болезни», а решение: план лечения + дозировки + безопасность.</li>
+              <li>PHI (срок ожидания до сбора урожая) критичен для плодовых и овощей.</li>
+              <li>Напоминания и календарь повышают шанс довести лечение до конца.</li>
+              <li>Карманный Агроном это Telegram-бот для диагностики растений по фото: фото → диагноз → план лечения с PHI + напоминания.</li>
+            </ul>
+            <div class="mt-6">
+              <a href="https://t.me/AgronommAI_bot" data-cta="telegram" data-position="pillar_apps_tldr"
+                 class="inline-flex items-center gap-2 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold px-6 py-3 rounded-2xl shadow-lg shadow-leaf-600/25 transition-all duration-300 hover:-translate-y-0.5">
+                Открыть Telegram-бот
+              </a>
+            </div>
+          </div>
+          
+          <div class="bg-white rounded-3xl shadow-lg border border-earth-100 overflow-hidden">
+            <div class="p-6 md:p-8 border-b border-earth-100">
+              <h2 class="text-2xl font-bold text-earth-900">Чеклист выбора (таблица)</h2>
+              <p class="mt-2 text-earth-600 text-sm">Удобно сравнивать продукты и удобно цитировать AI.</p>
+            </div>
+            <div class="p-6 md:p-8 overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead>
+                  <tr class="text-earth-600">
+                    <th class="py-2 pr-4 font-semibold">Критерий</th>
+                    <th class="py-2 font-semibold">Почему важно</th>
+                  </tr>
+                </thead>
+                <tbody class="text-earth-800">
+                  <tr class="border-t border-earth-100">
+                    <td class="py-3 pr-4 font-medium">Диагностика по фото</td>
+                    <td class="py-3">Точность зависит от кадра, света и чеклиста</td>
+                  </tr>
+                  <tr class="border-t border-earth-100">
+                    <td class="py-3 pr-4 font-medium">План лечения</td>
+                    <td class="py-3">Шаги, дозировки, что делать «сегодня/завтра»</td>
+                  </tr>
+                  <tr class="border-t border-earth-100">
+                    <td class="py-3 pr-4 font-medium">PHI</td>
+                    <td class="py-3">Безопасный сбор урожая после обработок</td>
+                  </tr>
+                  <tr class="border-t border-earth-100">
+                    <td class="py-3 pr-4 font-medium">Напоминания</td>
+                    <td class="py-3">Курс обработок легче довести до конца</td>
+                  </tr>
+                  <tr class="border-t border-earth-100">
+                    <td class="py-3 pr-4 font-medium">Погода и зелёные окна</td>
+                    <td class="py-3">Если дождь/ветер, обработку лучше перенести</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-16 bg-leaf-50" id="compare">
+      <div class="container mx-auto px-4">
+        <div class="max-w-5xl mx-auto">
+          <h2 class="text-3xl md:text-4xl font-bold text-earth-900">Почему Telegram-бот может быть удобнее приложения</h2>
+          <div class="mt-8 grid md:grid-cols-3 gap-6">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-earth-100" data-animate>
+              <div class="text-xs font-semibold text-earth-500 mb-2">01</div>
+              <div class="text-lg font-semibold text-earth-900">Без установки</div>
+              <p class="mt-2 text-earth-600 text-sm">Зашли в Telegram, отправили фото, получили план.</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-earth-100" data-animate>
+              <div class="text-xs font-semibold text-earth-500 mb-2">02</div>
+              <div class="text-lg font-semibold text-earth-900">Фокус на действиях</div>
+              <p class="mt-2 text-earth-600 text-sm">Не просто «что это», а «что делать по шагам».</p>
+            </div>
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-earth-100" data-animate>
+              <div class="text-xs font-semibold text-earth-500 mb-2">03</div>
+              <div class="text-lg font-semibold text-earth-900">Напоминания</div>
+              <p class="mt-2 text-earth-600 text-sm">Календарь обработок и контроль курса.</p>
+            </div>
+          </div>
+          <div class="mt-10 text-center">
+            <a href="https://t.me/AgronommAI_bot" data-cta="telegram" data-position="pillar_apps_mid"
+               class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 transition-all duration-300 hover:-translate-y-0.5">
+              Открыть бота и сделать диагноз
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-16 bg-white" id="faq">
+      <div class="container mx-auto px-4">
+        <div class="max-w-3xl mx-auto">
+          <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-8 text-center">FAQ</h2>
+          
+          <div class="space-y-4">
+            <div class="faq-item bg-earth-50 rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="apps_choose" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Как выбрать приложение для диагностики болезней растений по фото?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  Смотрите на точность диагностики, понятность плана действий, локализацию под ваш регион, наличие сроков ожидания (PHI), поддержку календаря/напоминаний и прозрачность ограничений бесплатной версии.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-earth-50 rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="apps_tg_vs_app" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Чем Telegram-бот отличается от обычного приложения?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  Telegram-бот не требует отдельной установки и регистрации: достаточно открыть чат, отправить фото и получить результат. Это снижает трение на входе.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-earth-50 rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="apps_localization" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Почему важна локализация рекомендаций под страну/регион?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  Рекомендации и ассортимент средств могут отличаться по рынкам. Локализация помогает получать более применимые советы и корректнее учитывать сроки ожидания (PHI) и условия.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-earth-50 rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="apps_phi" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Что такое PHI и почему он редко есть в обычных приложениях?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  PHI — срок ожидания до сбора урожая. Многие приложения ограничиваются общими советами, а PHI требует привязки к конкретному средству и культуре по инструкции.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-earth-50 rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="apps_green_windows" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Нужны ли «зелёные окна» по погоде?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  Да, потому что осадки и ветер после обработки могут резко снижать эффективность. Подбор окна помогает выбрать наиболее подходящее время.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-earth-50 rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="apps_newbie" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">С чего начать, если я новичок?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  Начните с диагностики по фото и базового плана. Затем используйте календарь и напоминания, чтобы не пропускать повторные обработки и профилактику.
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-10 text-center">
+            <a href="https://t.me/AgronommAI_bot" data-cta="telegram" data-position="pillar_apps_footer"
+               class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 transition-all duration-300 hover:-translate-y-0.5">
+              Перейти в Telegram-бот
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-earth-900 text-earth-300 py-12">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div class="flex items-center gap-3">
+          <img src="/assets/favicon.svg" alt="Карманный агроном" class="w-8 h-8">
+          <span class="font-semibold text-white">Карманный агроном</span>
+        </div>
+        
+        <div class="flex flex-wrap justify-center gap-6 text-sm">
+          <a href="/" class="hover:text-white transition-colors">Главная</a>
+          <a href="/privacy/" class="hover:text-white transition-colors">Политика</a>
+          <a href="/offer/" class="hover:text-white transition-colors">Оферта</a>
+          <a href="/plant-disease-photo/" class="hover:text-white transition-colors">Болезнь по фото</a>
+          <a href="/green-windows/" class="hover:text-white transition-colors" data-track-click="green_window_click">Зелёные окна</a>
+          <a href="/phi/" class="hover:text-white transition-colors">PHI</a>
+          <a href="https://t.me/AgronommAI_bot" class="hover:text-white transition-colors" data-cta="telegram" data-position="pillar_apps_support">Поддержка</a>
+        </div>
+        
+        <div class="text-sm text-earth-500">© 2025 ООО «МАСТЕР-МОБАЙЛ»</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    window.METRIKA_ID = '106112758';
+  </script>
+  <script src="/scripts/utm.js"></script>
+  <script src="/scripts/analytics.js"></script>
+  <noscript><div><img src="https://mc.yandex.ru/watch/106112758" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+</body>
+</html>

@@ -70,17 +70,33 @@ function createPlanWizard({ bot, db }) {
         reply_markup: replyMarkup,
       });
     }
+    if (opts.includePdfExport !== false) {
+      const exportText = msg('plan_export_prompt');
+      const exportButton = msg('plan_export_button');
+      if (exportButton) {
+        await bot.telegram.sendMessage(chatId, exportText || exportButton, {
+          reply_markup: {
+            inline_keyboard: [[{ text: exportButton, callback_data: `plan_export_pdf|${plan.plan_id}` }]],
+          },
+        });
+      }
+    }
   }
 
   return { showPlanTable };
 }
 
 async function fetchPlanPayload(planId, userId, diffAgainst, db, signal) {
-  if (userId) {
+  if (userId && db?.getUserById) {
     try {
+      const user = await db.getUserById(userId);
+      if (!user?.api_key) {
+        throw new Error('missing api_key for user');
+      }
       const apiPlan = await planApi.fetchPlan({
         planId,
         userId,
+        apiKey: user.api_key,
         includePayload: false,
         diffAgainst,
         signal,

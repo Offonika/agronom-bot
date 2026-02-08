@@ -6,19 +6,34 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.config import Settings
 from app.dependencies import compute_signature
 from sqlalchemy import text
 from app.db import SessionLocal
 from app.models import Photo
+from tests.utils.auth import build_auth_headers
+from tests.utils.consent import ensure_base_consents
 
 client = TestClient(app)
+SETTINGS = Settings()
 
-HEADERS = {
-    "X-API-Key": "test-api-key",
-    "X-API-Ver": "v1",
-    "X-User-ID": "1",
-}
+def _headers(
+    method: str, path: str, *, user_id: int = 1, body: object | None = None
+) -> dict[str, str]:
+    return build_auth_headers(
+        method, path, user_id=user_id, api_key="test-api-key", body=body
+    )
 
+def _ensure_user(user_id: int = 1, api_key: str = "test-api-key") -> None:
+    with SessionLocal() as session:
+        session.execute(
+            text(
+                "INSERT OR IGNORE INTO users (id, tg_id, api_key) "
+                "VALUES (:uid, :tg, :api_key)"
+            ),
+            {"uid": user_id, "tg": user_id, "api_key": api_key},
+        )
+        session.commit()
 
 @pytest.fixture(autouse=True)
 def stub_upload(monkeypatch):
@@ -49,10 +64,15 @@ def test_start_to_diagnose():
 def test_paywall_with_mock_payment(monkeypatch):
     monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 0)
 
-    headers = HEADERS | {"X-User-ID": "2"}
+    headers = _headers(
+        "POST",
+        "/v1/payments/create",
+        user_id=2,
+        body={"user_id": 2, "plan": "pro", "months": 1},
+    )
+    _ensure_user(2)
     with SessionLocal() as session:
-        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (2, 2)"))
-        session.commit()
+        ensure_base_consents(session, 2)
 
     create = client.post(
         "/v1/payments/create",
@@ -68,11 +88,17 @@ def test_paywall_with_mock_payment(monkeypatch):
         "status": "success",
         "paid_at": now.isoformat().replace("+00:00", "Z"),
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(SETTINGS.hmac_secret, payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
-        headers=headers | {"X-Sign": sig},
+        headers=_headers(
+            "POST",
+            "/v1/payments/sbp/webhook",
+            user_id=2,
+            body=payload,
+        )
+        | {"X-Sign": sig},
         json=payload,
     )
     assert resp.status_code == 200
@@ -80,6 +106,7 @@ def test_paywall_with_mock_payment(monkeypatch):
 
 @pytest.mark.smoke
 def test_retry_queue():
+    _ensure_user(1)
     now = datetime.now(timezone.utc)
     with SessionLocal() as session:
         photo = Photo(user_id=1, file_id="r.jpg", status="pending", ts=now)
@@ -87,19 +114,26 @@ def test_retry_queue():
         session.commit()
         pid = photo.id
 
-    resp = client.get(f"/v1/photos/{pid}", headers=HEADERS)
+    resp = client.get(
+        f"/v1/photos/{pid}",
+        headers=_headers("GET", f"/v1/photos/{pid}"),
+    )
     assert resp.status_code == 200
     assert resp.json()["status"] == "pending"
 
 
 @pytest.mark.smoke
 def test_history_endpoint():
+    _ensure_user(1)
     now = datetime.now(timezone.utc)
     with SessionLocal() as session:
         session.add(Photo(user_id=1, file_id="h.jpg", status="ok", ts=now))
         session.commit()
 
-    resp = client.get("/v1/photos/history", headers=HEADERS)
+    resp = client.get(
+        "/v1/photos/history",
+        headers=_headers("GET", "/v1/photos/history"),
+    )
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -123,9 +157,14 @@ def test_help_command():
 def test_camelot_import():
     pytest.importorskip("camelot", exc_type=ImportError, reason="Camelot not installed")
 
+    _ensure_user(1)
     resp = client.post(
         "/v1/ai/diagnose",
-        headers=HEADERS,
+        headers=_headers(
+            "POST",
+            "/v1/ai/diagnose",
+            body={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+        ),
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert resp.status_code == 200

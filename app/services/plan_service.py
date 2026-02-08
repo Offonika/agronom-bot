@@ -9,11 +9,11 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable
+from typing import Any
 
 from sqlalchemy import text
 
-from app.db import SessionLocal, engine as db_engine
+from app.db import SessionLocal
 from app.services.plan_payload import PlanNormalizationResult
 
 
@@ -50,14 +50,30 @@ def is_object_owned(user_id: int, object_id: int) -> bool:
     return bool(result)
 
 
+def _normalize_stage_kind(value: str | None) -> str:
+    allowed = {"season", "trigger", "adhoc"}
+    if not value:
+        return "adhoc"
+    lowered = str(value).strip().lower()
+    if lowered in allowed:
+        return lowered
+    if lowered in {"seasonal", "сезон", "по сезону"}:
+        return "season"
+    if lowered in {"adhoc", "ad-hoc", "manual", "ручной", "разово"}:
+        return "adhoc"
+    return "trigger"
+
+
 def _insert_with_id(session, query: str, params: dict[str, Any]) -> int | None:
     """Вставка с возвратом id для sqlite/postgres."""
-    if db_engine is not None and db_engine.dialect.name != "sqlite":
+    bind = session.get_bind()
+    if bind is not None and bind.dialect.name != "sqlite":
         result = session.execute(text(query + " RETURNING id"), params)
         row = result.fetchone()
         return int(row[0]) if row else None
     session.execute(text(query), params)
-    return session.execute(text("SELECT last_insert_rowid()")).scalar()
+    row = session.execute(text("SELECT last_insert_rowid()")).scalar()
+    return int(row) if row is not None else None
 
 
 def create_plan_from_payload(
@@ -102,7 +118,7 @@ def create_plan_from_payload(
                     {
                         "pid": plan_id,
                         "title": stage.name,
-                        "kind": stage.trigger or "custom",
+                        "kind": _normalize_stage_kind(stage.trigger),
                         "note": stage.notes,
                         "phi_days": stage.options[0].phi_days if stage.options else None,
                         "meta": json.dumps({"trigger": stage.trigger} if stage.trigger else {}),
@@ -125,7 +141,12 @@ def create_plan_from_payload(
                                 "dose_unit": opt.dose_unit,
                                 "method": opt.method,
                                 "meta": json.dumps(
-                                    {"needs_review": opt.needs_review, "product_code": opt.product_code}
+                                    {
+                                        "needs_review": opt.needs_review,
+                                        "product_code": opt.product_code,
+                                        "phi_days": opt.phi_days,
+                                        "notes": opt.notes,
+                                    }
                                 ),
                                 "selected": idx == 0,
                             },
@@ -141,7 +162,10 @@ def _normalize_dt(dt_str: str | None):
     if not dt_str:
         return None
     try:
-        return datetime.fromisoformat(dt_str)
+        cleaned = dt_str.strip()
+        if cleaned.endswith("Z"):
+            cleaned = cleaned[:-1] + "+00:00"
+        return datetime.fromisoformat(cleaned)
     except Exception:
         return None
 

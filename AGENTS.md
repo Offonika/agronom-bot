@@ -1,7 +1,7 @@
 AGENTS.md — Contributor Guide для Codex/AI‑агентов
 
 Version 1.2 — 21 November 2025 (v1.1 → v1.2: порядок работы с tasks.md, чеклист доков/тестов)
-
+Всегда отвечай на русском в чатах.
 Quick English Overview
 
 This repo relies on Codex automation. Use Python 3.11+ (3.12 experimental) for the API and Node.js 20+ for the bot.
@@ -72,9 +72,17 @@ BOT_TOKEN_DEV
 
 Telegram Bot Token (dev)
 
+BOT_TOKEN_PROD
+
+Telegram Bot Token (prod)
+
 BOT_METRICS_PORT
 
 порт HTTP-сервера метрик бота (по умолчанию 3000; поменяйте, если порт занят, например Grafana)
+
+SUPPORT_CHAT_ID
+
+чат поддержки для /support (Telegram ID, может быть отрицательным для супергрупп)
 
 OPENAI_API_KEY
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import atexit
 import base64
-import imghdr
 import json
 import logging
 import os
@@ -14,7 +13,7 @@ from typing import Any
 import httpx
 from openai import APITimeoutError, OpenAI, OpenAIError
 
-from .storage import get_public_url
+from .storage import detect_image_type, get_public_url
 
 logger = logging.getLogger("gpt")
 
@@ -24,6 +23,7 @@ _http_client: httpx.Client | None = None
 _TEMPERATURE_DISABLED = False
 _TEMPERATURE_WARNING_EMITTED = False
 _MODEL = (os.environ.get("OPENAI_VISION_MODEL") or "gpt-5").strip() or "gpt-5"
+_ASSISTANT_MODEL = (os.environ.get("OPENAI_ASSISTANT_MODEL") or _MODEL).strip() or _MODEL
 _MODEL_FALLBACK_RAW = os.environ.get("OPENAI_VISION_MODEL_FALLBACK", "").strip()
 _MODEL_FALLBACK = _MODEL_FALLBACK_RAW or None
 _OPENAI_HOST = "api.openai.com"
@@ -237,7 +237,7 @@ def _execute_completion(client: OpenAI, kwargs: dict[str, Any]) -> Any:
 
 def _build_image_source(key: str, image_bytes: bytes | None) -> str:
     if image_bytes:
-        img_type = imghdr.what(None, image_bytes) or "jpeg"
+        img_type = detect_image_type(image_bytes) or "jpeg"
         data = base64.b64encode(image_bytes).decode("ascii")
         return f"data:image/{img_type};base64,{data}"
     return get_public_url(key)
@@ -394,6 +394,35 @@ def call_gpt_vision(
     }
 
 
+def call_gpt_chat(
+    messages: list[dict[str, Any]],
+    *,
+    model: str | None = None,
+    response_format: dict[str, Any] | None = None,
+    timeout: float | None = None,
+) -> str:
+    """Send a text-only chat completion and return the raw content string."""
+
+    client = _get_client()
+    base_payload: dict[str, Any] = {
+        "messages": messages,
+        "timeout": timeout or _TIMEOUT_SECONDS,
+    }
+    if response_format is not None:
+        base_payload["response_format"] = response_format
+    response = _request_completion(client, model or _ASSISTANT_MODEL, base_payload)
+    payload = response.choices[0].message.content
+    if isinstance(payload, list):
+        fragments: list[str] = []
+        for part in payload:
+            text = part.get("text") if isinstance(part, dict) else getattr(part, "text", None)
+            if text is None and hasattr(part, "content"):
+                text = getattr(part, "content")
+            fragments.append(str(text or ""))
+        return "".join(fragments)
+    return str(payload or "")
+
+
 def _clean(value: Any) -> str:
     if value is None:
         return ""
@@ -451,4 +480,4 @@ def _sanitize_plan(plan_raw: Any) -> dict[str, Any] | None:
     return candidate if core_ok else None
 
 
-__all__ = ["call_gpt_vision"]
+__all__ = ["call_gpt_vision", "call_gpt_chat"]

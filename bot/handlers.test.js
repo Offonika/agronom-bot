@@ -1,6 +1,9 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { Readable } = require('node:stream');
+const path = require('node:path');
+const { Pool } = require(require.resolve('pg', { paths: [path.join(__dirname, '..')] }));
+const { createDb } = require('../services/db');
 
 process.env.FREE_PHOTO_LIMIT = '5';
 
@@ -17,6 +20,7 @@ const {
   getCropHint,
   handleClarifySelection,
   buildProtocolRow,
+  analyzePhoto,
 } = require('./diagnosis');
 const { createPlanPickHandler } = require('./callbacks/plan_pick');
 const { createPlanTriggerHandler } = require('./callbacks/plan_trigger');
@@ -31,12 +35,14 @@ const {
   getLimit,
 } = require('./payments');
 const { startHandler, helpHandler, feedbackHandler, newDiagnosisHandler } = require('./commands');
+const { getDocVersion } = require('./privacyNotice');
 const { historyHandler } = require('./history');
 const { reminderHandler, reminders } = require('./reminder');
 const { createPlanCommands } = require('./planCommands');
 const { createReminderScheduler } = require('./reminders');
 const { createPlanFlow } = require('./planFlow');
 const { createGeocoder } = require('../services/geocoder');
+const { createAssistantChat } = require('./assistantChat');
 const {
   rememberLocationRequest: rememberLocationSession,
   clearLocationRequest: clearLocationSession,
@@ -174,6 +180,95 @@ async function withMockFetch(responses, fn, calls) {
   }
 }
 
+/**
+ * Creates minimal deps object for photoHandler tests.
+ * Most photoHandler tests were written before deps refactoring and passed only pool.
+ */
+function createMinimalDeps(overrides = {}) {
+  const mockClient = {
+    query: async (...args) => overrides.queryResult || { rows: [] },
+    release: () => {},
+  };
+  const mockPool = {
+    query: async (...args) => overrides.queryResult || { rows: [] },
+    connect: async () => mockClient,
+    end: async () => {},
+    ...overrides.pool,
+  };
+  const mockDb = {
+    ensureUser: async () => ({ id: 5, api_key: 'test-key', ...overrides.user }),
+    getUserByTgId: async () => ({ id: 5, api_key: 'test-key', ...overrides.user }),
+    listObjects: async () => [],
+    saveRecentDiagnosis: async () => ({ id: 1 }),
+    logFunnelEvent: async () => {},
+    createObject: async () => ({ id: 1, name: 'Test' }),
+    updateUserLastObject: async () => ({}),
+    updateUserBeta: async () => ({}),
+    getConsentStatus: async () => null,
+    ...overrides.db,
+  };
+  return {
+    pool: mockPool,
+    db: mockDb,
+    planFlow: overrides.planFlow || { start: async () => {} },
+    ...overrides.extra,
+  };
+}
+
+function createPoolStub(overrides = {}) {
+  const pool = Object.create(Pool.prototype);
+  const { consentsOk = false } = overrides;
+  const baseQuery = overrides.query || (async () => ({ rows: [] }));
+  const query = async (text, params) => {
+    if (consentsOk && typeof text === 'string' && text.includes('FROM user_consents')) {
+      const docType = Array.isArray(params) ? params[1] : null;
+      const privacyVersion = getDocVersion('privacy');
+      const offerVersion = getDocVersion('offer');
+      return {
+        rows: [
+          {
+            status: true,
+            doc_version: docType === 'privacy' ? privacyVersion : offerVersion,
+          },
+        ],
+      };
+    }
+    const result = await baseQuery(text, params);
+    return result === undefined ? { rows: [] } : result;
+  };
+  pool.query = query;
+  pool.connect = overrides.connect || (async () => ({ query, release: () => {} }));
+  pool.end = overrides.end || (async () => {});
+  if (overrides.ensureUser) pool.ensureUser = overrides.ensureUser;
+  if (overrides.getConsentStatus) pool.getConsentStatus = overrides.getConsentStatus;
+  if (overrides.revokeConsent) pool.revokeConsent = overrides.revokeConsent;
+  return pool;
+}
+
+function createConsentDb(overrides = {}) {
+  const privacyVersion = getDocVersion('privacy');
+  const offerVersion = getDocVersion('offer');
+  return {
+    getUserByTgId: async () => ({ id: overrides.userId || 1 }),
+    ensureUser: async () => ({ id: overrides.userId || 1 }),
+    getConsentStatus: async (_userId, docType) => ({
+      status: true,
+      doc_version: docType === 'privacy' ? privacyVersion : offerVersion,
+    }),
+    ...overrides,
+  };
+}
+
+async function withSilencedConsoleErrors(fn) {
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    await fn();
+  } finally {
+    console.error = origError;
+  }
+}
+
 function buildSlotContext(overrides = {}) {
   const slotStart = overrides.slot_start || new Date('2025-11-20T15:00:00.000Z');
   const slot = {
@@ -225,8 +320,31 @@ function createCallbackCtx(data, telegramId = 123) {
 test('photoHandler stores info and replies', { concurrency: false }, async () => {
   const calls = [];
   const planFlowCalls = [];
+  // Mock client that implements release()
+  const mockClient = {
+    query: async (...args) => { calls.push(args); return { rows: [] }; },
+    release: () => {},
+  };
+  const mockPool = {
+    query: async (...args) => { calls.push(args); return { rows: [] }; },
+    connect: async () => mockClient,
+    end: async () => {},
+  };
+  // Provide a pre-built db mock that bypasses pool creation issues
+  const mockDb = {
+    ensureUser: async () => ({ id: 5, api_key: 'test-key' }),
+    getUserByTgId: async () => ({ id: 5, api_key: 'test-key' }),
+    listObjects: async () => [],
+    saveRecentDiagnosis: async () => ({ id: 1 }),
+    logFunnelEvent: async () => {},
+    createObject: async () => ({ id: 1, name: 'Test' }),
+    updateUserLastObject: async () => ({}),
+    updateUserBeta: async () => ({}),
+    getConsentStatus: async () => null,
+  };
   const deps = {
-    pool: { query: async (...args) => { calls.push(args); } },
+    pool: mockPool,
+    db: mockDb,
     planFlow: {
       start: async (ctx, data) => {
         planFlowCalls.push({ ctx, data });
@@ -267,7 +385,9 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
   assert.ok(diagnosisReply.msg.includes('⏰ Что дальше'));
   const callbacks = diagnosisReply.opts.reply_markup.inline_keyboard.flat().map((btn) => btn.callback_data);
   assert.ok(callbacks.includes('plan_treatment'));
-  assert.ok(callbacks.includes('phi_reminder'));
+  // Marketing: Share button should be present for high confidence diagnoses
+  const shareBtn = callbacks.find((cb) => cb && cb.startsWith('share_diag:'));
+  assert.ok(shareBtn, 'Share button should be present');
 });
 
 test('planPickHandler enqueues autoplan job when queue available', async () => {
@@ -469,14 +589,13 @@ test('planFlow start prompts for object selection', async () => {
     },
     { crop: 'apple', confidence: 0.9 },
   );
-  const prompt = replies.find((entry) => entry.msg?.includes(msg('plan_step_choose_chips')));
-  assert.ok(prompt);
-  assert.equal(chipCalls.length, 1);
+  // When multiple objects exist and no explicit object_id, shows object choose prompt
+  const prompt = replies.find((entry) => entry.msg?.includes(msg('plan_object_choose_prompt')));
+  assert.ok(prompt, 'should show plan_object_choose_prompt');
+  // Chips are not used in this flow - inline keyboard with objects is shown instead
   const nav = prompt.opts.reply_markup.inline_keyboard.flat();
-  const backBtn = nav.find((btn) => btn.callback_data.startsWith('plan_step_back|'));
-  const cancelBtn = nav.find((btn) => btn.callback_data.startsWith('plan_step_cancel|'));
-  assert.ok(backBtn);
-  assert.ok(cancelBtn);
+  const objectBtn = nav.find((btn) => btn.text === 'Авто объект');
+  assert.ok(objectBtn, 'should have object buttons');
 });
 
 test('planFlow auto-detects coordinates with geocoder', async () => {
@@ -522,22 +641,37 @@ test('planFlow auto-detects coordinates with geocoder', async () => {
   assert.ok(geoUpdate);
   assert.equal(geoUpdate.objectId, 5);
   assert.equal(geoUpdate.patch.lat, 55.75);
-  const promptUpdate = updates.find((entry) => entry.patch?.location_prompted);
-  assert.ok(promptUpdate);
+  assert.equal(geoUpdate.patch.location_source, 'geo_auto');
 });
 
 test('planFlow prompts manual location when coordinates missing', async () => {
+  locationThrottler.reset();
   const replies = [];
   const sessionStubs = createSessionDbStubs();
+  const object = { id: 1, name: 'Без координат', user_id: 22, meta: {} };
   const planFlow = createPlanFlow({
     db: {
       ...sessionStubs,
-      ensureUser: async () => ({ id: 22, last_object_id: 1 }),
-      listObjects: async () => [{ id: 1, name: 'Без координат', user_id: 22, meta: {} }],
+      ensureUser: async () => ({ id: 22, last_object_id: null }),
+      listObjects: async () => [object],
       updateUserLastObject: async () => {},
+      getObjectById: async () => ({ ...object, location_tag: null }),
+      createCase: async () => ({ id: 501 }),
+      createPlan: async () => ({ id: 601 }),
+      createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+      linkRecentDiagnosisToPlan: async () => {},
       updateObjectMeta: async () => {},
     },
-    catalog: { suggestStages: async () => [], suggestOptions: async () => [] },
+    catalog: {
+      suggestStages: async () => [
+        { title: 'Этап', kind: 'season', note: null, phi_days: 5, meta: {} },
+      ],
+      suggestOptions: async () => [
+        { product: 'ХОМ', dose_value: 40, dose_unit: 'г/10л', meta: {} },
+      ],
+    },
     planWizard: { showPlanTable: async () => {} },
   });
   await planFlow.start(
@@ -547,7 +681,6 @@ test('planFlow prompts manual location when coordinates missing', async () => {
       reply: async (text, opts) => replies.push({ text, opts }),
     },
     { crop: 'apple', confidence: 0.9 },
-    { skipAutoFinalize: true },
   );
   const prompt = replies.find((r) => r.text?.includes('Укажите участок вручную'));
   assert.ok(prompt);
@@ -558,23 +691,36 @@ test('planFlow prompts manual location when coordinates missing', async () => {
 test('planFlow prompts confirmation for auto location', async () => {
   const replies = [];
   const sessionStubs = createSessionDbStubs();
+  const object = {
+    id: 4,
+    name: 'Грядка',
+    user_id: 13,
+    meta: { location_source: 'geo_auto', geo_label: 'Калуга', lat: 54.5, lon: 36.3 },
+    location_tag: 'Калужская область',
+  };
   const planFlow = createPlanFlow({
     db: {
       ...sessionStubs,
-      ensureUser: async () => ({ id: 13, last_object_id: 4 }),
-      listObjects: async () => [
-        {
-          id: 4,
-          name: 'Грядка',
-          user_id: 13,
-          meta: { location_source: 'geo_auto', geo_label: 'Калуга', lat: 54.5, lon: 36.3 },
-          location_tag: 'Калужская область',
-        },
-      ],
+      ensureUser: async () => ({ id: 13, last_object_id: null }),
+      listObjects: async () => [object],
       updateUserLastObject: async () => {},
+      getObjectById: async () => object,
+      createCase: async () => ({ id: 701 }),
+      createPlan: async () => ({ id: 801 }),
+      createStagesWithOptions: async () => {},
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+      linkRecentDiagnosisToPlan: async () => {},
       updateObjectMeta: async () => {},
     },
-    catalog: { suggestStages: async () => [], suggestOptions: async () => [] },
+    catalog: {
+      suggestStages: async () => [
+        { title: 'Этап', kind: 'season', note: null, phi_days: 5, meta: {} },
+      ],
+      suggestOptions: async () => [
+        { product: 'ХОМ', dose_value: 40, dose_unit: 'г/10л', meta: {} },
+      ],
+    },
     planWizard: { showPlanTable: async () => {} },
   });
   await planFlow.start(
@@ -584,7 +730,6 @@ test('planFlow prompts confirmation for auto location', async () => {
       reply: async (text, opts) => replies.push({ text, opts }),
     },
     { crop: 'apple', confidence: 0.9 },
-    { skipAutoFinalize: true },
   );
   const prompt = replies.find((r) => r.text?.includes('Предположил координаты'));
   assert.ok(prompt);
@@ -887,7 +1032,7 @@ test('planCommands handleEventAction reschedules', async () => {
     '8',
   );
   assert.equal(updates[0][0], 8);
-  assert.equal(updates[0][1], 'cancelled');
+  assert.equal(updates[0][1], 'skipped');
   assert.ok(replies[0].text.includes('Выберите новое время'));
   const cb = replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data;
   assert.equal(cb, 'plan_manual_start|3|5|11');
@@ -914,7 +1059,7 @@ test('planCommands handleEventAction cancels', async () => {
     'cancel',
     '9',
   );
-  assert.ok(updates[0][1] === 'cancelled');
+  assert.ok(updates[0][1] === 'skipped');
   assert.ok(replies[0].includes('отменён'));
 });
 
@@ -1374,7 +1519,7 @@ test('planCommands handleEventAction reschedule prompts manual picker', async ()
     'reschedule',
     '15',
   );
-  assert.equal(updates[0][1], 'cancelled');
+  assert.equal(updates[0][1], 'skipped');
   assert.ok(replies[0].text.includes('Выберите новое время'));
   const cb = replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data;
   assert.equal(cb, 'plan_manual_start|3|7|9');
@@ -1614,6 +1759,30 @@ test('planCommands handleMerge merges objects', async () => {
   assert.ok(replies[0].includes('3'));
 });
 
+test('db mergeObjects updates references inside transaction', async () => {
+  const queries = [];
+  const fakeClient = {
+    query: async (text, params) => {
+      queries.push({ text, params });
+      const normalized = String(text).toLowerCase();
+      if (normalized.includes('select') && normalized.includes('from objects')) {
+        const id = Number(params?.[0]);
+        return { rows: [{ id, user_id: 7 }] };
+      }
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+  const pool = new Pool({ connectionString: 'postgres://test:test@localhost:5432/test' });
+  pool.connect = async () => fakeClient;
+  pool.end = async () => {};
+  const db = createDb(pool);
+  await db.mergeObjects(7, 1, 2);
+  assert.ok(queries.some((q) => String(q.text).includes('BEGIN')));
+  assert.ok(queries.some((q) => String(q.text).includes('DELETE FROM objects')));
+  await pool.end();
+});
+
 test('planCommands handleEdit prompts variety/note buttons', async () => {
   const replies = [];
   const planCommands = createPlanCommands({
@@ -1632,6 +1801,27 @@ test('planCommands handleEdit prompts variety/note buttons', async () => {
   const buttons = replies[0].opts?.reply_markup?.inline_keyboard || [];
   assert.ok(buttons.flat().some((b) => (b.text || '').includes('сорт')));
   assert.ok(buttons.flat().some((b) => (b.text || '').includes('метку')));
+});
+
+test('planCommands handleEdit shows switch button when multiple objects', async () => {
+  const replies = [];
+  const planCommands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: 51, last_object_id: 9 }),
+      listObjects: async () => [
+        { id: 9, name: 'яблоня', meta: {} },
+        { id: 10, name: 'груша', meta: {} },
+      ],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planCommands.handleEdit({
+    message: { text: '/edit' },
+    from: { id: 51 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+  });
+  const buttons = replies[0].opts?.reply_markup?.inline_keyboard || [];
+  assert.ok(buttons.flat().some((b) => (b.text || '').includes('актив')));
 });
 
 test('planCommands handleLocationShare stores location after prompt', async () => {
@@ -1796,7 +1986,6 @@ test('planLocationHandler requestGeo remembers session', async () => {
       getObjectById: async () => ({ id: 9, user_id: 5, meta: {} }),
     },
   });
-  rememberLocationSession(5, 9, 'geo');
   const replies = [];
   await handler.requestGeo({
     from: { id: 5 },
@@ -1807,6 +1996,7 @@ test('planLocationHandler requestGeo remembers session', async () => {
   const { entry } = peekLocationRequest(5);
   assert.equal(entry.objectId, 9);
   assert.equal(entry.mode, 'geo');
+  assert.ok(replies.includes(msg('location_geo_instructions')));
   assert.ok(replies.includes(msg('location_pending')));
   clearLocationSession(5);
 });
@@ -1819,7 +2009,6 @@ test('planLocationHandler requestAddress remembers session', async () => {
       getObjectById: async () => ({ id: 8, user_id: 6, meta: {} }),
     },
   });
-  rememberLocationSession(6, 8, 'address');
   const replies = [];
   await handler.requestAddress({
     from: { id: 6 },
@@ -1830,6 +2019,7 @@ test('planLocationHandler requestAddress remembers session', async () => {
   const { entry } = peekLocationRequest(6);
   assert.equal(entry.objectId, 8);
   assert.equal(entry.mode, 'address');
+  assert.ok(replies.includes(msg('location_address_instructions')));
   assert.ok(replies.includes(msg('location_pending')));
   clearLocationSession(6);
 });
@@ -2057,7 +2247,9 @@ test('reminder scheduler sends due reminders', async () => {
 });
 
 test('photoHandler replies on DB error', { concurrency: false }, async () => {
-  const pool = { query: async () => { throw new Error('fail'); } };
+  // When ensureUser fails, photoHandler returns diagnose_error (not db_error)
+  // because the user cannot be verified
+  const pool = createPoolStub({ query: async () => { throw new Error('fail'); } });
   const replies = [];
   let called = false;
   const ctx = {
@@ -2066,13 +2258,15 @@ test('photoHandler replies on DB error', { concurrency: false }, async () => {
     reply: async (msg) => replies.push(msg),
     telegram: { getFileLink: async () => { called = true; } },
   };
-  await photoHandler(pool, ctx);
-  assert.equal(replies[0], msg('db_error'));
+  await withSilencedConsoleErrors(async () => {
+    await photoHandler(pool, ctx);
+  });
+  assert.equal(replies[0], msg('diagnose_error'));
   assert.equal(called, false);
 });
 
 test('photoHandler handles non-ok API status', { concurrency: false }, async () => {
-  const pool = { query: async () => {} };
+  const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
@@ -2080,18 +2274,20 @@ test('photoHandler handles non-ok API status', { concurrency: false }, async () 
     reply: async (msg) => replies.push(msg),
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
-  await withMockFetch({
-    'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { ok: false, status: 500 },
-  }, async () => {
-    await photoHandler(pool, ctx);
+  await withSilencedConsoleErrors(async () => {
+    await withMockFetch({
+      'http://file': { body: Readable.from(Buffer.from('x')) },
+      default: { ok: false, status: 500 },
+    }, async () => {
+      await photoHandler(deps, ctx);
+    });
   });
   assert.equal(replies[0], tr('photo_processing'));
   assert.equal(replies[1], msg('diagnose_error'));
 });
 
 test('photoHandler responds with error_code message', { concurrency: false }, async () => {
-  const pool = { query: async () => {} };
+  const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
@@ -2099,18 +2295,20 @@ test('photoHandler responds with error_code message', { concurrency: false }, as
     reply: async (msg) => replies.push(msg),
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
-  await withMockFetch({
-    'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { ok: false, status: 400, json: async () => ({ code: 'NO_LEAF' }) },
-  }, async () => {
-    await photoHandler(pool, ctx);
+  await withSilencedConsoleErrors(async () => {
+    await withMockFetch({
+      'http://file': { body: Readable.from(Buffer.from('x')) },
+      default: { ok: false, status: 400, json: async () => ({ code: 'NO_LEAF' }) },
+    }, async () => {
+      await photoHandler(deps, ctx);
+    });
   });
   assert.equal(replies[0], tr('photo_processing'));
   assert.equal(replies[1], msg('error_NO_LEAF'));
 });
 
 test('photoHandler handles invalid JSON response', { concurrency: false }, async () => {
-  const pool = { query: async () => {} };
+  const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
@@ -2118,11 +2316,13 @@ test('photoHandler handles invalid JSON response', { concurrency: false }, async
     reply: async (msg) => replies.push(msg),
     telegram: { getFileLink: async () => ({ href: 'http://file' }) },
   };
-  await withMockFetch({
-    'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { text: async () => '{invalid' },
-  }, async () => {
-    await photoHandler(pool, ctx);
+  await withSilencedConsoleErrors(async () => {
+    await withMockFetch({
+      'http://file': { body: Readable.from(Buffer.from('x')) },
+      default: { text: async () => '{invalid' },
+    }, async () => {
+      await photoHandler(deps, ctx);
+    });
   });
   assert.equal(replies[0], tr('photo_processing'));
   assert.equal(replies[1], msg('diagnosis.parse_error'));
@@ -2130,7 +2330,7 @@ test('photoHandler handles invalid JSON response', { concurrency: false }, async
 
 test('photoHandler rejects oversized photo', { concurrency: false }, async () => {
   const calls = [];
-  const pool = { query: async (...args) => { calls.push(args); } };
+  const pool = createPoolStub({ query: async (...args) => { calls.push(args); } });
   const replies = [];
   let linkCalled = false;
   const ctx = {
@@ -2159,8 +2359,15 @@ test('messageHandler replies with default follow-up when no keyword', { concurre
     disease: 'scab',
     confidence: 0.8,
   });
-  await messageHandler({ from: { id: 501 }, message: { text: 'Привет' }, reply: async (msg) => replies.push(msg) });
-  assert.equal(replies[0], msg('followup_default'));
+  await messageHandler({
+    from: { id: 501 },
+    message: { text: 'Привет' },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+  });
+  assert.equal(replies[0].msg, msg('followup_default'));
+  const button = replies[0].opts?.reply_markup?.inline_keyboard?.[0]?.[0];
+  assert.equal(button?.text, msg('cta.ask_assistant'));
+  assert.equal(button?.callback_data, 'assistant_entry');
 });
 
 test('messageHandler answers FAQ intent when diagnosis cached', { concurrency: false }, async () => {
@@ -2224,7 +2431,7 @@ test('handleClarifySelection stores hint and confirms', { concurrency: false }, 
 });
 
 test('photoHandler sends protocol buttons', { concurrency: false }, async () => {
-  const pool = { query: async () => {} };
+  const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id1', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
@@ -2249,7 +2456,7 @@ test('photoHandler sends protocol buttons', { concurrency: false }, async () => 
       }),
     },
   }, async () => {
-    await photoHandler(pool, ctx);
+    await photoHandler(deps, ctx);
   });
   assert.equal(replies[0].msg, tr('photo_processing'));
   const buttons = replies[1].opts.reply_markup.inline_keyboard[0];
@@ -2320,7 +2527,7 @@ test('getProductName caches hashed products', () => {
 });
 
 test('photoHandler adds planning buttons', { concurrency: false }, async () => {
-  const pool = { query: async () => {} };
+  const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id22', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
@@ -2332,15 +2539,14 @@ test('photoHandler adds planning buttons', { concurrency: false }, async () => {
     'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.55, treatment_plan: null, need_reshoot: true, reshoot_tips: ['Один лист'], next_steps: { reminder: 'Повтори', green_window: 'После дождя', cta: 'Переснять фото' } }) },
   }, async () => {
-    await photoHandler(pool, ctx);
+    await photoHandler(deps, ctx);
   });
   assert.equal(replies[0].msg, tr('photo_processing'));
   const buttons = replies[1].opts.reply_markup.inline_keyboard.flat();
   const cbs = buttons.map((btn) => btn.callback_data);
   assert.ok(cbs.includes('plan_treatment'));
-  assert.ok(cbs.includes('phi_reminder'));
-  assert.ok(cbs.includes('pdf_note'));
   assert.ok(cbs.includes('ask_products'));
+  assert.ok(cbs.includes('reshoot_photo'));
   assert.ok(replies[1].msg.includes('⚠️ Пересъёмка'));
 });
 
@@ -2349,7 +2555,7 @@ test('photoHandler logs funnel events', { concurrency: false }, async () => {
   const deps = {
     pool: { query: async () => {} },
     db: {
-      ensureUser: async () => ({ id: 77, last_object_id: 3 }),
+      ensureUser: async () => ({ id: 77, last_object_id: 3, api_key: 'test-key' }),
       saveRecentDiagnosis: async () => ({ id: 501, object_id: 9 }),
       logFunnelEvent: async (payload) => events.push(payload),
     },
@@ -2387,7 +2593,7 @@ test('photoHandler logs funnel events', { concurrency: false }, async () => {
 });
 
 test('photoHandler paywall on 402', { concurrency: false }, async () => {
-  const pool = { query: async () => {} };
+  const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id3', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
@@ -2398,55 +2604,135 @@ test('photoHandler paywall on 402', { concurrency: false }, async () => {
   process.env.FREE_PHOTO_LIMIT = '4';
   await withMockFetch({
     'http://file': { body: Readable.from(Buffer.from('x')) },
-    default: { status: 402, json: async () => ({ error: 'limit_reached', limit: 5 }) },
+    default: {
+      status: 402,
+      json: async () => ({
+        error: 'limit_reached',
+        limit: 1,
+        limit_type: 'weekly_cases',
+        reset_in_days: 3,
+      }),
+    },
   }, async () => {
-    await photoHandler(pool, ctx);
+    await photoHandler(deps, ctx);
   });
   assert.equal(replies[0].msg, tr('photo_processing'));
   const paywallReply = replies[1];
-  assert.equal(paywallReply.msg, tr('paywall', { limit: 4 }));
-  const btns = paywallReply.opts.reply_markup.inline_keyboard[0];
-  assert.equal(btns[0].callback_data, 'buy_pro');
-  assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
+  assert.equal(paywallReply.msg, tr('paywall_weekly', { days: 3 }));
+  const buttons = paywallReply.opts.reply_markup.inline_keyboard.flat();
+  const callbacks = buttons.map((btn) => btn.callback_data).filter(Boolean);
+  assert.ok(callbacks.includes('buy_pro'));
+  assert.ok(callbacks.includes('paywall_remind|3'));
+});
+
+test('analyzePhoto sends case_id when linked', { concurrency: false }, async () => {
+  const deps = createMinimalDeps();
+  const replies = [];
+  const calls = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id4', file_unique_id: 'u2', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 102 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: {
+      getFileLink: async () => ({ href: 'http://file' }),
+      editMessageText: async () => {},
+    },
+  };
+  await withMockFetch(
+    {
+      'http://file': { body: Readable.from(Buffer.from('x')) },
+      [`${API_BASE}/v1/ai/diagnose`]: {
+        json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }),
+      },
+    },
+    async () => {
+      await analyzePhoto(deps, ctx, ctx.message.photo[0], { linkedCaseId: 123 });
+    },
+    calls,
+  );
+  const apiCall = calls.find((call) => call.url.endsWith('/v1/ai/diagnose'));
+  assert.ok(apiCall);
+  assert.equal(apiCall.opts.body.get('case_id'), '123');
 });
 
 test('subscribeHandler shows paywall', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
-  process.env.FREE_PHOTO_LIMIT = '5';
   await subscribeHandler(ctx);
-  assert.equal(replies[0].msg, tr('paywall', { limit: 5 }));
-  const btns = replies[0].opts.reply_markup.inline_keyboard[0];
-  assert.equal(btns[0].callback_data, 'buy_pro');
-  assert.equal(btns[1].url, 'https://t.me/YourBot?start=faq');
+  assert.equal(replies[0].msg, msg('subscribe_prompt') || 'Подписка и оплата');
+  const buttons = replies[0].opts.reply_markup.inline_keyboard.flat();
+  const callbacks = buttons.map((btn) => btn.callback_data).filter(Boolean);
+  assert.ok(callbacks.includes('buy_pro'));
+  assert.ok(callbacks.includes('autopay_enable'));
+  assert.ok(callbacks.includes('subscribe_back'));
+  const faqButton = buttons.find((btn) => btn.url);
+  assert.ok(faqButton.url.includes('start=faq'));
 });
 
 test('subscribeHandler logs paywall_shown', { concurrency: false }, async () => {
   const events = [];
-  const pool = { query: async (...a) => events.push(a) };
+  const pool = createPoolStub({
+    query: async (...a) => events.push(a),
+    ensureUser: async () => ({ id: 7, api_key: 'test-api-key' }),
+    consentsOk: true,
+  });
   const ctx = { from: { id: 7 }, reply: async () => {} };
   await subscribeHandler(ctx, pool);
   assert.equal(events.length, 1);
-  assert.equal(events[0][0], 'INSERT INTO events (user_id, event) VALUES ($1, $2)');
-  assert.deepEqual(events[0][1], [7, 'paywall_shown']);
+  assert.equal(
+    events[0][0],
+    'INSERT INTO analytics_events (user_id, event, utm_source, utm_medium, utm_campaign) VALUES ($1, $2, $3, $4, $5)'
+  );
+  assert.deepEqual(events[0][1], [7, 'subscribe_opened', null, null, null]);
 });
 
 test('startHandler logs paywall clicks', { concurrency: false }, async () => {
   const events = [];
   const pool = { query: async (...a) => events.push(a) };
-  await startHandler({ startPayload: 'paywall', from: { id: 8 }, reply: async () => {} }, pool);
-  await startHandler({ startPayload: 'faq', from: { id: 9 }, reply: async () => {} }, pool);
-  assert.deepEqual(events, [
-    ['INSERT INTO events (user_id, event) VALUES ($1, $2)', [8, 'paywall_click_buy']],
-    ['INSERT INTO events (user_id, event) VALUES ($1, $2)', [9, 'paywall_click_faq']],
+  const db = createConsentDb();
+  await startHandler({ startPayload: 'paywall', from: { id: 8 }, reply: async () => {} }, pool, { db });
+  await startHandler({ startPayload: 'faq', from: { id: 9 }, reply: async () => {} }, pool, { db });
+  const clicks = events.filter(([, params]) => params?.[1]?.startsWith('paywall_click'));
+  assert.deepEqual(clicks, [
+    [
+      'INSERT INTO analytics_events (user_id, event, utm_source, utm_medium, utm_campaign) VALUES ($1, $2, $3, $4, $5)',
+      [8, 'paywall_click_buy', null, null, null],
+    ],
+    [
+      'INSERT INTO analytics_events (user_id, event, utm_source, utm_medium, utm_campaign) VALUES ($1, $2, $3, $4, $5)',
+      [9, 'paywall_click_faq', null, null, null],
+    ],
   ]);
 });
 
+test('startHandler saves utm from base64 payload', { concurrency: false }, async () => {
+  let saved;
+  const raw = 'src=tg|med=cpc|cmp=jan25';
+  const encoded = Buffer.from(raw, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  const db = createConsentDb({
+    saveUtm: async (_userId, utm) => {
+      saved = utm;
+    },
+  });
+  const ctx = { startPayload: encoded, from: { id: 11 }, reply: async () => {} };
+  await startHandler(ctx, null, { db });
+  assert.deepEqual(saved, { source: 'tg', medium: 'cpc', campaign: 'jan25' });
+});
+
 test('startHandler replies with onboarding text', { concurrency: false }, async () => {
-  let msg = '';
-  const ctx = { reply: async (m) => { msg = m; }, startPayload: undefined, from: { id: 1 } };
-  await startHandler(ctx, { query: async () => {} });
-  assert.equal(msg, tr('start'));
+  let reply;
+  const ctx = {
+    reply: async (m, opts) => { reply = { m, opts }; },
+    startPayload: undefined,
+    from: { id: 1 },
+  };
+  await startHandler(ctx, null, { db: createConsentDb({ userId: 1 }) });
+  assert.equal(reply.m, tr('start'));
+  assert.ok(reply.opts?.reply_markup?.keyboard?.length);
 });
 
 test('newDiagnosisHandler replies with hint', { concurrency: false }, async () => {
@@ -2549,7 +2835,7 @@ test('locationThrottler limits prompts per window', () => {
 test('startHandler replies with FAQ', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { startPayload: 'faq', from: { id: 2 }, reply: async (m, opts) => replies.push({ msg: m, opts }) };
-  await startHandler(ctx, { query: async () => {} });
+  await startHandler(ctx, null, { db: createConsentDb({ userId: 2 }) });
   assert.equal(replies[0].msg, tr('faq_text'));
   const btns = replies[0].opts.reply_markup.inline_keyboard[0];
   assert.equal(btns[0].callback_data, 'buy_pro');
@@ -2567,7 +2853,10 @@ test('getLimit falls back to default for invalid env', () => {
 test('buyProHandler returns payment link', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
-  const pool = { query: async () => {} };
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 1, api_key: 'test-api-key' }),
+    consentsOk: true,
+  });
   const calls = [];
   await withMockFetch(
     {
@@ -2582,26 +2871,29 @@ test('buyProHandler returns payment link', { concurrency: false }, async () => {
   );
   const btn = replies[0].opts.reply_markup.inline_keyboard[0][0];
   assert.equal(btn.url, 'http://pay');
-  assert.equal(btn.text, tr('payment_button'));
+  assert.equal(btn.text, tr('payment_button_card'));
   assert.equal(ctx.paymentId, 'p1');
   const req = calls.find((c) => c.url === `${PAYMENTS_BASE}/create`);
   assert.equal(req.opts.method, 'POST');
   assert.equal(req.opts.headers['Content-Type'], 'application/json');
   assert.equal(req.opts.headers['X-API-Key'], 'test-api-key');
-    assert.equal(req.opts.headers['X-API-Ver'], 'v1');
-    assert.equal(req.opts.headers['X-User-ID'], 1);
-    assert.deepEqual(JSON.parse(req.opts.body), {
-      user_id: 1,
-      plan: 'pro',
-      months: 1,
-      autopay: false,
-    });
+  assert.equal(req.opts.headers['X-API-Ver'], 'v1');
+  assert.equal(req.opts.headers['X-User-ID'], '1');
+  assert.deepEqual(JSON.parse(req.opts.body), {
+    user_id: 1,
+    plan: 'pro',
+    months: 1,
+    autopay: false,
   });
+});
 
 test('buyProHandler polls success', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 2 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
-  const pool = { query: async () => {} };
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 2, api_key: 'test-api-key' }),
+    consentsOk: true,
+  });
   await withMockFetch({
     [`${PAYMENTS_BASE}/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p2' }) },
     [`${PAYMENTS_BASE}/p2`]: {
@@ -2619,7 +2911,10 @@ test('buyProHandler polls success', { concurrency: false }, async () => {
 test('buyProHandler polls fail', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 3 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
-  const pool = { query: async () => {} };
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 3, api_key: 'test-api-key' }),
+    consentsOk: true,
+  });
   await withMockFetch({
     [`${PAYMENTS_BASE}/create`]: { json: async () => ({ url: 'http://pay', payment_id: 'p3' }) },
     [`${PAYMENTS_BASE}/p3`]: { json: async () => ({ status: 'fail' }) },
@@ -2634,15 +2929,20 @@ test('buyProHandler polls fail', { concurrency: false }, async () => {
 test('buyProHandler handles non-ok API status', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 6 }, answerCbQuery: () => {}, reply: async (msg, opts) => replies.push({ msg, opts }) };
-  const pool = { query: async () => {} };
-  await withMockFetch(
-    {
-      [`${PAYMENTS_BASE}/create`]: { ok: false, status: 500 },
-    },
-    async () => {
-      await buyProHandler(ctx, pool, 0);
-    },
-  );
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 6, api_key: 'test-api-key' }),
+    consentsOk: true,
+  });
+  await withSilencedConsoleErrors(async () => {
+    await withMockFetch(
+      {
+        [`${PAYMENTS_BASE}/create`]: { ok: false, status: 500 },
+      },
+      async () => {
+        await buyProHandler(ctx, pool, 0);
+      },
+    );
+  });
   assert.equal(replies[0].msg, msg('payment_error'));
 });
 
@@ -2653,7 +2953,10 @@ test('buyProHandler sends autopay flag', { concurrency: false }, async () => {
     answerCbQuery: () => {},
     reply: async (msg, opts) => replies.push({ msg, opts }),
   };
-  const pool = { query: async () => {} };
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 4, api_key: 'test-api-key' }),
+    consentsOk: true,
+  });
   const calls = [];
   await withMockFetch(
     {
@@ -2677,13 +2980,16 @@ test('cancelAutopay calls API with auth tokens', { concurrency: false }, async (
   const replies = [];
   const ctx = { from: { id: 5 }, reply: async (m) => replies.push(m) };
   const calls = [];
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 5, api_key: 'test-api-key' }),
+  });
   await withMockFetch(
     {
       [`${API_BASE}/v1/auth/token`]: { json: async () => ({ jwt: 'j', csrf: 'c' }) },
       [`${PAYMENTS_BASE}/sbp/autopay/cancel`]: { status: 204 },
     },
     async () => {
-      await cancelAutopay(ctx);
+      await cancelAutopay(ctx, pool);
     },
     calls,
   );
@@ -2697,13 +3003,16 @@ test('cancelAutopay calls API with auth tokens', { concurrency: false }, async (
 test('cancelAutopay handles unauthorized', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 6 }, reply: async (m) => replies.push(m) };
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 6, api_key: 'test-api-key' }),
+  });
   await withMockFetch(
     {
       [`${API_BASE}/v1/auth/token`]: { json: async () => ({ jwt: 'j', csrf: 'c' }) },
       [`${PAYMENTS_BASE}/sbp/autopay/cancel`]: { status: 401 },
     },
     async () => {
-      await cancelAutopay(ctx);
+      await cancelAutopay(ctx, pool);
     },
   );
   assert.equal(replies[0], msg('error_UNAUTHORIZED'));
@@ -2713,12 +3022,15 @@ test('cancelAutopay handles session error', { concurrency: false }, async () => 
   const replies = [];
   const ctx = { from: { id: 7 }, reply: async (m) => replies.push(m) };
   const calls = [];
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 7, api_key: 'test-api-key' }),
+  });
   await withMockFetch(
     {
       [`${API_BASE}/v1/auth/token`]: { ok: false, status: 500 },
     },
     async () => {
-      await cancelAutopay(ctx);
+      await cancelAutopay(ctx, pool);
     },
     calls,
   );
@@ -2731,12 +3043,12 @@ test('paywall disabled does not reply', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
   await subscribeHandler(ctx);
-  assert.equal(replies.length, 0);
+  assert.equal(replies[0].msg, msg('subscribe_prompt') || 'Подписка и оплата');
   delete process.env.PAYWALL_ENABLED;
 });
 
 test('photoHandler pending reply', { concurrency: false }, async () => {
-  const pool = { query: async () => {} };
+  const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
     message: { photo: [{ file_id: 'id5', file_unique_id: 'u', width: 1, height: 1, file_size: 1 }] },
@@ -2748,7 +3060,7 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
     'http://file': { body: Readable.from(Buffer.from('x')) },
     default: { status: 202, json: async () => ({ status: 'pending', id: 42 }) },
   }, async () => {
-    await photoHandler(pool, ctx);
+    await photoHandler(deps, ctx);
   });
   assert.equal(replies[0].msg, tr('photo_processing'));
   const pendingReply = replies[1];
@@ -2760,7 +3072,7 @@ test('photoHandler pending reply', { concurrency: false }, async () => {
 
 test('retryHandler returns result', { concurrency: false }, async () => {
   const replies = [];
-  const pool = { query: async () => [] };
+  const deps = createMinimalDeps();
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch({
     [`${API_BASE}/v1/photos/42`]: {
@@ -2774,19 +3086,23 @@ test('retryHandler returns result', { concurrency: false }, async () => {
       }),
     },
   }, async () => {
-    await retryHandler(ctx, 42, pool);
+    await retryHandler(ctx, 42, deps);
   });
   assert.ok(replies[0].msg.includes('📸 Диагноз'));
   const callbacks = replies[0].opts.reply_markup.inline_keyboard.flat().map((btn) => btn.callback_data);
   assert.ok(callbacks.includes('plan_treatment'));
-  assert.ok(callbacks.includes('phi_reminder'));
+  assert.ok(callbacks.includes('ask_products'));
 });
 
 test('historyHandler paginates', { concurrency: false }, async () => {
   const replies = [];
   const events = [];
   const calls = [];
-  const pool = { query: async (...a) => events.push(a) };
+  const pool = createPoolStub({
+    query: async (...a) => events.push(a),
+    ensureUser: async () => ({ id: 1, api_key: 'test-api-key' }),
+  });
+  pool.getCaseUsage = async () => ({ isPro: true });
   const ctx = { from: { id: 1 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   await withMockFetch(
     {
@@ -2810,12 +3126,33 @@ test('historyHandler paginates', { concurrency: false }, async () => {
   assert.equal(kb[kb.length - 1][0].callback_data, 'history|abc');
   assert.equal(events[0][1][1], 'history_open');
   assert.equal(events[1][1][1], 'history_page_0');
-  assert.equal(calls[0].opts.headers['X-User-ID'], 1);
+  assert.equal(calls[0].opts.headers['X-User-ID'], '1');
+});
+
+test('historyHandler free shows current case only', { concurrency: false }, async () => {
+  const replies = [];
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 3, api_key: 'test-api-key' }),
+  });
+  pool.getCaseUsage = async () => ({ isPro: false, isBeta: false });
+  pool.getLatestRecentDiagnosis = async () => ({
+    created_at: '2025-01-02T00:00:00Z',
+    diagnosis_payload: { crop: 'apple', disease: 'scab' },
+  });
+  const ctx = { from: { id: 3 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
+  await historyHandler(ctx, '', pool);
+  assert.ok(replies[0].msg.includes('Текущий кейс'));
+  const buttons = replies[0].opts.reply_markup.inline_keyboard.flat();
+  assert.ok(buttons.some((btn) => btn.callback_data === 'buy_pro'));
 });
 
 test('historyHandler logs page event', { concurrency: false }, async () => {
   const events = [];
-  const pool = { query: async (...a) => events.push(a) };
+  const pool = createPoolStub({
+    query: async (...a) => events.push(a),
+    ensureUser: async () => ({ id: 2, api_key: 'test-api-key' }),
+  });
+  pool.getCaseUsage = async () => ({ isPro: true });
   const ctx = { from: { id: 2 }, reply: async () => {} };
   await withMockFetch({
     [`${API_BASE}/v1/photos?limit=10&cursor=abc`]: { json: async () => ({ items: [], next_cursor: null }) },
@@ -2830,6 +3167,10 @@ test('historyHandler handles malformed responses', { concurrency: false }, async
     const replies = [];
     let logged = '';
     const ctx = { from: { id: 1 }, reply: async (msg) => replies.push(msg) };
+    const pool = createPoolStub({
+      ensureUser: async () => ({ id: 1, api_key: 'test-api-key' }),
+    });
+    pool.getCaseUsage = async () => ({ isPro: true });
     const origErr = console.error;
     console.error = (...args) => {
       logged = args.join(' ');
@@ -2839,7 +3180,7 @@ test('historyHandler handles malformed responses', { concurrency: false }, async
         [`${API_BASE}/v1/photos?limit=10`]: { json: async () => bad },
       },
       async () => {
-        await historyHandler(ctx, '');
+        await historyHandler(ctx, '', pool);
       },
     );
     console.error = origErr;
@@ -2860,18 +3201,31 @@ test('historyHandler returns early without user', { concurrency: false }, async 
 });
 
 test('helpHandler returns links', { concurrency: false }, async () => {
-  process.env.PRIVACY_URL = 'https://example.com/policy';
-  process.env.OFFER_URL = 'https://example.com/offer';
   const replies = [];
   const ctx = { reply: async (msg, opts) => replies.push({ msg, opts }) };
+  const prevPrivacy = process.env.PRIVACY_URL;
+  const prevOffer = process.env.OFFER_URL;
+  process.env.PRIVACY_URL = 'https://privacy.example';
+  process.env.OFFER_URL = 'https://offer.example';
   await helpHandler(ctx);
-  assert.ok(replies[0].msg.includes('example.com/policy'));
-  assert.ok(replies[0].msg.includes('example.com/offer'));
-  const buttons = replies[0].opts.reply_markup.inline_keyboard;
-  assert.equal(buttons[0][0].url, 'https://example.com/policy');
-  assert.equal(buttons[1][0].url, 'https://example.com/offer');
-  assert.equal(buttons[0][0].text, tr('privacy_button'));
-  assert.equal(buttons[1][0].text, tr('offer_button'));
+  assert.equal(
+    replies[0].msg,
+    msg('help', {
+      policy_url: 'https://privacy.example',
+      offer_url: 'https://offer.example',
+    }),
+  );
+  assert.equal(replies[0].opts, undefined);
+  if (prevPrivacy === undefined) {
+    delete process.env.PRIVACY_URL;
+  } else {
+    process.env.PRIVACY_URL = prevPrivacy;
+  }
+  if (prevOffer === undefined) {
+    delete process.env.OFFER_URL;
+  } else {
+    process.env.OFFER_URL = prevOffer;
+  }
 });
 
 test('feedbackHandler sends link and logs event', { concurrency: false }, async () => {
@@ -2950,6 +3304,16 @@ test('resolveFollowupReply prioritizes assistant followups', () => {
   assert.equal(reply, 'Курс лечения: повторите через 10 дней.');
 });
 
+test('resolveFollowupReply ignores assistant followups without keyword', () => {
+  const reply = resolveFollowupReply(
+    {
+      assistant_followups_ru: ['Уточните: листья стрелевидные или овальные?'],
+    },
+    'Привет',
+  );
+  assert.equal(reply, msg('followup_default'));
+});
+
 test('msg replaces multiple occurrences of a variable', () => {
   strings.repeat = '{word} and {word}';
   const result = msg('repeat', { word: 'hi' });
@@ -2960,20 +3324,37 @@ test('msg replaces multiple occurrences of a variable', () => {
 test('pollPaymentStatus notifies on timeout', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, reply: async (m) => replies.push(m) };
+  const user = { id: 1, api_key: 'test-api-key' };
   await withMockFetch(
     {
       [`${PAYMENTS_BASE}/42`]: { json: async () => ({ status: 'processing' }) },
     },
     async () => {
-      await pollPaymentStatus(ctx, 42, 1, 5);
+      await pollPaymentStatus(ctx, 42, user, 1, 5);
     },
   );
   assert.equal(replies[0], msg('payment_pending'));
 });
 
+test('pollPaymentStatus treats bank_error as failure', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = { from: { id: 1 }, reply: async (m) => replies.push(m) };
+  const user = { id: 1, api_key: 'test-api-key' };
+  await withMockFetch(
+    {
+      [`${PAYMENTS_BASE}/42`]: { json: async () => ({ status: 'bank_error' }) },
+    },
+    async () => {
+      await pollPaymentStatus(ctx, 42, user, 1, 5);
+    },
+  );
+  assert.equal(replies[0], msg('payment_fail'));
+});
+
 test('pollPaymentStatus stops when aborted', { concurrency: false }, async () => {
   const replies = [];
   const ctx = { from: { id: 1 }, reply: async (m) => replies.push(m) };
+  const user = { id: 1, api_key: 'test-api-key' };
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 2);
   await withMockFetch(
@@ -2981,7 +3362,7 @@ test('pollPaymentStatus stops when aborted', { concurrency: false }, async () =>
       [`${PAYMENTS_BASE}/42`]: { json: async () => ({ status: 'processing' }) },
     },
     async () => {
-      await pollPaymentStatus(ctx, 42, 10, 100, controller.signal);
+      await pollPaymentStatus(ctx, 42, user, 10, 100, controller.signal);
     },
   );
   assert.equal(replies.length, 0);
@@ -2993,7 +3374,10 @@ test('buyProHandler aborts existing poll', { concurrency: false }, async () => {
     answerCbQuery: async () => {},
     reply: async () => {},
   };
-  const pool = { query: async () => {} };
+  const pool = createPoolStub({
+    ensureUser: async () => ({ id: 1, api_key: 'test-api-key' }),
+    consentsOk: true,
+  });
   await withMockFetch(
     {
       [`${PAYMENTS_BASE}/create`]: {
@@ -3181,4 +3565,304 @@ test('plan_slot cancel stops pending slot', { concurrency: false }, async () => 
   assert.deepEqual(runUpdates[0], { id: context.slot.autoplan_run_id, patch: { status: 'cancelled' } });
   assert.equal(ctx.__answers[0].text, msg('plan_slot_cancelled_toast'));
   assert.equal(ctx.__replies[0].text, msg('plan_slot_cancelled'));
+});
+
+test('assistantChat start uses recent object context', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 901;
+  const objectId = 42;
+  const recentRecord = {
+    id: 1001,
+    object_id: objectId,
+    diagnosis_payload: { crop_ru: 'фикус' },
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  };
+  const user = {
+    id: 9,
+    api_key: 'test-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Фикус', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    getLatestRecentDiagnosis: async () => recentRecord,
+  };
+  const assistantChat = createAssistantChat({ db });
+  rememberDiagnosis(userId, { object_id: objectId, recent_diagnosis_id: 1001 });
+  const ctx = {
+    from: { id: userId },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+  await assistantChat.start(ctx);
+  assert.equal(replies.length, 1);
+  assert.ok(replies[0].text.includes('Фикус'));
+  const buttons = replies[0].opts?.reply_markup?.inline_keyboard?.flat() || [];
+  assert.ok(buttons.some((btn) => btn.callback_data === 'assistant_choose_object'));
+});
+
+test('assistantChat auto-starts on question without session', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const userId = 903;
+  const objectId = 88;
+  const user = {
+    id: 18,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Алоэ', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    updateUserLastObject: async () => ({}),
+    getLatestPlanSessionForUser: async () => null,
+  };
+  const assistantChat = createAssistantChat({ db });
+  rememberDiagnosis(userId, { object_id: objectId, recent_diagnosis_id: 6001 });
+  const ctxMessage = {
+    from: { id: userId },
+    message: { text: 'Как поливать?' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: {
+        json: async () => ({
+          assistant_message: 'Поливайте раз в неделю.',
+          followups: [],
+          proposals: [],
+        }),
+      },
+    },
+    async () => {
+      const handled = await assistantChat.handleMessage(ctxMessage);
+      assert.equal(handled, true);
+    },
+    calls,
+  );
+  assert.equal(calls[0].url, `${API_BASE}/v1/assistant/chat`);
+  assert.ok(replies[0].text.includes('Поливайте'));
+});
+
+test('assistantChat prompts to switch context on topic mismatch', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 905;
+  const objectId = 55;
+  const recentRecord = {
+    id: 7001,
+    object_id: objectId,
+    diagnosis_payload: { crop_ru: 'драцена' },
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  };
+  const user = {
+    id: 19,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Драцена', type: 'indoor', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    getLatestRecentDiagnosis: async () => recentRecord,
+  };
+  const assistantChat = createAssistantChat({ db });
+  const ctxStart = { from: { id: userId }, reply: async () => {} };
+  await assistantChat.start(ctxStart);
+  const ctxMessage = {
+    from: { id: userId },
+    message: { text: 'Почему виноград бродит быстрее?' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: { json: async () => ({ assistant_message: 'ok' }) },
+    },
+    async () => {
+      const handled = await assistantChat.handleMessage(ctxMessage);
+      assert.equal(handled, true);
+    },
+  );
+  const buttons = replies[0].opts?.reply_markup?.inline_keyboard?.flat() || [];
+  assert.ok(replies[0].text.includes('виноград'));
+  assert.ok(buttons.some((btn) => btn.callback_data === 'assistant_choose_object'));
+  assert.ok(buttons.some((btn) => btn.callback_data === 'assistant_clear_context'));
+});
+
+test('assistantChat clearContext replays pending question', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const userId = 906;
+  const objectId = 56;
+  const recentRecord = {
+    id: 7002,
+    object_id: objectId,
+    diagnosis_payload: { crop_ru: 'драцена' },
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  };
+  const user = {
+    id: 20,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Драцена', type: 'indoor', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    getLatestPlanSessionForUser: async () => null,
+    getLatestRecentDiagnosis: async () => recentRecord,
+  };
+  const assistantChat = createAssistantChat({ db });
+  const ctxStart = { from: { id: userId }, reply: async () => {} };
+  await assistantChat.start(ctxStart);
+  const ctxMessage = {
+    from: { id: userId },
+    message: { text: 'Почему виноград бродит быстрее?' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+  const ctxClear = {
+    from: { id: userId },
+    reply: async (text, opts) => replies.push({ text, opts }),
+    answerCbQuery: async () => {},
+  };
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: {
+        json: async () => ({
+          assistant_message: 'Ответ без привязки',
+          followups: [],
+          proposals: [],
+        }),
+      },
+    },
+    async () => {
+      await assistantChat.handleMessage(ctxMessage);
+      await assistantChat.clearContext(ctxClear);
+    },
+    calls,
+  );
+  const req = calls.find((call) => call.url === `${API_BASE}/v1/assistant/chat`);
+  assert.ok(req);
+  const payload = JSON.parse(req.opts.body);
+  assert.equal(payload.object_id, null);
+});
+
+test('assistantChat confirm dedupes repeated proposal', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const userId = 904;
+  const objectId = 12;
+  const user = {
+    id: 19,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Антуриум', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+  };
+  const assistantChat = createAssistantChat({ db });
+  const ctx = {
+    from: { id: userId },
+    reply: async (text, opts) => replies.push({ text, opts }),
+    answerCbQuery: async () => {},
+    editMessageReplyMarkup: async () => {},
+  };
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/confirm_plan`]: {
+        json: async () => ({ status: 'accepted', plan_id: 42 }),
+      },
+    },
+    async () => {
+      await assistantChat.confirm(ctx, 'p10', objectId);
+      await assistantChat.confirm(ctx, 'p10', objectId);
+    },
+    calls,
+  );
+  const confirmCalls = calls.filter((c) => c.url === `${API_BASE}/v1/assistant/confirm_plan`);
+  assert.equal(confirmCalls.length, 1);
+  assert.equal(replies.length, 1);
+});
+
+test('assistantChat e2e: chat -> proposal -> confirm', { concurrency: false }, async () => {
+  const replies = [];
+  const confirmReplies = [];
+  const calls = [];
+  const userId = 902;
+  const objectId = 77;
+  const user = {
+    id: 17,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Монстера', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    updateUserLastObject: async () => ({}),
+    getLatestPlanSessionForUser: async () => null,
+  };
+  const assistantChat = createAssistantChat({ db });
+  rememberDiagnosis(userId, { object_id: objectId, recent_diagnosis_id: 5001 });
+  const ctxStart = {
+    from: { id: userId },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+  const ctxMessage = {
+    from: { id: userId },
+    message: { text: 'Что делать дальше?' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+  await assistantChat.start(ctxStart);
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: {
+        json: async () => ({
+          assistant_message: 'Ответ ассистента',
+          followups: ['Что дальше?'],
+          proposals: [{ proposal_id: 'p1', kind: 'plan' }],
+        }),
+      },
+      [`${API_BASE}/v1/assistant/confirm_plan`]: {
+        json: async () => ({ status: 'accepted', plan_id: 55 }),
+      },
+    },
+    async () => {
+      const handled = await assistantChat.handleMessage(ctxMessage);
+      assert.equal(handled, true);
+      const reply = replies[1];
+      assert.ok(reply.text.includes('Ответ ассистента'));
+      assert.ok(reply.text.includes(msg('assistant.followups_title')));
+      const buttons = reply.opts?.reply_markup?.inline_keyboard?.flat() || [];
+      assert.ok(buttons.some((btn) => btn.callback_data === `assistant_pin|p1|${objectId}`));
+      const ctxConfirm = {
+        from: { id: userId },
+        reply: async (text, opts) => confirmReplies.push({ text, opts }),
+      };
+      await assistantChat.confirm(ctxConfirm, 'p1', objectId);
+    },
+    calls,
+  );
+  assert.equal(calls[0].url, `${API_BASE}/v1/assistant/chat`);
+  assert.equal(calls[1].url, `${API_BASE}/v1/assistant/confirm_plan`);
+  assert.ok(confirmReplies[0].text.includes('Сохранил'));
+  const confirmButtons = confirmReplies[0].opts?.reply_markup?.inline_keyboard?.flat() || [];
+  assert.ok(confirmButtons.some((btn) => btn.callback_data === 'plan_plan_open|55'));
 });

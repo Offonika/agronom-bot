@@ -2,6 +2,9 @@ const strings = require('../locales/ru.json');
 
 function resolve(path) {
   if (!path) return undefined;
+  if (Object.prototype.hasOwnProperty.call(strings, path)) {
+    return strings[path];
+  }
   const parts = path.split('.');
   let current = strings;
   for (const part of parts) {

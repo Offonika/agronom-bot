@@ -7,6 +7,7 @@ const {
   buildTreatmentEvents,
   buildReminderPayloads,
 } = require('../../services/plan_events');
+const { limitRemindersForUser } = require('../reminderLimits');
 const DEFAULT_TRIGGER_DELAY_H = Number(process.env.TRIGGER_DELAY_H || process.env.REMINDER_DEFAULT_DELAY_H || '24');
 const TRIGGER_CHOICES = [
   { key: 'now', hoursAgo: 0, textKey: 'plan_trigger_option_now' },
@@ -113,9 +114,15 @@ function createPlanTriggerHandler({ db, reminderScheduler }) {
       );
       const reminders = buildReminderPayloads(events);
       if (reminders.length) {
-        const createdReminders = await db.createReminders(reminders);
-        if (reminderScheduler) {
-          reminderScheduler.scheduleMany(createdReminders);
+        const { allowed, limited } = await limitRemindersForUser(db, user.id, reminders);
+        if (allowed.length) {
+          const createdReminders = await db.createReminders(allowed);
+          if (reminderScheduler) {
+            reminderScheduler.scheduleMany(createdReminders);
+          }
+        }
+        if (limited) {
+          await ctx.reply(msg('reminder_limit_reached'));
         }
       }
       await updatePlanStatusSafe(db, {

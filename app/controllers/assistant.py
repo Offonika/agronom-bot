@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from typing import Any
@@ -13,7 +14,6 @@ from app.models import ErrorCode
 from app.services import assistant as assistant_service
 from app.services import assistant_orchestrator
 from app.services.plan_payload import PlanPayloadError, PlanNormalizationResult, normalize_plan_payload
-from app.services.plan_session import upsert_plan_session
 from app.services.plan_service import (
     create_plan_from_payload,
     create_event_with_reminder,
@@ -93,17 +93,28 @@ async def assistant_chat(
         assistant_chat_counter.labels(status="bad_request").inc()
         raise HTTPException(status_code=400, detail=err.model_dump())
 
-    ctx = assistant_orchestrator.load_context(user_id, body.object_id)
-    answer, proposals = assistant_orchestrator.build_response(message, ctx)
+    ctx = await asyncio.to_thread(assistant_orchestrator.load_context, user_id, body.object_id)
+    answer, proposals, followups = await asyncio.to_thread(
+        assistant_orchestrator.build_response,
+        message,
+        ctx,
+    )
     prepared: list[AssistantProposal] = []
     for raw in proposals:
         if not raw.get("proposal_id"):
             raw["proposal_id"] = str(uuid.uuid4())
-        await assistant_service.save_proposal(user_id, body.object_id, raw)
+        try:
+            await assistant_service.save_proposal(user_id, body.object_id, raw)
+        except HTTPException as exc:
+            logger.warning("assistant_chat_proposal_store_failed: %s", exc.detail or exc)
+            continue
+        except Exception as exc:
+            logger.exception("assistant_chat_proposal_store_failed: %s", exc)
+            continue
         prepared.append(AssistantProposal(**raw))
     response = AssistantChatResponse(
         assistant_message=answer,
-        followups=[],
+        followups=followups,
         proposals=prepared,
     )
     assistant_chat_counter.labels(status="ok").inc()
@@ -121,6 +132,7 @@ async def assistant_confirm_plan(
         assistant_confirm_counter.labels(status="not_found").inc()
         raise HTTPException(status_code=404, detail=err.model_dump())
     if record.get("user_id") != user_id:
+        await assistant_service.set_proposal_status(body.proposal_id, "failed", error_code="PROPOSAL_NOT_OWNED")
         err = ErrorResponse(code=ErrorCode.UNAUTHORIZED, message="PROPOSAL_NOT_OWNED")
         assistant_confirm_counter.labels(status="unauthorized").inc()
         raise HTTPException(status_code=401, detail=err.model_dump())
@@ -129,15 +141,18 @@ async def assistant_confirm_plan(
 
     payload = record.get("payload") or {}
     if payload.get("kind") not in {"plan", "event"}:
+        await assistant_service.set_proposal_status(body.proposal_id, "failed", error_code="UNSUPPORTED_PROPOSAL_KIND")
         err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="UNSUPPORTED_PROPOSAL_KIND")
         raise HTTPException(status_code=400, detail=err.model_dump())
 
     plan_payload: dict[str, Any] | None = payload.get("plan_payload")
     if payload.get("object_id") and payload.get("object_id") != body.object_id:
+        await assistant_service.set_proposal_status(body.proposal_id, "failed", error_code="OBJECT_MISMATCH")
         err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="OBJECT_MISMATCH")
         assistant_confirm_counter.labels(status="bad_request").inc()
         raise HTTPException(status_code=400, detail=err.model_dump())
     if not is_object_owned(user_id, body.object_id):
+        await assistant_service.set_proposal_status(body.proposal_id, "failed", error_code="OBJECT_NOT_OWNED")
         err = ErrorResponse(code=ErrorCode.FORBIDDEN, message="OBJECT_NOT_OWNED")
         assistant_confirm_counter.labels(status="forbidden").inc()
         raise HTTPException(status_code=403, detail=err.model_dump())
@@ -145,10 +160,12 @@ async def assistant_confirm_plan(
     try:
         normalized: PlanNormalizationResult | None = normalize_plan_payload(plan_payload) if plan_payload else None
     except PlanPayloadError as exc:
+        await assistant_service.set_proposal_status(body.proposal_id, "failed", error_code="INVALID_PLAN_PAYLOAD")
         err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message=str(exc))
         assistant_confirm_counter.labels(status="bad_request").inc()
         raise HTTPException(status_code=400, detail=err.model_dump()) from exc
     if not has_valid_options(normalized):
+        await assistant_service.set_proposal_status(body.proposal_id, "failed", error_code="NO_OPTIONS_IN_PLAN")
         err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="NO_OPTIONS_IN_PLAN")
         assistant_confirm_counter.labels(status="bad_request").inc()
         raise HTTPException(status_code=400, detail=err.model_dump())
@@ -209,7 +226,14 @@ async def assistant_confirm_plan(
         plan_id,
         event_ids,
         reminder_ids,
-        )
+    )
+    await assistant_service.set_proposal_status(
+        body.proposal_id,
+        "confirmed",
+        plan_id=plan_id,
+        event_ids=event_ids,
+        reminder_ids=reminder_ids,
+    )
     assistant_confirm_counter.labels(status="ok").inc()
     return AssistantConfirmResponse(
         status="accepted",

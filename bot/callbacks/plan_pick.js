@@ -1,6 +1,6 @@
 'use strict';
 
-const { msg } = require('../utils');
+const { msg, sanitizeObjectName } = require('../utils');
 const { replyUserError } = require('../userErrors');
 const { logFunnelEvent } = require('../funnel');
 const {
@@ -212,10 +212,11 @@ async function sendFallbackSlotCard({ ctx, db, user, stage, optionId, planId, se
     end: ensureDate(slotRow?.slot_end) || slotEnd,
     reason: Array.isArray(slotRow?.reason) ? slotRow.reason : reasons,
   };
+  const objectName = sanitizeObjectName(object?.name, msg('object.default_name'));
   const text = formatSlotCard({
     slot,
     stageName: stage.title,
-    objectName: object?.name,
+    objectName,
     translate,
   });
   const keyboard = buildSlotKeyboard(slotId || 0, translate);

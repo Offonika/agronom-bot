@@ -3,9 +3,12 @@ const { Queue, Worker } = require('bullmq');
 const { Pool } = require('pg');
 
 async function sendTgMessage(chatId, text) {
-  const token = process.env.BOT_TOKEN_DEV;
+  const token =
+    process.env.BOT_TOKEN_PROD ||
+    process.env.BOT_TOKEN_DEV ||
+    process.env.BOT_TOKEN;
   if (!token) {
-    throw new Error('BOT_TOKEN_DEV not set');
+    throw new Error('BOT_TOKEN_PROD or BOT_TOKEN_DEV not set');
   }
   const body = new URLSearchParams({ chat_id: String(chatId), text });
   try {

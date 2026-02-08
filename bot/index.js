@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { Telegraf } = require('telegraf');
 const { Queue } = require('bullmq');
 const Redis = require('ioredis');
@@ -12,10 +13,10 @@ const {
   handleClarifySelection,
   getLastDiagnosis,
   rememberDiagnosis,
+  buildDiagnosisObjectList,
 } = require('./diagnosis');
-const { subscribeHandler, buyProHandler } = require('./payments');
+const { subscribeHandler, buyProHandler, handlePaywallRemind } = require('./payments');
 const { historyHandler } = require('./history');
-const { reminderHandler } = require('./reminder');
 const {
   startHandler,
   helpHandler,
@@ -23,8 +24,11 @@ const {
   cancelAutopayHandler,
   autopayEnableHandler,
   newDiagnosisHandler,
+  supportHandler,
+  menuHandler,
+  getMainMenuActions,
 } = require('./commands');
-const { msg } = require('./utils');
+const { msg, sanitizeObjectName } = require('./utils');
 const { list } = require('./i18n');
 const { createDb } = require('../services/db');
 const { createCatalog } = require('../services/catalog');
@@ -34,24 +38,36 @@ const { createPlanTriggerHandler } = require('./callbacks/plan_trigger');
 const { createPlanLocationHandler } = require('./callbacks/plan_location');
 const { createPlanManualSlotHandlers } = require('./callbacks/plan_manual_slot');
 const { createPlanSlotHandlers } = require('./callbacks/plan_slot');
+const { createAssistantChat } = require('./assistantChat');
 const { createReminderScheduler } = require('./reminders');
 const { createOverdueNotifier } = require('./overdueNotifier');
+const { createPaywallReminderScheduler } = require('./paywallReminderScheduler');
 const { createPlanCommands } = require('./planCommands');
 const { createPlanFlow } = require('./planFlow');
 const { createPlanSessionsApi } = require('./planSessionsApi');
 const { createObjectChips } = require('./objectChips');
+const { createBetaFollowupScheduler } = require('./betaFollowup');
+const adminCommands = require('./adminCommands');
+const { fetchPlanPdf } = require('./planApi');
+const betaSurvey = require('./betaSurvey');
 const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessage');
 const { replyUserError } = require('./userErrors');
 const { logFunnelEvent } = require('./funnel');
 const photoTips = require('./photoTips');
+const { getDocVersion, sendConsentScreen } = require('./privacyNotice');
+const { requirePrivacyConsent } = require('./consentGate');
+const support = require('./support');
 const {
   addPhoto,
   getState: getPhotoState,
+  getSamePlantPending,
   pickPrimary: pickPhotoForAnalysis,
   clearSession: clearPhotoSession,
+  setSamePlantPending,
   skipOptional: skipOptionalPhotos,
   MIN_PHOTOS,
   MAX_PHOTOS,
+  SAME_PLANT_CHECK_DAYS,
 } = require('./photoCollector');
 const { analyzePhoto } = require('./diagnosis');
 
@@ -60,19 +76,57 @@ const { createGeocoder } = require('../services/geocoder');
 
 const HOUR_IN_MS = 60 * 60 * 1000;
 const PLAN_START_THROTTLE_MS = 2000;
+const CONSENT_THROTTLE_MS = 1500;
 const planStartGuards = new Map();
+const consentGuards = new Map();
 const photoReplyTimers = new Map();
 const photoLastStatus = new Map();
+const photoLastStatusMessage = new Map();
+const PHOTO_STATUS_EDIT_WINDOW_MS = Number(process.env.PHOTO_STATUS_EDIT_WINDOW_MS || `${5 * 60 * 1000}`);
+const consentVersions = {
+  privacy: getDocVersion('privacy'),
+  offer: getDocVersion('offer'),
+  autopay: getDocVersion('autopay'),
+  marketing: getDocVersion('marketing'),
+};
 
 function formatPercent(value) {
   if (typeof value !== 'number' || Number.isNaN(value)) return null;
   return Math.round(Math.max(0, Math.min(1, value)) * 100);
 }
 
-const token = process.env.BOT_TOKEN_DEV;
-if (!token) {
-  throw new Error('BOT_TOKEN_DEV not set');
+function shouldThrottle(map, key, windowMs) {
+  if (!key) return false;
+  const now = Date.now();
+  const last = map.get(key);
+  if (last && now - last < windowMs) return true;
+  map.set(key, now);
+  return false;
 }
+
+async function safeAnswerCbQuery(ctx, text, opts) {
+  if (typeof ctx?.answerCbQuery !== 'function') return;
+  try {
+    await ctx.answerCbQuery(text, opts);
+  } catch {
+    // ignore answerCbQuery errors (stale/invalid callback)
+  }
+}
+
+const token =
+  process.env.BOT_TOKEN_PROD ||
+  process.env.BOT_TOKEN_DEV ||
+  process.env.BOT_TOKEN;
+if (!token) {
+  throw new Error('BOT_TOKEN_PROD or BOT_TOKEN_DEV not set');
+}
+
+const tokenSource = process.env.BOT_TOKEN_PROD
+  ? 'BOT_TOKEN_PROD'
+  : process.env.BOT_TOKEN_DEV
+    ? 'BOT_TOKEN_DEV'
+    : 'BOT_TOKEN';
+console.log(`Telegram bot token source: ${tokenSource}`);
 
 const dbUrl = process.env.BOT_DATABASE_URL || process.env.DATABASE_URL;
 if (!dbUrl) {
@@ -104,6 +158,8 @@ const db = createDb(pool);
 const catalog = createCatalog(pool);
 const reminderScheduler = createReminderScheduler({ bot, db });
 const overdueNotifier = createOverdueNotifier({ bot, db });
+const paywallReminderScheduler = createPaywallReminderScheduler({ bot, db });
+const betaFollowupScheduler = createBetaFollowupScheduler({ bot, db });
 const planWizard = createPlanWizard({ bot, db });
 const geocoder = createGeocoder({ redis });
 const planManualHandlers = createPlanManualSlotHandlers({ db, reminderScheduler });
@@ -117,6 +173,7 @@ const planTriggerHandler = createPlanTriggerHandler({ db, reminderScheduler });
 const planSessionsApi = createPlanSessionsApi();
 const planFlow = createPlanFlow({ db, catalog, planWizard, geocoder, planSessions: planSessionsApi });
 const objectChips = createObjectChips({ bot, db, planFlow });
+const assistantChat = createAssistantChat({ db, pool });
 const pendingObjectDetails = new Map();
 const DETAILS_PROMPT_TTL_MS = Number(process.env.OBJECT_DETAILS_PROMPT_TTL_MS || `${24 * 60 * 60 * 1000}`);
 if (typeof planFlow.attachObjectChips === 'function') {
@@ -144,6 +201,10 @@ const planLocationHandler = createPlanLocationHandler({ db });
 const deps = { pool, db, catalog, planWizard, planFlow, objectChips };
 const planOnboardingShown = new Set();
 const planShortHintShown = new Map();
+const deleteConfirmSeen = new Map();
+const DELETE_CONFIRM_TTL_MS = 5000;
+const diagObjectCreateSeen = new Map();
+const DIAG_OBJECT_CREATE_TTL_MS = Number(process.env.DIAG_OBJECT_CREATE_TTL_MS || 2000);
 
 const PHOTO_LABEL_KEYS = [
   'photo_album_label_overview',
@@ -157,6 +218,34 @@ function now() {
   return Date.now();
 }
 
+function normalizeLocationTag(tag) {
+  return (tag || '').trim().toLowerCase();
+}
+
+function formatObjectLabel(object) {
+  if (!object) return msg('object.default_name');
+  const parts = [];
+  if (object.meta?.variety) parts.push(object.meta.variety);
+  if (object.meta?.note) parts.push(object.meta.note);
+  const baseName = sanitizeObjectName(object.name, msg('object.default_name'));
+  if (!parts.length) return baseName;
+  return `${baseName} • ${parts.join(' / ')}`;
+}
+
+function deriveObjectNameFromDiagnosis(payload) {
+  const name = String(payload?.crop_ru || payload?.crop || '').trim();
+  return name || msg('object.default_name');
+}
+
+function buildObjectMetaFromDiagnosis(payload) {
+  const meta = { source: 'diagnosis_choice' };
+  const variety = String(payload?.variety_ru || payload?.variety || '').trim();
+  if (variety) meta.variety = variety;
+  const cropRu = String(payload?.crop_ru || '').trim();
+  if (cropRu) meta.crop_ru = cropRu;
+  return meta;
+}
+
 async function getObjectSafe(objectId) {
   if (!objectId || typeof db.getObjectById !== 'function') return null;
   try {
@@ -164,6 +253,19 @@ async function getObjectSafe(objectId) {
   } catch (err) {
     console.error('object fetch failed', err);
     return null;
+  }
+}
+
+async function updateLastObjectAfterDelete(user, deletedId) {
+  if (!user?.last_object_id || Number(user.last_object_id) !== Number(deletedId)) return;
+  try {
+    const list = (await db.listObjects(user.id)) || [];
+    const next = list[0] || null;
+    if (typeof db.updateUserLastObject === 'function') {
+      await db.updateUserLastObject(user.id, next?.id || null);
+    }
+  } catch (err) {
+    console.error('object delete update last failed', err);
   }
 }
 
@@ -189,7 +291,8 @@ async function maybePromptObjectDetails(objectId, userId, chatId) {
     rows.push([{ text: msg('object_details_button_note'), callback_data: `obj_detail|note|${object.id}` }]);
   }
   rows.push([{ text: msg('object_details_skip'), callback_data: `obj_detail_skip|${object.id}` }]);
-  await bot.telegram.sendMessage(chatId, msg('object_details_intro', { name: object.name }), {
+  const objectName = sanitizeObjectName(object.name, msg('object.default_name'));
+  await bot.telegram.sendMessage(chatId, msg('object_details_intro', { name: objectName }), {
     reply_markup: { inline_keyboard: rows },
   });
   if (typeof db.updateObjectMeta === 'function') {
@@ -204,7 +307,13 @@ async function maybeSuggestMerge(objectId, userId, chatId) {
     const current = objects.find((o) => Number(o.id) === Number(objectId));
     if (!current) return;
     const similar = objects.filter(
-      (o) => Number(o.id) !== Number(objectId) && (o.type === current.type || o.name === current.name),
+      (o) =>
+        Number(o.id) !== Number(objectId) &&
+        (o.type === current.type ||
+          o.name === current.name ||
+          (o.location_tag &&
+            current.location_tag &&
+            normalizeLocationTag(o.location_tag) === normalizeLocationTag(current.location_tag))),
     );
     if (similar.length < 1) return;
     const candidates = [current, ...similar].sort((a, b) => Number(a.id) - Number(b.id));
@@ -226,6 +335,52 @@ async function maybeSuggestMerge(objectId, userId, chatId) {
     });
   } catch (err) {
     console.error('merge suggest failed', err);
+  }
+}
+
+async function handleBetaCreateIndoorObject(ctx) {
+  if (typeof ctx.answerCbQuery === 'function') {
+    try {
+      await ctx.answerCbQuery();
+    } catch {
+      // ignore answer errors
+    }
+  }
+  const tgUserId = ctx.from?.id;
+  if (!tgUserId || typeof db.ensureUser !== 'function') {
+    await ctx.reply(msg('objects_error'));
+    return;
+  }
+  try {
+    const user = await db.ensureUser(tgUserId);
+    const objects = typeof db.listObjects === 'function' ? await db.listObjects(user.id) : [];
+    let target = objects.find((obj) => obj.type === 'indoor');
+    let created = false;
+    if (!target && typeof db.createObject === 'function') {
+      const name = msg('beta.indoor_object_name') || msg('object.default_name');
+      target = await db.createObject(user.id, {
+        name,
+        type: 'indoor',
+        meta: { source: 'beta' },
+      });
+      created = Boolean(target);
+    }
+    if (!target) {
+      await ctx.reply(msg('objects_error'));
+      return;
+    }
+    if (typeof db.updateUserLastObject === 'function') {
+      await db.updateUserLastObject(user.id, target.id);
+    }
+    const displayName = sanitizeObjectName(target?.name, msg('object.default_name'));
+    if (created) {
+      await ctx.reply(msg('beta.indoor_created', { name: displayName }));
+    } else {
+      await ctx.reply(msg('beta.indoor_exists', { name: displayName }));
+    }
+  } catch (err) {
+    console.error('beta indoor create failed', err);
+    await ctx.reply(msg('objects_error'));
   }
 }
 
@@ -262,8 +417,27 @@ async function handleObjectDetailsText(ctx) {
   const patch =
     session.field === 'variety'
       ? { variety: text, details_prompted_at: new Date().toISOString() }
-      : { note: text, details_prompted_at: new Date().toISOString() };
-  if (typeof db.updateObjectMeta === 'function') {
+      : session.field === 'note'
+        ? { note: text, details_prompted_at: new Date().toISOString() }
+        : null;
+  if (session.field === 'rename') {
+    const cleaned = text.trim();
+    const sanitizedName = sanitizeObjectName(cleaned, '');
+    if (!sanitizedName || sanitizedName.length < 2 || sanitizedName.length > 64) {
+      await ctx.reply(msg('object_rename_invalid'));
+      return true;
+    }
+    if (typeof db.updateObjectName === 'function') {
+      await db.updateObjectName(object.user_id, object.id, sanitizedName);
+    }
+    clearDetailsSession(userId);
+    await ctx.reply(msg('object_rename_saved', { name: sanitizedName }));
+    if (objectChips) {
+      await objectChips.send(ctx);
+    }
+    return true;
+  }
+  if (patch && typeof db.updateObjectMeta === 'function') {
     await db.updateObjectMeta(object.id, patch);
   }
   clearDetailsSession(userId);
@@ -303,6 +477,17 @@ function buildPhotoStatusPayload(state) {
   };
 }
 
+function clearPhotoStatus(userId) {
+  if (!userId) return;
+  const timer = photoReplyTimers.get(userId);
+  if (timer) {
+    clearTimeout(timer);
+    photoReplyTimers.delete(userId);
+  }
+  photoLastStatus.delete(userId);
+  photoLastStatusMessage.delete(userId);
+}
+
 function schedulePhotoStatus(ctx) {
   const userId = ctx.from?.id;
   const chatId = ctx.chat?.id;
@@ -318,17 +503,141 @@ function schedulePhotoStatus(ctx) {
       if (!payload?.text) return;
       const last = photoLastStatus.get(userId);
       if (last === payload.text) return;
-      photoLastStatus.set(userId, payload.text);
-      await ctx.telegram.sendMessage(chatId, payload.text, {
+      const lastMessage = photoLastStatusMessage.get(userId);
+      const isFresh =
+        lastMessage &&
+        lastMessage.chatId === chatId &&
+        Date.now() - lastMessage.ts <= PHOTO_STATUS_EDIT_WINDOW_MS;
+      if (isFresh) {
+        try {
+          await ctx.telegram.editMessageText(
+            chatId,
+            lastMessage.messageId,
+            undefined,
+            payload.text,
+            { reply_markup: payload.reply_markup, disable_web_page_preview: true },
+          );
+          photoLastStatus.set(userId, payload.text);
+          lastMessage.ts = Date.now();
+          return;
+        } catch (err) {
+          console.debug('photo_status_edit_failed', err?.message || err);
+          photoLastStatusMessage.delete(userId);
+        }
+      }
+      const sent = await ctx.telegram.sendMessage(chatId, payload.text, {
         reply_markup: payload.reply_markup,
         reply_to_message_id: undefined,
         allow_sending_without_reply: true,
       });
+      photoLastStatus.set(userId, payload.text);
+      if (sent?.message_id) {
+        photoLastStatusMessage.set(userId, {
+          chatId,
+          messageId: sent.message_id,
+          ts: Date.now(),
+        });
+      }
     } catch (err) {
       console.error('photo_status_send_failed', err);
     }
   }, 500);
   photoReplyTimers.set(userId, timer);
+}
+
+function buildSamePlantKeyboard(caseId) {
+  return {
+    inline_keyboard: [
+      [{ text: msg('same_plant.yes_button') || '✅ Да, то же', callback_data: `same_plant_yes:${caseId}` }],
+      [{ text: msg('same_plant.no_button') || '🌿 Нет, другое', callback_data: 'same_plant_no' }],
+    ],
+  };
+}
+
+async function maybeAskSamePlant(ctx, userId) {
+  if (!userId || !db?.ensureUser || typeof db.getRecentCaseForSamePlantCheck !== 'function') {
+    return false;
+  }
+  const pending = getSamePlantPending(userId);
+  if (pending) {
+    const notice = msg('same_plant.pending');
+    if (notice) {
+      await ctx.reply(notice);
+    }
+    return true;
+  }
+  const state = getPhotoState(userId);
+  if (state?.samePlantChecked) {
+    return false;
+  }
+  let user;
+  try {
+    user = await db.ensureUser(userId);
+  } catch (err) {
+    console.error('same_plant.ensureUser failed', err);
+    return false;
+  }
+  if (!user) return false;
+  let recent = null;
+  try {
+    recent = await db.getRecentCaseForSamePlantCheck(user.id, SAME_PLANT_CHECK_DAYS);
+  } catch (err) {
+    console.error('same_plant.fetch failed', err);
+    return false;
+  }
+  if (!recent?.caseId) return false;
+  let label = '';
+  let age = '';
+  if (recent.createdAt) {
+    age = describeRecentAge({ created_at: recent.createdAt }) || '';
+  }
+  if (recent.objectId && typeof db.getObjectById === 'function') {
+    try {
+      const object = await db.getObjectById(recent.objectId);
+      label = sanitizeObjectName(object?.name || '');
+    } catch (err) {
+      console.error('same_plant.object failed', err);
+    }
+  }
+  if (!label) {
+    const parts = [];
+    if (recent.crop) parts.push(String(recent.crop).trim());
+    if (recent.disease) parts.push(String(recent.disease).trim());
+    label = sanitizeObjectName(parts.filter(Boolean).join(' — '));
+  }
+  setSamePlantPending(userId, recent);
+  const promptText = label
+    ? (msg('same_plant.prompt_with_label', { label, age }) ||
+      `Это то же растение, что и раньше — ${label}${age ? ` (${age})` : ''}?`)
+    : (msg('same_plant.prompt') || 'Это то же растение, что и раньше?');
+  await ctx.reply(promptText, {
+    reply_markup: buildSamePlantKeyboard(recent.caseId),
+  });
+  return true;
+}
+
+async function resumePhotoAnalysis(ctx, userId) {
+  const state = getPhotoState(userId);
+  if (!state?.ready || !userId) {
+    const need = Math.max(0, MIN_PHOTOS - (state?.count || 0));
+    await ctx.reply(msg('photo_album_not_ready', { need }));
+    return false;
+  }
+  const photo = pickPhotoForAnalysis(userId);
+  if (!photo) {
+    await ctx.reply(msg('photo_album_not_ready', { need: MIN_PHOTOS }));
+    return false;
+  }
+  try {
+    await analyzePhoto(deps, ctx, photo, { linkedCaseId: state.linkedCaseId });
+    clearPhotoSession(userId);
+    clearPhotoStatus(userId);
+    return true;
+  } catch (err) {
+    console.error('photo_album_done analyze failed', err);
+    await ctx.reply(msg('diagnose_error'));
+    return false;
+  }
 }
 
 function toDate(value) {
@@ -464,6 +773,12 @@ async function resolveDiagnosisForPlanning(userId, opts = {}) {
       return { diagnosis: null, record: null, expired: false, source: null };
     }
     const payload = record.diagnosis_payload;
+    if (!payload.object_id && record.object_id) {
+      payload.object_id = record.object_id;
+    }
+    if (!payload.case_id && record.case_id) {
+      payload.case_id = record.case_id;
+    }
     payload.recent_diagnosis_id = record.id;
     rememberDiagnosis(userId, payload);
     return {
@@ -478,11 +793,25 @@ async function resolveDiagnosisForPlanning(userId, opts = {}) {
   }
 }
 
-function maybeSendPlanOnboarding(ctx) {
+async function maybeSendPlanOnboarding(ctx, dbUser) {
   const userId = ctx.from?.id;
   if (!userId || planOnboardingShown.has(userId)) return;
+  const dbUserId = dbUser?.id;
+  if (!dbUserId) return;
+  try {
+    if (typeof db.listPlansByUser === 'function') {
+      const plans = await db.listPlansByUser(dbUserId, 1);
+      if (plans.length) return;
+    }
+    if (typeof db.getLatestRecentDiagnosis === 'function') {
+      const recent = await db.getLatestRecentDiagnosis(dbUserId);
+      if (recent) return;
+    }
+  } catch (err) {
+    console.error('plan_onboarding.check_failed', err);
+  }
   planOnboardingShown.add(userId);
-  ctx.reply(msg('plan_onboarding_steps'), {
+  await ctx.reply(msg('plan_onboarding_steps'), {
     reply_markup: {
       inline_keyboard: [
         [{ text: msg('plan_onboarding_demo_button'), callback_data: 'plan_demo' }],
@@ -514,7 +843,6 @@ async function maybeSendShortPathHint(ctx, diagnosis, record, dbUser) {
 async function handlePlanTreatment(ctx, opts = {}) {
   const tgUserId = ctx.from?.id;
   if (!tgUserId) return;
-  maybeSendPlanOnboarding(ctx);
   let dbUser = null;
   if (typeof db.ensureUser === 'function') {
     try {
@@ -536,6 +864,7 @@ async function handlePlanTreatment(ctx, opts = {}) {
     userId,
     hasDbUser: Boolean(dbUser),
   });
+  await maybeSendPlanOnboarding(ctx, dbUser);
   const pendingTime =
     typeof db.getLatestTimeSessionForUser === 'function'
       ? await db.getLatestTimeSessionForUser(userId)
@@ -614,7 +943,9 @@ async function handlePlanTreatment(ctx, opts = {}) {
     });
   }
   try {
-    await planFlow.start(ctx, diagnosis);
+    const needsChoice = diagnosis.require_object_choice && !diagnosis.object_id;
+    const startOpts = needsChoice ? { skipAutoFinalize: true } : undefined;
+    await planFlow.start(ctx, diagnosis, startOpts);
   } catch (err) {
     console.error('plan_treatment action error', err);
     await ctx.reply(msg('plan_object_error'));
@@ -763,10 +1094,11 @@ async function resumeAutoplanLookup(ctx, session) {
 async function sendSlotCardMessage(ctx, slotContext) {
   if (!ctx?.reply || !slotContext?.slot) return false;
   const slot = normalizeSlot(slotContext.slot);
+  const objectName = sanitizeObjectName(slotContext.object?.name, msg('object.default_name'));
   const text = formatSlotCard({
     slot,
     stageName: slotContext.stage?.title,
-    objectName: slotContext.object?.name,
+    objectName,
     translate: msg,
   });
   const markup = buildSlotKeyboard(slot.id, msg);
@@ -831,15 +1163,8 @@ function mergeKeyboards(...keyboards) {
 
 async function init() {
   try {
-    await bot.telegram.setMyCommands([
-      { command: 'new', description: '📷 Новый диагноз' },
-      { command: 'plans', description: '📋 Мои планы' },
-      { command: 'objects', description: '🌱 Мои растения' },
-      { command: 'location', description: '📍 Обновить координаты' },
-    ]);
-
     bot.start(async (ctx) => {
-      await startHandler(ctx, pool);
+      await startHandler(ctx, pool, { db });
       await bot.telegram.setChatMenuButton(ctx.chat.id, { type: 'commands' });
     });
 
@@ -848,15 +1173,18 @@ async function init() {
     });
 
     bot.command('new', async (ctx) => newDiagnosisHandler(ctx));
+    bot.command('menu', async (ctx) => menuHandler(ctx));
+    bot.command('assistant', (ctx) => assistantChat.start(ctx));
 
     bot.command('help', (ctx) => helpHandler(ctx));
+    bot.command('support', async (ctx) => supportHandler(ctx));
 
     bot.command('autopay_enable', async (ctx) => {
       await autopayEnableHandler(ctx, pool);
     });
 
     bot.command('cancel_autopay', async (ctx) => {
-      await cancelAutopayHandler(ctx);
+      await cancelAutopayHandler(ctx, pool);
     });
 
     bot.command('history', async (ctx) => historyHandler(ctx, '', pool));
@@ -868,7 +1196,11 @@ async function init() {
     bot.command('plans', (ctx) => planCommands.handlePlans(ctx));
     bot.command('plan', (ctx) => planCommands.handlePlan(ctx));
     bot.command('done', (ctx) => planCommands.handleDone(ctx));
-    bot.command('skip', (ctx) => planCommands.handleSkip(ctx));
+    bot.command('skip', async (ctx) => {
+      const handled = await betaSurvey.handleSkipCommand(ctx, db);
+      if (handled) return;
+      return planCommands.handleSkip(ctx);
+    });
     bot.command('stats', (ctx) => planCommands.handleStats(ctx));
     bot.on('location', (ctx) => planCommands.handleLocationShare(ctx));
     bot.command('demo', async (ctx) => {
@@ -877,11 +1209,10 @@ async function init() {
       await ctx.reply(msg('plan_demo_public_note'));
     });
 
-    bot.command('reminder', reminderHandler);
-
-    bot.action(/^remind/, reminderHandler);
-
     bot.command('feedback', (ctx) => feedbackHandler(ctx, pool));
+    bot.command('beta_add', (ctx) => adminCommands.handleBetaAdd(ctx, db));
+    bot.command('beta_remove', (ctx) => adminCommands.handleBetaRemove(ctx, db));
+    bot.command('beta_list', (ctx) => adminCommands.handleBetaList(ctx, db));
 
     bot.action(/^pick_opt\|/, planPickHandler);
     bot.action(/^plan_slot_accept\|/, planSlotHandlers.accept);
@@ -905,6 +1236,144 @@ async function init() {
     bot.action(/^plan_obj_create/, (ctx) => {
       const [, token] = ctx.callbackQuery.data.split('|');
       return planFlow.create(ctx, token || null);
+    });
+    bot.action(/^diag_object_choose\|/, async (ctx) => {
+      const [, diagnosisId] = ctx.callbackQuery.data.split('|');
+      await safeAnswerCbQuery(ctx);
+      if (!diagnosisId) {
+        await ctx.reply(msg('diag_object_error'));
+        return;
+      }
+      const tgUserId = ctx.from?.id;
+      if (!tgUserId) return;
+      try {
+        const user = await db.ensureUser(tgUserId);
+        const objects = await db.listObjects(user.id);
+        if (!Array.isArray(objects) || objects.length < 1) {
+          const text =
+            msg('diag_object_no_objects') || msg('plan_object_no_objects') || msg('assistant.no_objects') || msg('photo_prompt');
+          await ctx.reply(text, {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: msg('diag_object_create_button'), callback_data: `diag_object_create|${diagnosisId}` }],
+              ],
+            },
+          });
+          return;
+        }
+        const keyboard = buildDiagnosisObjectList(objects, diagnosisId);
+        if (!keyboard) {
+          await ctx.reply(msg('diag_object_error'));
+          return;
+        }
+        await ctx.reply(msg('diag_object_pick_prompt'), { reply_markup: keyboard });
+      } catch (err) {
+        console.error('diag_object_choose failed', err);
+        await ctx.reply(msg('diag_object_error'));
+      }
+    });
+    bot.action(/^diag_object_pick\|/, async (ctx) => {
+      const [, diagnosisIdRaw, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await safeAnswerCbQuery(ctx);
+      const diagnosisId = Number(diagnosisIdRaw);
+      const objectId = Number(objectIdRaw);
+      const tgUserId = ctx.from?.id;
+      if (!tgUserId || !diagnosisId || !objectId) {
+        await ctx.reply(msg('diag_object_error'));
+        return;
+      }
+      try {
+        const user = await db.ensureUser(tgUserId);
+        const object = await db.getObjectById(objectId);
+        if (!object || Number(object.user_id) !== Number(user.id)) {
+          await ctx.reply(msg('diag_object_error'));
+          return;
+        }
+        if (typeof db.updateUserLastObject === 'function') {
+          await db.updateUserLastObject(user.id, object.id);
+        }
+        if (typeof db.linkRecentDiagnosisToPlan === 'function') {
+          await db.linkRecentDiagnosisToPlan({ diagnosisId, objectId: object.id });
+        }
+        if (typeof db.getRecentDiagnosisById === 'function') {
+          const record = await db.getRecentDiagnosisById(user.id, diagnosisId);
+          if (record?.diagnosis_payload) {
+            const payload = record.diagnosis_payload;
+            payload.object_id = object.id;
+            payload.require_object_choice = false;
+            rememberDiagnosis(tgUserId, payload);
+          }
+        }
+        await ctx.reply(msg('diag_object_linked', { name: formatObjectLabel(object) }));
+      } catch (err) {
+        console.error('diag_object_pick failed', err);
+        await ctx.reply(msg('diag_object_error'));
+      }
+    });
+    bot.action(/^diag_object_create\|/, async (ctx) => {
+      const [, diagnosisIdRaw] = ctx.callbackQuery.data.split('|');
+      await safeAnswerCbQuery(ctx);
+      const diagnosisId = Number(diagnosisIdRaw);
+      const tgUserId = ctx.from?.id;
+      if (!tgUserId || !diagnosisId) {
+        await ctx.reply(msg('diag_object_error'));
+        return;
+      }
+      const createKey = `${tgUserId}:${diagnosisId}`;
+      const lastSeen = diagObjectCreateSeen.get(createKey) || 0;
+      if (Date.now() - lastSeen < DIAG_OBJECT_CREATE_TTL_MS) {
+        return;
+      }
+      try {
+        const user = await db.ensureUser(tgUserId);
+        if (typeof db.getRecentDiagnosisById !== 'function') {
+          await ctx.reply(msg('diag_object_error'));
+          return;
+        }
+        const record = await db.getRecentDiagnosisById(user.id, diagnosisId);
+        const payload = record?.diagnosis_payload;
+        if (!payload || typeof db.createObject !== 'function') {
+          await ctx.reply(msg('diag_object_error'));
+          return;
+        }
+        if (record?.object_id && typeof db.getObjectById === 'function') {
+          const existing = await db.getObjectById(record.object_id);
+          if (existing && Number(existing.user_id) === Number(user.id)) {
+            if (typeof db.updateUserLastObject === 'function') {
+              await db.updateUserLastObject(user.id, existing.id);
+            }
+            payload.object_id = existing.id;
+            payload.require_object_choice = false;
+            rememberDiagnosis(tgUserId, payload);
+            await ctx.reply(msg('diag_object_linked', { name: formatObjectLabel(existing) }));
+            return;
+          }
+        }
+        diagObjectCreateSeen.set(createKey, Date.now());
+        const name = deriveObjectNameFromDiagnosis(payload);
+        const created = await db.createObject(user.id, {
+          name,
+          type: payload.crop || null,
+          locationTag: payload.region || null,
+          meta: buildObjectMetaFromDiagnosis(payload),
+        });
+        if (created && typeof db.updateUserLastObject === 'function') {
+          await db.updateUserLastObject(user.id, created.id);
+        }
+        if (created && typeof db.linkRecentDiagnosisToPlan === 'function') {
+          await db.linkRecentDiagnosisToPlan({ diagnosisId, objectId: created.id });
+        }
+        if (created && payload) {
+          payload.object_id = created.id;
+          payload.require_object_choice = false;
+          rememberDiagnosis(tgUserId, payload);
+        }
+        await ctx.reply(msg('diag_object_created', { name: formatObjectLabel(created) }));
+      } catch (err) {
+        console.error('diag_object_create failed', err);
+        diagObjectCreateSeen.delete(createKey);
+        await ctx.reply(msg('diag_object_error'));
+      }
     });
     bot.action(/^plan_trigger\|/, planTriggerHandler.prompt);
     bot.action(/^plan_trigger_at\|/, planTriggerHandler.confirm);
@@ -959,23 +1428,150 @@ async function init() {
       return retryHandler(ctx, id, pool);
     });
 
+    bot.action(/^consent_accept\|/, async (ctx) => {
+      const parts = ctx.callbackQuery.data.split('|');
+      const docType = parts[1];
+      const nextAction = parts[2] || null;
+      const autopayFlag = parts[3] === '1';
+      const docVersion = consentVersions[docType];
+      if (!docType || (!docVersion && docType !== 'all')) {
+        await ctx.answerCbQuery();
+        return;
+      }
+      const userId = ctx.from?.id;
+      if (shouldThrottle(consentGuards, `consent:${userId}`, CONSENT_THROTTLE_MS)) {
+        await ctx.answerCbQuery();
+        return;
+      }
+      let dbUser = null;
+      if (userId && db?.ensureUser) {
+        try {
+          dbUser = await db.ensureUser(userId);
+        } catch (err) {
+          console.error('consent ensureUser failed', err);
+        }
+      }
+      if (!dbUser || !db?.acceptConsent) {
+        await ctx.answerCbQuery();
+        return;
+      }
+      const meta = {
+        tg_chat_id: ctx.chat?.id || null,
+        message_id: ctx.callbackQuery?.message?.message_id || null,
+        callback_data: ctx.callbackQuery?.data || null,
+      };
+      if (docType === 'all') {
+        await db.acceptConsent(dbUser.id, 'privacy', consentVersions.privacy, 'bot', meta);
+        await db.acceptConsent(dbUser.id, 'offer', consentVersions.offer, 'bot', meta);
+      } else {
+        await db.acceptConsent(dbUser.id, docType, docVersion, 'bot', meta);
+      }
+      await ctx.answerCbQuery();
+      await ctx.reply(msg('consent_accepted'));
+      if (nextAction === 'pay') {
+        await buyProHandler(ctx, pool, 3000, 60000, autopayFlag);
+      } else if (nextAction === 'subscribe') {
+        await subscribeHandler(ctx, pool);
+      }
+    });
+
+    bot.action('autopay_confirm', async (ctx) => {
+      await ctx.answerCbQuery();
+      const userId = ctx.from?.id;
+      if (!userId || !db?.ensureUser || !db?.acceptConsent) return;
+      if (shouldThrottle(consentGuards, `autopay:${userId}`, CONSENT_THROTTLE_MS)) return;
+      let dbUser = null;
+      try {
+        dbUser = await db.ensureUser(userId);
+      } catch (err) {
+        console.error('autopay confirm ensureUser failed', err);
+        return;
+      }
+      if (!dbUser) return;
+      if (typeof db.getConsentStatus === 'function') {
+        const privacyConsent = await db.getConsentStatus(dbUser.id, 'privacy');
+        const offerConsent = await db.getConsentStatus(dbUser.id, 'offer');
+        const privacyOk =
+          privacyConsent &&
+          privacyConsent.status &&
+          privacyConsent.doc_version === consentVersions.privacy;
+        const offerOk =
+          offerConsent && offerConsent.status && offerConsent.doc_version === consentVersions.offer;
+        if (!privacyOk || !offerOk) {
+          await sendConsentScreen(ctx, { acceptCallback: 'consent_accept|all|subscribe' });
+          return;
+        }
+      }
+      const meta = {
+        tg_chat_id: ctx.chat?.id || null,
+        message_id: ctx.callbackQuery?.message?.message_id || null,
+        callback_data: ctx.callbackQuery?.data || null,
+      };
+      await db.acceptConsent(dbUser.id, 'autopay', consentVersions.autopay, 'bot', meta);
+      await buyProHandler(ctx, pool, 3000, 60000, true);
+    });
+
+    bot.action('autopay_cancel', async (ctx) => {
+      await ctx.answerCbQuery();
+      await subscribeHandler(ctx, pool);
+    });
+
+    bot.action('subscribe_back', async (ctx) => {
+      await ctx.answerCbQuery();
+      await menuHandler(ctx);
+    });
+
     bot.on('text', async (ctx, next) => {
+      const handledSupport = await support.handleSupportText(ctx);
+      if (handledSupport) return undefined;
+      const handledSurvey = await betaSurvey.handleComment(ctx, db);
+      if (handledSurvey) return undefined;
       const handledDetails = await handleObjectDetailsText(ctx);
       if (handledDetails) return undefined;
       const handledLocation = await planCommands.handleLocationText(ctx);
+      if (!handledLocation) {
+        const text = ctx.message?.text?.trim();
+        const menuActions = getMainMenuActions();
+        const menuCommand = text ? menuActions[text] : null;
+        if (menuCommand) {
+          const menuHandlers = {
+            new: (ctx) => newDiagnosisHandler(ctx),
+            objects: (ctx) => planCommands.handleObjects(ctx),
+            assistant: (ctx) => assistantChat.start(ctx),
+            location: (ctx) => planCommands.handleLocation(ctx),
+            edit: (ctx) => planCommands.handleEdit(ctx),
+            plans: (ctx) => planCommands.handlePlans(ctx),
+          };
+          const handler = menuHandlers[menuCommand];
+          if (handler) {
+            await handler(ctx);
+            return undefined;
+          }
+        }
+      }
       if (!handledLocation && typeof next === 'function') {
         return next();
       }
       return undefined;
     });
     bot.on('photo', async (ctx) => {
+      const allowed = await requirePrivacyConsent(ctx, db, {
+        privacy: consentVersions.privacy,
+        offer: consentVersions.offer,
+      });
+      if (!allowed) return;
       await photoTips.offerHint(ctx);
       const userId = ctx.from?.id;
       addPhoto(userId, ctx.message);
       schedulePhotoStatus(ctx);
     });
 
-    bot.on('message', messageHandler);
+    bot.on('message', async (ctx) => {
+      const handled = await assistantChat.handleMessage(ctx);
+      if (!handled) {
+        await messageHandler({ pool }, ctx);
+      }
+    });
 
     bot.action('plan_treatment', async (ctx) => {
       await ctx.answerCbQuery();
@@ -1037,7 +1633,27 @@ async function init() {
       });
     });
 
-    bot.action(/^obj_detail\|(variety|note)\|(\d+)/, async (ctx) => {
+    bot.command('objects_merge', (ctx) => planCommands.handleMerge(ctx));
+    bot.command('objectsmerge', (ctx) => planCommands.handleMerge(ctx));
+
+    bot.action('obj_edit_pick', async (ctx) => {
+      await ctx.answerCbQuery();
+      if (typeof planCommands.handleEditPick === 'function') {
+        await planCommands.handleEditPick(ctx);
+      }
+    });
+
+    bot.action(/^obj_edit_select\|(\d+)/, async (ctx) => {
+      const [, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const objectId = Number(objectIdRaw);
+      if (!objectId) return;
+      if (typeof planCommands.handleEditSelect === 'function') {
+        await planCommands.handleEditSelect(ctx, objectId);
+      }
+    });
+
+    bot.action(/^obj_detail\|(variety|note|rename)\|(\d+)/, async (ctx) => {
       const [, field, objectIdRaw] = ctx.callbackQuery.data.split('|');
       await ctx.answerCbQuery();
       const objectId = Number(objectIdRaw);
@@ -1056,8 +1672,151 @@ async function init() {
         return;
       }
       setDetailsSession(ctx.from.id, object.id, field);
-      const promptKey = field === 'variety' ? 'object_details_prompt_variety' : 'object_details_prompt_note';
-      await ctx.reply(msg(promptKey, { name: object.name }));
+      const promptKey =
+        field === 'variety'
+          ? 'object_details_prompt_variety'
+          : field === 'note'
+            ? 'object_details_prompt_note'
+            : 'object_rename_prompt';
+      const objectName = sanitizeObjectName(object.name, msg('object.default_name'));
+      await ctx.reply(msg(promptKey, { name: objectName }));
+    });
+
+    bot.action(/^obj_delete_confirm\|(\d+)/, async (ctx) => {
+      const [, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const objectId = Number(objectIdRaw);
+      if (!objectId) return;
+      const userId = ctx.from?.id;
+      if (userId) {
+        const messageId = ctx.callbackQuery?.message?.message_id || '0';
+        const key = `${userId}:${objectId}:${messageId}`;
+        const last = deleteConfirmSeen.get(key) || 0;
+        const ts = now();
+        if (ts - last < DELETE_CONFIRM_TTL_MS) {
+          return;
+        }
+        deleteConfirmSeen.set(key, ts);
+      }
+      const object = await getObjectSafe(objectId);
+      const name = sanitizeObjectName(object?.name, msg('object.default_name'));
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: msg('object_delete_button_confirm'), callback_data: `obj_delete_yes|${objectId}` }],
+          [{ text: msg('object_delete_button_cancel'), callback_data: `obj_delete_no|${objectId}` }],
+        ],
+      };
+      const text = msg('object_delete_confirm', { name });
+      if (typeof ctx.editMessageText === 'function') {
+        try {
+          await ctx.editMessageText(text, { reply_markup: keyboard });
+          return;
+        } catch (err) {
+          if (!String(err?.description || '').includes('message is not modified')) {
+            console.error('object_delete_confirm.edit_failed', err);
+          }
+        }
+      }
+      await ctx.reply(text, { reply_markup: keyboard });
+    });
+
+    bot.action(/^obj_delete_no\|(\d+)/, async (ctx) => {
+      await ctx.answerCbQuery();
+      await ctx.reply(msg('object_delete_cancelled'));
+    });
+
+    bot.action(/^obj_delete_yes\|(\d+)/, async (ctx) => {
+      const [, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const objectId = Number(objectIdRaw);
+      if (!objectId) return;
+      const user = await db.ensureUser(ctx.from.id);
+      const object = await getObjectSafe(objectId);
+      if (!object || Number(object.user_id) !== Number(user.id)) {
+        await ctx.reply(msg('objects_not_found'));
+        return;
+      }
+      const planCount = typeof db.countPlansByObject === 'function'
+        ? await db.countPlansByObject(objectId)
+        : (await db.listPlansByObject(objectId, 1)).length;
+      if (planCount > 0) {
+        const objectName = sanitizeObjectName(object.name, msg('object.default_name'));
+        await ctx.reply(msg('object_delete_with_plans_confirm', { name: objectName, count: planCount }), {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: msg('object_delete_with_plans_button'), callback_data: `obj_delete_force|${objectId}` }],
+              [{ text: msg('object_delete_button_cancel'), callback_data: `obj_delete_no|${objectId}` }],
+            ],
+          },
+        });
+        return;
+      }
+      let deleted = typeof db.deleteObject === 'function' ? await db.deleteObject(user.id, objectId) : null;
+      if (!deleted && typeof db.deleteObjectById === 'function') {
+        deleted = await db.deleteObjectById(objectId);
+        if (deleted) {
+          console.warn('object_delete.force_fallback', { userId: user.id, objectId });
+        }
+      }
+      if (!deleted) {
+        const stillExists = await getObjectSafe(objectId);
+        if (stillExists) {
+          console.warn('object_delete.missing_row', { userId: user.id, objectId });
+          await ctx.reply(msg('objects_error'));
+          return;
+        }
+        deleted = object;
+      }
+      await updateLastObjectAfterDelete(user, objectId);
+      clearDetailsSession(ctx.from?.id);
+      const deletedName = sanitizeObjectName(deleted?.name, msg('object.default_name'));
+      await ctx.reply(msg('object_delete_done', { name: deletedName }));
+    });
+
+    bot.action(/^obj_delete_force\|(\d+)/, async (ctx) => {
+      const [, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const objectId = Number(objectIdRaw);
+      if (!objectId) return;
+      const user = await db.ensureUser(ctx.from.id);
+      const object = await getObjectSafe(objectId);
+      if (!object || Number(object.user_id) !== Number(user.id)) {
+        await ctx.reply(msg('objects_not_found'));
+        return;
+      }
+      if (typeof db.deletePlansForObject === 'function') {
+        try {
+          await db.deletePlansForObject(user.id, objectId);
+        } catch (err) {
+          console.error('object_delete.delete_plans_failed', { userId: user.id, objectId, err });
+        }
+      } else if (typeof db.cancelPlansForObject === 'function') {
+        try {
+          await db.cancelPlansForObject(user.id, objectId);
+        } catch (err) {
+          console.error('object_delete.cancel_plans_failed', { userId: user.id, objectId, err });
+        }
+      }
+      let deleted = typeof db.deleteObject === 'function' ? await db.deleteObject(user.id, objectId) : null;
+      if (!deleted && typeof db.deleteObjectById === 'function') {
+        deleted = await db.deleteObjectById(objectId);
+        if (deleted) {
+          console.warn('object_delete_force.fallback', { userId: user.id, objectId });
+        }
+      }
+      if (!deleted) {
+        const stillExists = await getObjectSafe(objectId);
+        if (stillExists) {
+          console.warn('object_delete_force.missing_row', { userId: user.id, objectId });
+          await ctx.reply(msg('objects_error'));
+          return;
+        }
+        deleted = object;
+      }
+      await updateLastObjectAfterDelete(user, objectId);
+      clearDetailsSession(ctx.from?.id);
+      const deletedName = sanitizeObjectName(deleted?.name, msg('object.default_name'));
+      await ctx.reply(msg('object_delete_done_force', { name: deletedName }));
     });
 
     bot.action(/^obj_detail_skip\|(\d+)/, async (ctx) => {
@@ -1099,6 +1858,18 @@ async function init() {
 
     bot.action('plan_error_objects', async (ctx) => {
       await ctx.answerCbQuery();
+      if (typeof db.getLatestPlanSessionForUser === 'function') {
+        try {
+          const user = await db.ensureUser(ctx.from.id);
+          const session = await db.getLatestPlanSessionForUser(user.id);
+          if (session?.token) {
+            await planFlow.choose(ctx, session.token);
+            return;
+          }
+        } catch (err) {
+          console.error('plan_error_objects.session_failed', err);
+        }
+      }
       await planCommands.handleObjects(ctx);
     });
 
@@ -1207,19 +1978,110 @@ async function init() {
       await planFlow.confirm(ctx, objectId, null);
     });
 
-    bot.action('phi_reminder', async (ctx) => {
+    bot.action(/^plan_export_pdf\|/, async (ctx) => {
+      const [, planIdRaw] = ctx.callbackQuery.data.split('|');
       await ctx.answerCbQuery();
-      return ctx.reply(msg('phi_action_hint'));
+      const planId = Number(planIdRaw);
+      if (!planId) {
+        await ctx.reply(msg('plan_export_error'));
+        return;
+      }
+      let user = null;
+      try {
+        user = await db.ensureUser(ctx.from?.id);
+      } catch (err) {
+        console.error('plan_export.ensure_user_failed', err);
+      }
+      if (!user?.api_key) {
+        await ctx.reply(msg('plan_export_error'));
+        return;
+      }
+      try {
+        const buffer = await fetchPlanPdf({
+          planId,
+          userId: user.id,
+          apiKey: user.api_key,
+        });
+        const caption = msg('plan_export_ready');
+        await ctx.replyWithDocument(
+          { source: buffer, filename: `plan-${planId}.pdf` },
+          caption ? { caption } : undefined,
+        );
+      } catch (err) {
+        console.error('plan_export.failed', err);
+        await ctx.reply(msg('plan_export_error'));
+      }
     });
-
-    bot.action('pdf_note', async (ctx) => {
-      await ctx.answerCbQuery();
-      return ctx.reply(msg('pdf_action_hint'));
-    });
-
     bot.action('ask_products', async (ctx) => {
       await ctx.answerCbQuery();
       await replyFaq(ctx, 'regional_products');
+    });
+
+    // Marketing: Share diagnosis result
+    bot.action(/^share_diag:(.*)$/, async (ctx) => {
+      await ctx.answerCbQuery();
+      const diagId = ctx.match?.[1] || '';
+      const userId = ctx.from?.id;
+
+      // Get last diagnosis for share text
+      let disease = '';
+      try {
+        const lastDiag = getLastDiagnosis(ctx.from?.id);
+        disease = lastDiag?.disease_name_ru || lastDiag?.disease || '';
+      } catch (err) {
+        console.error('share_diag.getLastDiagnosis failed', err);
+      }
+
+      // Log share event
+      try {
+        const user = await db.ensureUser(userId);
+        await logFunnelEvent(db, {
+          event: 'share_clicked',
+          userId: user?.id,
+          data: { diagnosis_id: diagId, disease },
+        });
+      } catch (err) {
+        console.error('share_diag.logFunnelEvent failed', err);
+      }
+
+      // Generate share text
+      const shareText = disease
+        ? msg('share.text', { disease }) || `🌱 Нашёл проблему у растения: ${disease}\n\nПроверь своё → @AgronommAI_bot`
+        : '🌱 Проверил своё растение с AI-агрономом! Попробуй и ты → @AgronommAI_bot';
+
+      await ctx.reply(shareText, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📲 Переслать друзьям', switch_inline_query: shareText.slice(0, 256) }],
+          ],
+        },
+      });
+    });
+    bot.action('assistant_entry', async (ctx) => {
+      await ctx.answerCbQuery();
+      await assistantChat.start(ctx);
+    });
+    bot.action('assistant_choose_object', async (ctx) => {
+      await ctx.answerCbQuery();
+      await assistantChat.chooseObject(ctx);
+    });
+    bot.action('assistant_clear_context', async (ctx) => {
+      await assistantChat.clearContext(ctx);
+    });
+    bot.action(/^assistant_object\|/, async (ctx) => {
+      const [, objectId] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      await assistantChat.pickObject(ctx, objectId);
+    });
+    bot.action(/^assistant_pin\|/, async (ctx) => {
+      const [, proposalId, objectIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const objectId = objectIdRaw ? Number(objectIdRaw) : null;
+      await assistantChat.confirm(ctx, proposalId, objectId);
+    });
+    bot.action('assistant_continue', async (ctx) => {
+      await ctx.answerCbQuery();
+      await assistantChat.continueChat(ctx);
     });
 
     bot.action('reshoot_photo', async (ctx) => {
@@ -1242,18 +2104,15 @@ async function init() {
         await ctx.reply(msg('photo_album_not_ready', { need }));
         return;
       }
-      const photo = pickPhotoForAnalysis(userId);
-      if (!photo) {
-        await ctx.reply(msg('photo_album_not_ready', { need: MIN_PHOTOS }));
+      const allowed = await requirePrivacyConsent(ctx, db, {
+        privacy: consentVersions.privacy,
+        offer: consentVersions.offer,
+      });
+      if (!allowed) return;
+      if (await maybeAskSamePlant(ctx, userId)) {
         return;
       }
-      try {
-        await analyzePhoto(deps, ctx, photo);
-        clearPhotoSession(userId);
-      } catch (err) {
-        console.error('photo_album_done analyze failed', err);
-        await ctx.reply(msg('diagnose_error'));
-      }
+      await resumePhotoAnalysis(ctx, userId);
     });
 
     bot.action('photo_album_add', async (ctx) => {
@@ -1287,6 +2146,7 @@ async function init() {
       await ctx.answerCbQuery();
       const userId = ctx.from?.id;
       const cleared = clearPhotoSession(userId);
+      clearPhotoStatus(userId);
       const reply = cleared ? msg('photo_album_reset_done') : msg('photo_album_reset_empty');
       if (reply) {
         await ctx.reply(reply);
@@ -1299,23 +2159,149 @@ async function init() {
       await replyFaq(ctx, intent);
     });
 
+    bot.action('support_cancel', async (ctx) => {
+      await ctx.answerCbQuery();
+      await support.cancel(ctx);
+    });
+
     bot.action(/^clarify_crop\|/, async (ctx) => {
       const [, optionId] = ctx.callbackQuery.data.split('|');
       await handleClarifySelection(ctx, optionId);
+    });
+
+    // Marketing: "Same plant?" confirmation
+    bot.action(/^same_plant_yes:(\d+)$/, async (ctx) => {
+      await ctx.answerCbQuery();
+      const caseId = parseInt(ctx.match?.[1], 10);
+      const {
+        confirmSamePlant: confirmSP,
+      } = require('./photoCollector');
+
+      confirmSP(ctx.from?.id, caseId);
+      await ctx.reply(msg('same_plant.using_same') || 'Отлично, продолжаю с прошлым кейсом.');
+      await resumePhotoAnalysis(ctx, ctx.from?.id);
+
+      // Log event
+      try {
+        let user = null;
+        try {
+          user = ctx.from?.id ? await db.ensureUser(ctx.from.id) : null;
+        } catch (err) {
+          console.error('same_plant_yes.ensureUser failed', err);
+        }
+        await logFunnelEvent(db, {
+          event: 'same_plant_confirmed',
+          userId: user?.id,
+          data: { case_id: caseId },
+        });
+      } catch (err) {
+        console.error('same_plant_yes.logFunnelEvent failed', err);
+      }
+    });
+
+    bot.action('same_plant_no', async (ctx) => {
+      await ctx.answerCbQuery();
+      const {
+        denySamePlant: denySP,
+      } = require('./photoCollector');
+
+      denySP(ctx.from?.id);
+      await ctx.reply(msg('same_plant.new_case') || 'Хорошо, начинаю новый разбор.');
+      await resumePhotoAnalysis(ctx, ctx.from?.id);
+
+      // Log event
+      try {
+        let user = null;
+        try {
+          user = ctx.from?.id ? await db.ensureUser(ctx.from.id) : null;
+        } catch (err) {
+          console.error('same_plant_no.ensureUser failed', err);
+        }
+        await logFunnelEvent(db, {
+          event: 'same_plant_denied',
+          userId: user?.id,
+        });
+      } catch (err) {
+        console.error('same_plant_no.logFunnelEvent failed', err);
+      }
+    });
+
+    bot.action('beta_create_indoor', async (ctx) => {
+      await handleBetaCreateIndoorObject(ctx);
+    });
+
+    bot.action(/^beta_survey_q1\|/, async (ctx) => {
+      const [, caseIdRaw, score] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const caseId = Number(caseIdRaw);
+      await betaSurvey.handleQ1(ctx, db, caseId, score);
+    });
+
+    bot.action(/^beta_survey_q2\|/, async (ctx) => {
+      const [, feedbackIdRaw, score] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const feedbackId = Number(feedbackIdRaw);
+      await betaSurvey.handleQ2(ctx, db, feedbackId, score);
+    });
+
+    bot.action(/^beta_survey_skip\|/, async (ctx) => {
+      const [, feedbackIdRaw] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const feedbackId = Number(feedbackIdRaw);
+      await betaSurvey.handleSkip(ctx, db, feedbackId);
+    });
+
+    bot.action(/^beta_followup_action\|/, async (ctx) => {
+      const [, followupIdRaw, choice] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const followupId = Number(followupIdRaw);
+      await betaFollowupScheduler.handleAction(ctx, followupId, choice);
+    });
+
+    bot.action(/^beta_followup_result\|/, async (ctx) => {
+      const [, followupIdRaw, choice] = ctx.callbackQuery.data.split('|');
+      await ctx.answerCbQuery();
+      const followupId = Number(followupIdRaw);
+      await betaFollowupScheduler.handleResult(ctx, followupId, choice);
     });
 
     bot.action('buy_pro', async (ctx) => {
       await buyProHandler(ctx, pool);
     });
 
-    await bot.telegram.setMyCommands([
-      { command: 'new', description: msg('command_new_desc') || 'Новый диагноз' },
-      { command: 'plans', description: msg('command_plans_desc') || 'Мои планы' },
-      { command: 'objects', description: msg('command_objects_desc') || 'Мои растения' },
-    ]);
+    bot.action(/^paywall_remind\|/, async (ctx) => {
+      await handlePaywallRemind(ctx, pool);
+    });
+
+    bot.action('autopay_enable', async (ctx) => {
+      await ctx.answerCbQuery();
+      await autopayEnableHandler(ctx, pool);
+    });
+
+    bot.action('cancel_autopay', async (ctx) => {
+      await ctx.answerCbQuery();
+      await cancelAutopayHandler(ctx, pool);
+    });
+
+    const menuCommands = [
+      { command: 'menu', description: msg('command_menu_desc') || 'Показать меню' },
+      { command: 'demo', description: msg('command_demo_desc') || 'Демо-план' },
+      { command: 'help', description: msg('command_help_desc') || 'Помощь' },
+      { command: 'subscribe', description: msg('command_subscribe_desc') || 'Подписка и оплата' },
+      { command: 'support', description: msg('command_support_desc') || 'Поддержка' },
+    ];
+    await bot.telegram.setMyCommands(menuCommands);
+    await bot.telegram.setMyCommands(menuCommands, { language_code: 'ru' });
+    await bot.telegram.setMyCommands(menuCommands, { scope: { type: 'all_private_chats' } });
+    await bot.telegram.setMyCommands(menuCommands, {
+      scope: { type: 'all_private_chats' },
+      language_code: 'ru',
+    });
     await bot.launch();
     await reminderScheduler.start();
     await overdueNotifier.start();
+    await paywallReminderScheduler.start();
+    await betaFollowupScheduler.start();
     console.log('Bot started');
   } catch (err) {
     console.error('Bot initialization failed', err);
@@ -1332,6 +2318,8 @@ let metricsServer;
 async function shutdown() {
   reminderScheduler.stop();
   overdueNotifier.stop();
+  paywallReminderScheduler.stop();
+  betaFollowupScheduler.stop();
   await bot.stop();
   if (metricsServer) {
     try {
@@ -1382,8 +2370,23 @@ if (Number.isNaN(metricsPort) || metricsPort <= 0) {
     `Prometheus metrics server disabled: invalid BOT_METRICS_PORT="${metricsPortRaw}"`,
   );
 } else {
+  const metricsToken = process.env.BOT_METRICS_TOKEN || process.env.METRICS_TOKEN;
   metricsServer = http.createServer(async (req, res) => {
     if (req.url === '/metrics') {
+      if (metricsToken) {
+        let token = req.headers['x-metrics-token'] || '';
+        if (!token) {
+          const auth = req.headers.authorization || '';
+          if (auth.toLowerCase().startsWith('bearer ')) {
+            token = auth.slice(7).trim();
+          }
+        }
+        if (token !== metricsToken) {
+          res.statusCode = 401;
+          res.end('unauthorized');
+          return;
+        }
+      }
       res.setHeader('Content-Type', client.register.contentType);
       res.end(await client.register.metrics());
     } else {

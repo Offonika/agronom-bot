@@ -8,7 +8,7 @@ from redis.exceptions import RedisError
 from app import db as db_module
 from app import dependencies
 from app.config import Settings
-from app.dependencies import ErrorResponse, verify_partner_hmac
+from app.dependencies import ErrorResponse, ip_allowed, resolve_client_ip, verify_partner_hmac
 from app.models import PartnerOrder, ErrorCode
 
 settings = Settings()
@@ -34,11 +34,8 @@ async def partner_orders(
     request: Request,
     x_sign: str = Header(..., alias="X-Sign"),
 ):
-    raw_ip = request.headers.get(
-        "X-Forwarded-For", request.client.host if request.client else ""
-    )
-    client_ip = raw_ip.split(",")[0].strip()
-    if client_ip not in settings.partner_ips:
+    client_ip = resolve_client_ip(request, settings.trusted_proxies)
+    if not ip_allowed(client_ip, settings.partner_ips):
         logger.warning("audit: forbidden ip %s", client_ip)
         err = ErrorResponse(code=ErrorCode.FORBIDDEN, message="IP address forbidden")
         raise HTTPException(status_code=403, detail=err.model_dump())

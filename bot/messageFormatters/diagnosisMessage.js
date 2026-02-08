@@ -133,7 +133,7 @@ function buildFallbackAssistant(data) {
     sections.push('🧴 Что делать\nУдалите поражённые листья, обеспечьте проветривание и примените разрешённый фунгицид, соблюдая инструкцию.');
   }
   sections.push(
-    `⏰ Что дальше\n• ${msg('next.actions.green_window')}\n• ${msg('next.actions.phi')}\n• ${msg('next.actions.assist')}`,
+    `⏰ Что дальше\n• ${msg('next.actions.green_window')}\n• ${msg('next.actions.assist')}`,
   );
   return sections.join('\n\n');
 }
@@ -165,8 +165,11 @@ function buildAssistantText(data) {
   return parts.filter(Boolean).join('\n\n');
 }
 
-function buildKeyboardLayout(data) {
+function buildKeyboardLayout(data, options = {}) {
   const inline = [];
+  const confidence = typeof data.confidence === 'number' ? data.confidence : 0;
+  const isSuccessful = confidence >= LOW_CONFIDENCE_THRESHOLD;
+
   if (data.need_clarify_crop && Array.isArray(data.clarify_crop_variants) && data.clarify_crop_variants.length) {
     const clarifyRow = data.clarify_crop_variants.slice(0, 4).map((variant, idx) => ({
       text: variant,
@@ -175,12 +178,22 @@ function buildKeyboardLayout(data) {
     inline.push(clarifyRow);
   }
   inline.push([{ text: msg('cta.schedule'), callback_data: 'plan_treatment' }]);
-  inline.push([{ text: msg('cta.remind_phi'), callback_data: 'phi_reminder' }]);
-  inline.push([{ text: msg('cta.pdf'), callback_data: 'pdf_note' }]);
   inline.push([{ text: msg('cta.ask_products'), callback_data: 'ask_products' }]);
+  const assistantCta = msg('cta.ask_assistant');
+  if (assistantCta) {
+    inline.push([{ text: assistantCta, callback_data: 'assistant_entry' }]);
+  }
   if (data.need_reshoot) {
     inline.push([{ text: msg('cta.reshoot'), callback_data: 'reshoot_photo' }]);
   }
+
+  // Marketing: Share button for successful diagnoses
+  if (isSuccessful && !options.hideShare) {
+    const shareText = msg('share.button') || '📤 Поделиться';
+    const diagId = options.diagnosisId || data.diagnosis_id || '';
+    inline.push([{ text: shareText, callback_data: `share_diag:${diagId}` }]);
+  }
+
   return { inline_keyboard: inline };
 }
 
@@ -254,14 +267,12 @@ function defaultFollowupAnswer(keyword) {
 
 function pickAssistantFollowup(diag, keyword) {
   if (!diag?.assistant_followups_ru || !diag.assistant_followups_ru.length) return null;
-  const lowerKey = keyword ? keyword.toLowerCase() : '';
-  if (lowerKey) {
-    const matched = diag.assistant_followups_ru.find((line) =>
-      line.toLowerCase().includes(lowerKey.slice(0, 4)),
-    );
-    if (matched) return matched;
-  }
-  return diag.assistant_followups_ru[0];
+  if (!keyword) return null;
+  const lowerKey = keyword.toLowerCase();
+  const matched = diag.assistant_followups_ru.find((line) =>
+    line.toLowerCase().includes(lowerKey.slice(0, 4)),
+  );
+  return matched || diag.assistant_followups_ru[0];
 }
 
 function resolveFollowupReply(diag, userText) {

@@ -1,0 +1,66 @@
+groups:
+  - name: assistant-alerts
+    rules:
+      - alert: AssistantChatHighErrorRate
+        expr: |
+          (sum(rate(assistant_chat_requests_total{status!="ok"}[5m])) /
+           sum(rate(assistant_chat_requests_total[5m]))) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Живой ассистент: error-rate > 20% (чат)"
+          description: "Проверьте /v1/assistant/chat — рост ошибок за последние 10 минут."
+
+      - alert: AssistantConfirmHighErrorRate
+        expr: |
+          (sum(rate(assistant_confirm_total{status!="ok"}[5m])) /
+           sum(rate(assistant_confirm_total[5m]))) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Живой ассистент: error-rate > 20% (confirm)"
+          description: "Падают подтверждения предложений — проверьте /v1/assistant/confirm_plan."
+
+  - name: payments-alerts
+    rules:
+      - alert: WebhookForbiddenSpike
+        expr: |
+          increase(webhook_forbidden_total[10m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Платежи: рост 403 на webhook"
+          description: "Много отклоненных webhook (IP/подпись). Проверьте TINKOFF_IPS, TRUSTED_PROXIES, токены."
+
+      - alert: PaymentAmountMismatch
+        expr: |
+          increase(payment_amount_mismatch_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Платежи: расхождение суммы"
+          description: "В webhook пришла сумма, отличная от ожидаемой. Проверьте цены и настройки эквайринга."
+
+      - alert: AutopayAmountMismatch
+        expr: |
+          increase(autopay_amount_mismatch_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Автоплатежи: расхождение суммы"
+          description: "Автосписание с неверной суммой. Автопродление отключено."
+
+      - alert: PaymentFailuresHigh
+        expr: |
+          increase(payment_fail_total[10m]) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Платежи: рост неуспешных статусов"
+          description: "Много платежей завершилось fail/cancel/bank_error за последние 10 минут."

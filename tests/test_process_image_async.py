@@ -12,7 +12,9 @@ async def test_process_image_non_blocking(monkeypatch):
     async def fake_upload_photo(user_id: int, data: bytes) -> str:
         return "key"
 
-    async def fake_enforce_paywall(user_id: int):
+    async def fake_enforce_paywall(
+        user_id: int, same_case_id: int | None = None
+    ):
         return None
 
     def fake_call_gpt_vision(

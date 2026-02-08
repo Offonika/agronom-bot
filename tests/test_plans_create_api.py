@@ -2,11 +2,25 @@ from __future__ import annotations
 
 import os
 
-HEADERS = {
-    "X-API-Key": os.getenv("API_KEY", "test-api-key"),
-    "X-API-Ver": "v1",
-    "X-User-ID": "5001",
-}
+from tests.utils.auth import build_auth_headers
+
+USER_ID = 5001
+
+
+def _headers(
+    method: str,
+    path: str,
+    *,
+    user_id: int = USER_ID,
+    body: object | None = None,
+) -> dict[str, str]:
+    return build_auth_headers(
+        method,
+        path,
+        user_id=user_id,
+        api_key=os.getenv("API_KEY", "test-api-key"),
+        body=body,
+    )
 
 
 def _plan_payload():
@@ -46,14 +60,14 @@ def test_create_plan_event_autoplan(client):
                 ON CONFLICT (id) DO NOTHING
                 """
             ),
-            {"oid": 7001, "uid": int(HEADERS["X-User-ID"])},
+            {"oid": 7001, "uid": USER_ID},
         )
         session.commit()
 
     # Создать план
     resp = client.post(
         "/v1/plans",
-        headers=HEADERS,
+        headers=_headers("POST", "/v1/plans", body={"object_id": 7001, "plan_payload": _plan_payload()}),
         json={"object_id": 7001, "plan_payload": _plan_payload()},
     )
     assert resp.status_code == 200
@@ -66,7 +80,11 @@ def test_create_plan_event_autoplan(client):
     # Создать событие
     event_resp = client.post(
         f"/v1/plans/{data['plan_id']}/events",
-        headers=HEADERS,
+        headers=_headers(
+            "POST",
+            f"/v1/plans/{data['plan_id']}/events",
+            body={"stage_id": stage_id, "stage_option_id": option_id},
+        ),
         json={"stage_id": stage_id, "stage_option_id": option_id},
     )
     assert event_resp.status_code == 200
@@ -76,7 +94,11 @@ def test_create_plan_event_autoplan(client):
     # Автоплан
     autoplan_resp = client.post(
         f"/v1/plans/{data['plan_id']}/autoplan",
-        headers=HEADERS,
+        headers=_headers(
+            "POST",
+            f"/v1/plans/{data['plan_id']}/autoplan",
+            body={"stage_id": stage_id, "stage_option_id": option_id},
+        ),
         json={"stage_id": stage_id, "stage_option_id": option_id},
     )
     assert autoplan_resp.status_code == 202
@@ -88,7 +110,11 @@ def test_create_plan_for_foreign_object_forbidden(client):
     # создаём объект другого пользователя
     resp = client.post(
         "/v1/plans",
-        headers=HEADERS,
+        headers=_headers(
+            "POST",
+            "/v1/plans",
+            body={"object_id": 99999, "plan_payload": _plan_payload()},
+        ),
         json={"object_id": 99999, "plan_payload": _plan_payload()},
     )
     assert resp.status_code == 403
@@ -103,14 +129,18 @@ def test_create_plan_without_options_fails(client):
             text(
                 "INSERT INTO objects (id, user_id, name, meta) VALUES (:oid, :uid, 'No options', '{}') ON CONFLICT (id) DO NOTHING"
             ),
-            {"oid": 8001, "uid": int(HEADERS["X-User-ID"])},
+            {"oid": 8001, "uid": USER_ID},
         )
         session.commit()
 
     bad_payload = {"kind": "PLAN_NEW", "stages": [{"name": "Пусто", "options": []}]}
     resp = client.post(
         "/v1/plans",
-        headers=HEADERS,
+        headers=_headers(
+            "POST",
+            "/v1/plans",
+            body={"object_id": 8001, "plan_payload": bad_payload},
+        ),
         json={"object_id": 8001, "plan_payload": bad_payload},
     )
     assert resp.status_code == 400

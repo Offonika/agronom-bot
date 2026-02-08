@@ -33,6 +33,22 @@ const USER_ERROR_CODES = {
     textKey: 'error_plan_not_found',
     keyboard: () => [[{ text: msg('error_plan_not_found_button'), callback_data: 'plan_error_plans' }]],
   },
+  OBJECT_NOT_FOUND: {
+    textKey: 'error_object_not_found',
+    keyboard: () => [[{ text: msg('error_object_not_found_button'), callback_data: 'plan_error_objects' }]],
+  },
+  PRODUCT_FORBIDDEN: {
+    textKey: 'error_product_forbidden',
+    keyboard: () => [[{ text: msg('error_product_forbidden_button'), callback_data: 'plan_error_plans' }]],
+  },
+  PHI_CONFLICT: {
+    textKey: 'error_phi_conflict',
+    keyboard: () => [[{ text: msg('error_phi_conflict_button'), callback_data: 'plan_error_plans' }]],
+  },
+  WEATHER_UNAVAILABLE: {
+    textKey: 'error_weather_unavailable',
+    keyboard: () => [[{ text: msg('error_weather_unavailable_button'), callback_data: 'plan_error_plans' }]],
+  },
 };
 
 async function replyUserError(ctx, code, params = {}) {

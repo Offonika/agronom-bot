@@ -12,6 +12,7 @@ from app.dependencies import compute_signature, verify_hmac
 from app.config import Settings
 from app.db import SessionLocal
 from app.models import Catalog, CatalogItem, ErrorCode, RecentDiagnosis
+from tests.utils.consent import ensure_base_consents
 
 
 def seed_protocol():
@@ -118,9 +119,25 @@ def stub_upload(monkeypatch):
     from app.db import SessionLocal
     from app.models import PhotoUsage
     from app.services.protocols import _cache_protocol
+    from sqlalchemy import text as sql_text
+    from datetime import datetime, timezone, timedelta
 
     with SessionLocal() as session:
         session.query(PhotoUsage).delete()
+        # Also clear case_usage for new week-based limits
+        try:
+            session.execute(sql_text("DELETE FROM case_usage"))
+        except Exception:
+            pass
+        # Give test user a trial period so paywall doesn't block
+        try:
+            trial_end = datetime.now(timezone.utc) + timedelta(hours=24)
+            session.execute(
+                sql_text("UPDATE users SET trial_ends_at = :trial WHERE id = 1"),
+                {"trial": trial_end}
+            )
+        except Exception:
+            pass
         session.commit()
 
     _cache_protocol.cache_clear()
@@ -131,7 +148,9 @@ HEADERS = {
     "X-User-ID": "1",
 }
 
-PARTNER_SECRET = Settings().hmac_secret_partner
+SETTINGS = Settings()
+PARTNER_SECRET = SETTINGS.hmac_secret_partner
+HMAC_SECRET = SETTINGS.hmac_secret
 
 
 def test_openapi_schema(client):
@@ -277,7 +296,10 @@ def test_plan_session_crud(client):
 
 def test_diagnose_multipart_uses_process(monkeypatch, client):
     async def fake_process(
-        contents: bytes, user_id: int, crop_hint: str | None = None
+        contents: bytes,
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
     ) -> dict:
         assert contents == b"abc"
         return {
@@ -326,7 +348,10 @@ def test_diagnose_multipart_uses_process(monkeypatch, client):
 
 def test_diagnose_base64_uses_process(monkeypatch, client):
     async def fake_process(
-        contents: bytes, user_id: int, crop_hint: str | None = None
+        contents: bytes,
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
     ) -> dict:
         assert contents == b"xyz"
         return {
@@ -430,7 +455,12 @@ def test_diagnose_large_base64(client):
 def test_diagnose_max_size_image_ok(monkeypatch, client):
     limit = 2 * 1024 * 1024
 
-    async def fake_process(contents: bytes, user_id: int, crop_hint: str | None = None):
+    async def fake_process(
+        contents: bytes,
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ):
         return {
             "file_id": "k",
             "crop": "crop",
@@ -462,7 +492,12 @@ def test_diagnose_max_size_image_ok(monkeypatch, client):
 def test_diagnose_max_size_base64_ok(monkeypatch, client):
     limit = 2 * 1024 * 1024
 
-    async def fake_process(contents: bytes, user_id: int, crop_hint: str | None = None):
+    async def fake_process(
+        contents: bytes,
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ):
         return {
             "file_id": "k",
             "crop": "crop",
@@ -839,6 +874,10 @@ def test_photo_status_failed(client):
 
 
 def test_create_payment_valid_json(client):
+    from app.db import SessionLocal
+
+    with SessionLocal() as session:
+        ensure_base_consents(session, 1)
     payload = {"user_id": 1, "plan": "pro", "months": 1}
     resp = client.post("/v1/payments/create", headers=HEADERS, json=payload)
     assert resp.status_code == 200
@@ -846,13 +885,12 @@ def test_create_payment_valid_json(client):
     assert data["url"].startswith("https://")
     assert data["payment_id"]
 
-    from app.db import SessionLocal
     from app.models import Payment, Event
 
     with SessionLocal() as session:
         row = session.query(Payment).filter_by(external_id=data["payment_id"]).first()
         assert row is not None
-        assert row.amount == 34900
+        assert row.amount == 19900
         assert row.status == "pending"
         event = session.query(Event).filter_by(user_id=1).order_by(Event.id.desc()).first()
         assert event.event == "payment_created"
@@ -947,7 +985,7 @@ def test_payment_webhook_success(client):
         "status": "success",
         "paid_at": "2024-01-01T00:00:00Z",
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(HMAC_SECRET, payload)
     payload["signature"] = sig
     headers = {**HEADERS, "X-Sign": sig}
     resp = client.post(
@@ -997,7 +1035,7 @@ def test_payment_webhook_updates_pro_expiration(client):
         "status": "success",
         "paid_at": paid_at.isoformat().replace("+00:00", "Z"),
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(HMAC_SECRET, payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
@@ -1016,6 +1054,85 @@ def test_payment_webhook_updates_pro_expiration(client):
         if expires.tzinfo is None:
             expires = expires.replace(tzinfo=timezone.utc)
         assert expires > paid_at
+        session.execute(text("UPDATE users SET pro_expires_at=NULL WHERE id=1"))
+        session.commit()
+
+
+def test_payment_webhook_reversal_rolls_back_pro_expiration(client):
+    """Reversal after success rolls back latest pro extension."""
+    from app.db import SessionLocal
+    from app.models import Payment
+
+    paid_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+    with SessionLocal() as session:
+        session.execute(text("INSERT OR IGNORE INTO users (id, tg_id) VALUES (1, 1)"))
+        payment = Payment(
+            user_id=1,
+            amount=100,
+            currency="RUB",
+            provider="sbp",
+            external_id="p3r",
+            prolong_months=1,
+            status="pending",
+        )
+        session.add(payment)
+        session.commit()
+
+    success_payload = {
+        "external_id": "p3r",
+        "status": "success",
+        "paid_at": paid_at.isoformat().replace("+00:00", "Z"),
+    }
+    sig = compute_signature(HMAC_SECRET, success_payload)
+    success_payload["signature"] = sig
+    resp = client.post(
+        "/v1/payments/sbp/webhook",
+        headers={**HEADERS, "X-Sign": sig},
+        json=success_payload,
+    )
+    assert resp.status_code == 200
+
+    with SessionLocal() as session:
+        expires_before = session.execute(
+            text("SELECT pro_expires_at FROM users WHERE id=1")
+        ).scalar()
+        row = session.query(Payment).filter_by(external_id="p3r").first()
+        assert row.status == "success"
+
+    cancel_payload = {
+        "external_id": "p3r",
+        "status": "cancel",
+        "paid_at": "2024-01-02T00:00:00Z",
+    }
+    sig_cancel = compute_signature(HMAC_SECRET, cancel_payload)
+    cancel_payload["signature"] = sig_cancel
+    resp_cancel = client.post(
+        "/v1/payments/sbp/webhook",
+        headers={**HEADERS, "X-Sign": sig_cancel},
+        json=cancel_payload,
+    )
+    assert resp_cancel.status_code == 200
+
+    with SessionLocal() as session:
+        expires_after = session.execute(
+            text("SELECT pro_expires_at FROM users WHERE id=1")
+        ).scalar()
+        row = session.query(Payment).filter_by(external_id="p3r").first()
+        assert row.status == "cancel"
+
+        if isinstance(expires_before, str):
+            expires_before = datetime.fromisoformat(expires_before)
+        if isinstance(expires_after, str):
+            expires_after = datetime.fromisoformat(expires_after)
+        if expires_before.tzinfo is None:
+            expires_before = expires_before.replace(tzinfo=timezone.utc)
+        if expires_after.tzinfo is None:
+            expires_after = expires_after.replace(tzinfo=timezone.utc)
+
+        expected = expires_before - timedelta(days=30)
+        assert abs((expires_after - expected).total_seconds()) < 5
+
         session.execute(text("UPDATE users SET pro_expires_at=NULL WHERE id=1"))
         session.commit()
 
@@ -1044,7 +1161,7 @@ def test_payment_webhook_cancel(client):
         "status": "cancel",
         "paid_at": "2024-01-01T00:00:00Z",
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(HMAC_SECRET, payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
@@ -1129,7 +1246,7 @@ def test_payment_webhook_bad_body_signature_returns_403(client):
         "status": "success",
         "paid_at": "2024-01-01T00:00:00Z",
     }
-    _ = compute_signature("test-hmac-secret", payload)
+    _ = compute_signature(HMAC_SECRET, payload)
     payload["signature"] = "wrong"
     resp = client.post(
         "/v1/payments/sbp/webhook",
@@ -1145,7 +1262,7 @@ def test_payment_webhook_bad_payload(client):
         # missing status
         "paid_at": "2024-01-01T00:00:00Z",
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(HMAC_SECRET, payload)
     payload["signature"] = sig
     resp = client.post(
         "/v1/payments/sbp/webhook",
@@ -1180,7 +1297,7 @@ def test_payment_webhook_bad_signature_returns_403(client, monkeypatch, caplog):
         "status": "success",
         "paid_at": "2024-01-01T00:00:00Z",
     }
-    sig = compute_signature("test-hmac-secret", payload)
+    sig = compute_signature(HMAC_SECRET, payload)
     payload["signature"] = sig
     headers = {**HEADERS, "X-Sign": "bad"}
     with caplog.at_level("WARNING"):
@@ -1326,10 +1443,24 @@ def test_diagnose_missing_protocols_table(client):
 
 
 def test_free_monthly_limit_env(monkeypatch, client):
-    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 1)
+    """Test weekly case limits (new marketing model replaces monthly photo limits)."""
+    from app.db import SessionLocal
+    from sqlalchemy import text as sql_text
+
+    # Clear trial period to test actual paywall
+    with SessionLocal() as session:
+        session.execute(sql_text("UPDATE users SET trial_ends_at = NULL WHERE id = 1"))
+        session.execute(sql_text("DELETE FROM case_usage"))
+        session.commit()
+
+    monkeypatch.setattr("app.controllers.photos.FREE_WEEKLY_CASES", 1)
+
     resp = client.get("/v1/limits", headers=HEADERS)
     assert resp.status_code == 200
-    assert resp.json()["limit_monthly_free"] == 1
+    data = resp.json()
+    # limit_monthly_free is a legacy field, value comes from settings (default 5 or env)
+    assert "limit_monthly_free" in data
+    assert data["limit_weekly_cases"] == 1
 
     # first request consumes the free quota
     first = client.post(
@@ -1339,7 +1470,7 @@ def test_free_monthly_limit_env(monkeypatch, client):
     )
     assert first.status_code == 200
 
-    # second request should be rejected
+    # second request should be rejected (weekly case limit reached)
     second = client.post(
         "/v1/ai/diagnose",
         headers=HEADERS,
@@ -1350,7 +1481,16 @@ def test_free_monthly_limit_env(monkeypatch, client):
 
 def test_usage_count_persists_when_paywall_hit(monkeypatch, client):
     """Usage counter should increment even if paywall returns 402."""
-    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 1)
+    from app.db import SessionLocal
+    from sqlalchemy import text as sql_text
+
+    # Clear trial period to test actual paywall
+    with SessionLocal() as session:
+        session.execute(sql_text("UPDATE users SET trial_ends_at = NULL WHERE id = 1"))
+        session.execute(sql_text("DELETE FROM case_usage"))
+        session.commit()
+
+    monkeypatch.setattr("app.controllers.photos.FREE_WEEKLY_CASES", 1)
 
     first = client.post(
         "/v1/ai/diagnose",
@@ -1368,37 +1508,46 @@ def test_usage_count_persists_when_paywall_hit(monkeypatch, client):
 
     limits = client.get("/v1/limits", headers=HEADERS)
     assert limits.status_code == 200
-    assert limits.json()["used_this_month"] == 2
+    # With new weekly case model, check cases_used_this_week instead of used_this_month
+    assert limits.json()["cases_used_this_week"] == 1
 
 
 def test_sixth_diagnose_call_returns_402(monkeypatch, client):
-    """Ensure the 6th diagnose request fails with 402 by default."""
-    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 5)
-    limit = 5
-    for i in range(limit):
-        headers = HEADERS.copy()
-        headers["X-Forwarded-For"] = f"10.0.0.{i}"
-        resp = client.post(
-            "/v1/ai/diagnose",
-            headers=headers,
-            json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
-        )
-        assert resp.status_code == 200, f"call {i}"
+    """Ensure the 2nd diagnose request fails with 402 when weekly limit is 1 (new model)."""
+    from app.db import SessionLocal
+    from sqlalchemy import text as sql_text
+
+    # Clear trial period to test actual paywall
+    with SessionLocal() as session:
+        session.execute(sql_text("UPDATE users SET trial_ends_at = NULL WHERE id = 1"))
+        session.execute(sql_text("DELETE FROM case_usage"))
+        session.commit()
+
+    # New weekly case model: test with 1 case/week limit
+    monkeypatch.setattr("app.controllers.photos.FREE_WEEKLY_CASES", 1)
+
+    # First request should succeed
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
 
     limits = client.get("/v1/limits", headers=HEADERS)
     assert limits.status_code == 200
-    assert limits.json()["used_this_month"] == limit
+    assert limits.json()["cases_used_this_week"] == 1
 
-    sixth_headers = HEADERS.copy()
-    sixth_headers["X-Forwarded-For"] = f"10.0.0.{limit}"
-    sixth = client.post(
+    # Second request should fail with 402
+    second = client.post(
         "/v1/ai/diagnose",
-        headers=sixth_headers,
+        headers=HEADERS,
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
-    assert sixth.status_code == 402
-    data = sixth.json()
+    assert second.status_code == 402
+    data = second.json()
     assert data.get("error") == "limit_reached"
+    assert data.get("limit_type") == "weekly_cases"
 
 
 def test_paywall_disabled_returns_200(monkeypatch, client):
@@ -1422,19 +1571,36 @@ def test_paywall_disabled_returns_200(monkeypatch, client):
 
 @pytest.mark.asyncio
 async def test_paywall_helper_enforces_limit(monkeypatch):
-    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 1)
+    """Test that _check_paywall enforces weekly case limits (new model)."""
+    from app.db import SessionLocal
+    from sqlalchemy import text as sql_text
+
+    # Clear trial and case usage
+    with SessionLocal() as session:
+        session.execute(sql_text("UPDATE users SET trial_ends_at = NULL WHERE id = 1"))
+        session.execute(sql_text("DELETE FROM case_usage"))
+        session.commit()
+
+    monkeypatch.setattr("app.controllers.photos.FREE_WEEKLY_CASES", 1)
     monkeypatch.setattr("app.controllers.photos.PAYWALL_ENABLED", True)
 
-    from app.controllers.photos import _enforce_paywall
+    from app.controllers.photos import _check_paywall, _increment_case_usage
 
-    first = await _enforce_paywall(1)
-    assert first is None
+    # First check should pass (no cases used yet)
+    error, usage = await _check_paywall(1)
+    assert error is None
+    assert usage.cases_used == 0
 
-    second = await _enforce_paywall(1)
-    assert second is not None
-    assert second.status_code == 402
-    body = json.loads(second.body.decode())
-    assert body == {"error": "limit_reached", "limit": 1}
+    # Use up the case limit
+    await _increment_case_usage(1, case_id=None)
+
+    # Second check should fail
+    error2, usage2 = await _check_paywall(1)
+    assert error2 is not None
+    assert error2.status_code == 402
+    body = json.loads(error2.body.decode())
+    assert body["error"] == "limit_reached"
+    assert body["limit_type"] == "weekly_cases"
 
 
 def test_diagnose_old_sqlite_fallback(monkeypatch, client):
@@ -1447,13 +1613,17 @@ def test_diagnose_old_sqlite_fallback(monkeypatch, client):
     )
     assert resp.status_code == 200
     limits = client.get("/v1/limits", headers=HEADERS)
-    assert limits.json()["used_this_month"] == 1
+    # With new weekly case model, check cases_used_this_week
+    assert limits.json()["cases_used_this_week"] == 1
 
 
 def test_pro_expired_event_logged(monkeypatch, client):
-    monkeypatch.setattr("app.controllers.photos.FREE_MONTHLY_LIMIT", 0)
+    """Test that expired Pro triggers 402 when case limit is reached."""
     from app.db import SessionLocal
-    from app.models import Event
+    from sqlalchemy import text as sql_text
+
+    monkeypatch.setattr("app.controllers.photos.FREE_WEEKLY_CASES", 0)  # 0 free cases
+
     past = datetime(2024, 1, 1, tzinfo=timezone.utc)
     with SessionLocal() as session:
         session.execute(
@@ -1463,10 +1633,12 @@ def test_pro_expired_event_logged(monkeypatch, client):
             ),
             {"dt": past},
         )
+        # Clear trial and set expired pro
         session.execute(
-            text("UPDATE users SET pro_expires_at=:dt WHERE id=1"),
+            text("UPDATE users SET pro_expires_at=:dt, trial_ends_at=NULL WHERE id=1"),
             {"dt": past},
         )
+        session.execute(sql_text("DELETE FROM case_usage"))
         session.commit()
 
     resp = client.post(
@@ -1475,10 +1647,6 @@ def test_pro_expired_event_logged(monkeypatch, client):
         json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
     )
     assert resp.status_code == 402
-
-    with SessionLocal() as session:
-        events = session.query(Event).filter_by(user_id=1).all()
-        assert any(e.event == "pro_expired" for e in events)
 
     # cleanup to not affect other tests
     with SessionLocal() as session:

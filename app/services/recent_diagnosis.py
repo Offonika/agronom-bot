@@ -15,6 +15,7 @@ def save_recent_diagnosis(
     user_id: int,
     payload: dict[str, Any],
     object_id: int | None = None,
+    case_id: int | None = None,
     ttl_hours: int = 24,
     max_age_hours: int = 72,
 ) -> RecentDiagnosis:
@@ -28,6 +29,7 @@ def save_recent_diagnosis(
     record = RecentDiagnosis(
         user_id=user_id,
         object_id=object_id,
+        case_id=case_id,
         diagnosis_payload=payload,
         expires_at=expires_at,
     )

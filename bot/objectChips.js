@@ -1,9 +1,9 @@
 'use strict';
 
-const { msg } = require('./utils');
+const { msg, sanitizeObjectName } = require('./utils');
 
 const MAX_CHIPS = Number(process.env.OBJECT_CHIPS_LIMIT || '6');
-const ROW_SIZE = 3;
+const ROW_SIZE = Math.max(1, Number(process.env.OBJECT_CHIPS_ROW_SIZE || '1'));
 const PLAN_SELECTION_STEPS = new Set(['choose_object', 'confirm_object']);
 
 function chunk(items, size) {
@@ -37,11 +37,12 @@ function createObjectChips({ bot, db, planFlow }) {
   }
 
   function formatLabel(obj) {
+    const baseName = sanitizeObjectName(obj?.name, msg('object.default_name'));
     const parts = [];
     if (obj?.meta?.variety) parts.push(obj.meta.variety);
     if (obj?.meta?.note) parts.push(obj.meta.note);
-    if (!parts.length) return obj.name;
-    return `${obj.name} • ${parts.join(' / ')}`;
+    if (!parts.length) return baseName;
+    return `${baseName} • ${parts.join(' / ')}`;
   }
 
   function buildKeyboard(objects, activeId) {
@@ -49,7 +50,7 @@ function createObjectChips({ bot, db, planFlow }) {
     const chips = objects.slice(0, MAX_CHIPS).map((obj) => {
       const label = formatLabel(obj);
       return {
-        text: obj.id === activeId ? `• ${label}` : label,
+        text: obj.id === activeId ? `✅ ${label}` : label,
         callback_data: `obj_switch|${obj.id}`,
       };
     });
@@ -138,7 +139,8 @@ function createObjectChips({ bot, db, planFlow }) {
         console.info('objectChips.switch.already_active', { userId, objectId: key });
       }
       if (typeof ctx.answerCbQuery === 'function') {
-        await ctx.answerCbQuery(msg('objects_switched_chip', { name: target.name }));
+        const name = sanitizeObjectName(target?.name, msg('object.default_name'));
+        await ctx.answerCbQuery(msg('objects_switched_chip', { name }));
       }
       if (!alreadyActive) {
         console.info('objectChips.switch.applied', {

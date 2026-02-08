@@ -19,6 +19,7 @@ servers:
 
 security:
   - ApiKeyAuth: []
+    RequestSignAuth: []
 
 components:
   securitySchemes:
@@ -26,6 +27,10 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+    RequestSignAuth:
+      type: apiKey
+      in: header
+      name: X-Req-Sign
     HmacAuth:
       type: apiKey
       in: header
@@ -45,6 +50,47 @@ components:
       required: true
       schema:
         type: integer
+    RequestTimestampHeader:
+      name: X-Req-Ts
+      in: header
+      required: true
+      schema:
+        type: integer
+        description: Unix timestamp (seconds)
+    RequestNonceHeader:
+      name: X-Req-Nonce
+      in: header
+      required: true
+      schema:
+        type: string
+    RequestBodyHashHeader:
+      name: X-Req-Body-Sha256
+      in: header
+      required: false
+      schema:
+        type: string
+        description: "SHA-256 hex digest of canonical JSON body (required for application/json)."
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Idempotency key for payment creation retries.
+    AuthorizationHeader:
+      name: Authorization
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Bearer JWT for authenticated user actions.
+    CsrfTokenHeader:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+      description: CSRF token (must match csrf_token cookie).
 
   schemas:
     DiagnoseRequestMultipart:
@@ -60,6 +106,9 @@ components:
         crop_hint:
           type: string
           description: "Необязательная подсказка культуры (например, 'томат')."
+        case_id:
+          type: integer
+          description: "ID кейса при повторной проверке того же растения."
 
     DiagnoseRequestBase64:
       type: object
@@ -74,6 +123,9 @@ components:
         crop_hint:
           type: string
           description: "Необязательная подсказка культуры (например, 'томат')."
+        case_id:
+          type: integer
+          description: "ID кейса при повторной проверке того же растения."
 
     DiagnoseResponse:
       type: object
@@ -85,6 +137,22 @@ components:
         crop_ru:
           type: string
           example: "яблоня"
+        object_id:
+          type: integer
+          description: "ID объекта, если модель или бот смогли его определить/создать."
+          example: 123
+        case_id:
+          type: integer
+          description: "ID кейса, если запрос относится к повторной проверке."
+          example: 456
+        variety:
+          type: string
+          description: "Сорт/культивар на языке модели."
+          example: "Гала"
+        variety_ru:
+          type: string
+          description: "Сорт/культивар на русском."
+          example: "Антоновка"
         disease:
           type: string
           example: powdery_mildew
@@ -142,6 +210,81 @@ components:
           example: "Бета"
         protocol:
           $ref: '#/components/schemas/ProtocolResponse'
+
+    RecentDiagnosisRecord:
+      type: object
+      required: [id, created_at, expires_at, expired, diagnosis]
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        expired:
+          type: boolean
+        object_id:
+          type: integer
+          nullable: true
+        plan_id:
+          type: integer
+          nullable: true
+        diagnosis:
+          $ref: '#/components/schemas/DiagnoseResponse'
+
+    DsrDeleteRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+
+    DsrDeleteResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: deleted
+
+    ConsentStatus:
+      type: object
+      required: [doc_type, doc_version, status, updated_at, source]
+      properties:
+        doc_type:
+          type: string
+          example: privacy
+        doc_version:
+          type: string
+          example: "1.0"
+        status:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          example: api
+
+    ConsentRequest:
+      type: object
+      required: [doc_type, doc_version]
+      properties:
+        doc_type:
+          type: string
+          example: privacy
+        doc_version:
+          type: string
+          example: "1.0"
+        source:
+          type: string
+          nullable: true
+          example: api
+        meta:
+          type: object
+          additionalProperties: true
 
     ProtocolResponse:
       type: object
@@ -294,6 +437,37 @@ components:
         signature:
           type: string
           description: HMAC-SHA256 of payload
+
+    TinkoffWebhookNotification:
+      type: object
+      required: [TerminalKey, Status, Token]
+      additionalProperties: true
+      properties:
+        TerminalKey:
+          type: string
+        OrderId:
+          type: string
+          nullable: true
+        PaymentId:
+          type: string
+          nullable: true
+        Status:
+          type: string
+        Amount:
+          type: integer
+          nullable: true
+        Success:
+          type: boolean
+          nullable: true
+        Token:
+          type: string
+        RebillId:
+          type: string
+          nullable: true
+        Data:
+          type: object
+          nullable: true
+          additionalProperties: true
 
     AutopayWebhook:
       type: object
@@ -706,9 +880,13 @@ paths:
       tags: [assistant]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       requestBody:
         required: true
         content:
@@ -734,6 +912,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /v1/assistant/confirm_plan:
     post:
@@ -743,9 +927,12 @@ paths:
       tags: [assistant]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       requestBody:
         required: true
         content:
@@ -780,9 +967,12 @@ paths:
       tags: [plans]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       requestBody:
         required: true
         content:
@@ -803,16 +993,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /v1/plans/{plan_id}/pdf:
+    get:
+      summary: Export plan to PDF
+      operationId: exportPlanPdf
+      description: "Экспортирует план в PDF-заметку."
+      tags: [plans]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v1/plans/{plan_id}/events:
     post:
       summary: Create event/reminder for plan
       operationId: createPlanEvent
+      description: "Создаёт событие плана и напоминание (при необходимости)."
       tags: [plans]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - name: plan_id
           in: path
           required: true
@@ -842,12 +1070,16 @@ paths:
     post:
       summary: Enqueue autoplan run
       operationId: enqueueAutoplan
+      description: "Создаёт запись автоплана для поиска окна обработок."
       tags: [plans]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - name: plan_id
           in: path
           required: true
@@ -873,6 +1105,77 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /v1/diagnoses/recent:
+    get:
+      summary: Get latest recent diagnosis
+      operationId: getRecentDiagnosis
+      description: "Возвращает последний диагноз пользователя за 24 часа."
+      tags: [diagnose]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - name: include_expired
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Recent diagnosis record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecentDiagnosisRecord'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+
+  /v1/diagnoses/recent/{diagnosis_id}:
+    get:
+      summary: Get recent diagnosis by id
+      operationId: getRecentDiagnosisById
+      description: "Возвращает диагноз по recent_diagnosis_id."
+      tags: [diagnose]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - name: diagnosis_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recent diagnosis record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecentDiagnosisRecord'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+
   /v1/ai/diagnose:
     post:
       summary: Diagnose plant disease
@@ -884,9 +1187,12 @@ paths:
       tags: [diagnose]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       requestBody:
         required: true
         content:
@@ -948,12 +1254,16 @@ paths:
     post:
       summary: Create or refresh plan wizard session state
       operationId: upsertPlanSession
+      description: "Сохраняет шаг мастера плана или обновляет существующую сессию."
       tags: [plans]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       requestBody:
         required: true
         content:
@@ -982,12 +1292,16 @@ paths:
     get:
       summary: Fetch the latest or token-specific plan wizard session
       operationId: getPlanSession
+      description: "Возвращает последнюю сессию или конкретный токен мастера планов."
       tags: [plans]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - name: token
           in: query
           required: false
@@ -1034,12 +1348,16 @@ paths:
     delete:
       summary: Delete plan wizard session(s)
       operationId: deletePlanSession
+      description: "Удаляет конкретную сессию по токену/плану или все сессии пользователя."
       tags: [plans]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - name: token
           in: query
           required: false
@@ -1052,17 +1370,36 @@ paths:
           schema:
             type: integer
             description: "Удалить сессии, связанные с планом."
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /v1/plans/sessions/{session_id}:
     patch:
       summary: Update plan wizard session fields
       operationId: patchPlanSession
+      description: "Частично обновляет состояние конкретной сессии."
       tags: [plans]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - name: session_id
           in: path
           required: true
@@ -1093,15 +1430,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-      responses:
-        '204':
-          description: Deleted
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
   /v1/photos:
     get:
@@ -1111,9 +1439,12 @@ paths:
       tags: [photos]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - name: limit
           in: query
           schema:
@@ -1195,9 +1526,12 @@ paths:
       tags: [photos]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - in: path
           name: photo_id
           required: true
@@ -1227,9 +1561,12 @@ paths:
       tags: [limits]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       responses:
         '200':
           description: Текущие лимиты
@@ -1252,6 +1589,235 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /v1/users/{user_id}/export:
+    get:
+      summary: Export user data (ZIP)
+      operationId: exportUserData
+      description: "Экспортирует данные пользователя в ZIP-архив (data.json)."
+      tags: [users]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+          HmacAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/users/{user_id}/consents:
+    get:
+      summary: List user consents
+      operationId: listUserConsents
+      description: "Возвращает текущий статус согласий пользователя."
+      tags: [users]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Consent list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsentStatus'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/users/{user_id}/consents/accept:
+    post:
+      summary: Accept consent
+      operationId: acceptUserConsent
+      description: "Фиксирует согласие пользователя."
+      tags: [users]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentRequest'
+      responses:
+        '200':
+          description: Consent accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/users/{user_id}/consents/revoke:
+    post:
+      summary: Revoke consent
+      operationId: revokeUserConsent
+      description: "Отзывает согласие пользователя."
+      tags: [users]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentRequest'
+      responses:
+        '200':
+          description: Consent revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/dsr/delete_user:
+    post:
+      summary: Delete user data (DSR)
+      operationId: deleteUserDsr
+      description: "Каскадное удаление данных пользователя по DSR-запросу."
+      tags: [users]
+      security:
+        - ApiKeyAuth: []
+          RequestSignAuth: []
+          HmacAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiVersionHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DsrDeleteRequest'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DsrDeleteResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /v1/payments/create:
     post:
       summary: Create SBP payment
@@ -1260,9 +1826,12 @@ paths:
       tags: [payments]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       requestBody:
         required: true
         content:
@@ -1283,11 +1852,16 @@ paths:
                     example: 123e4567e89
                   url:
                     type: string
-                    example: https://sbp.example/pay
+                    example: https://pay.tbank.ru/xxxx
+                    description: Card payment URL (PaymentURL)
                   autopay_binding_id:
                     type: string
                     nullable: true
                     description: Identifier of SBP Autopay binding
+                  sbp_url:
+                    type: string
+                    nullable: true
+                    description: SBP QR payment URL (when available)
         '401':
           description: Unauthorized
           content:
@@ -1303,9 +1877,12 @@ paths:
       tags: [payments]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
         - in: path
           name: payment_id
           required: true
@@ -1331,23 +1908,30 @@ paths:
     post:
       summary: SBP payment webhook
       operationId: handleSbpWebhook
-      description: Process SBP payment callback and update payment status.
+      description: |
+        Process SBP payment callback and update payment status.
+        Accepts either internal HMAC payload (X-Sign + signature) or native T-Bank Token payload (OrderId/PaymentId/Status/Amount/Token).
+        T-Bank callbacks are additionally validated by source IP allowlist (`TINKOFF_IPS`).
       tags: [payments]
       security:
         - HmacAuth: []
-        - ApiKeyAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ApiVersionHeader'
-        - $ref: '#/components/parameters/UserIdHeader'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PaymentWebhook'
+              oneOf:
+                - $ref: '#/components/schemas/PaymentWebhook'
+                - $ref: '#/components/schemas/TinkoffWebhookNotification'
       responses:
         '200':
           description: Accepted
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden
           content:
@@ -1359,23 +1943,30 @@ paths:
     post:
       summary: SBP autopay webhook
       operationId: handleAutopayWebhook
-      description: Process SBP Autopay callback and update payment status.
+      description: |
+        Process SBP Autopay callback and update payment status.
+        Accepts either internal HMAC payload (X-Sign + signature) or native T-Bank Token payload (OrderId/PaymentId/Status/Amount/Token/RebillId).
+        T-Bank callbacks are additionally validated by source IP allowlist (`TINKOFF_IPS`).
       tags: [payments]
       security:
         - HmacAuth: []
-        - ApiKeyAuth: []
-      parameters:
-        - $ref: '#/components/parameters/ApiVersionHeader'
-        - $ref: '#/components/parameters/UserIdHeader'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AutopayWebhook'
+              oneOf:
+                - $ref: '#/components/schemas/AutopayWebhook'
+                - $ref: '#/components/schemas/TinkoffWebhookNotification'
       responses:
         '200':
           description: Accepted
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden
           content:
@@ -1391,9 +1982,14 @@ paths:
       tags: [payments]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
+        - $ref: '#/components/parameters/AuthorizationHeader'
+        - $ref: '#/components/parameters/CsrfTokenHeader'
       requestBody:
         required: true
         content:
@@ -1415,6 +2011,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /v1/partner/orders:
     post:
@@ -1425,9 +2027,12 @@ paths:
       security:
         - HmacAuth: []
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       requestBody:
         required: true
         content:
@@ -1450,6 +2055,8 @@ paths:
       responses:
         '202':
           description: Queued
+        '200':
+          description: Already processed
         '400':
           description: Bad request
           content:
@@ -1458,6 +2065,24 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service unavailable
           content:
             application/json:
               schema:
@@ -1471,9 +2096,12 @@ paths:
       tags: [expert]
       security:
         - ApiKeyAuth: []
+          RequestSignAuth: []
       parameters:
         - $ref: '#/components/parameters/ApiVersionHeader'
         - $ref: '#/components/parameters/UserIdHeader'
+        - $ref: '#/components/parameters/RequestTimestampHeader'
+        - $ref: '#/components/parameters/RequestNonceHeader'
       requestBody:
         required: true
         content:
@@ -1500,6 +2128,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /v1/beta_stats:
+    get:
+      summary: Beta houseplants stats snapshot
+      operationId: betaStats
+      tags: [beta]
+      security:
+        - HmacAuth: []
+      responses:
+        '200':
+          description: Aggregated beta metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [stats, generated_at, scope]
+                properties:
+                  scope:
+                    type: string
+                    example: beta_stats
+                  generated_at:
+                    type: string
+                    format: date-time
+                  stats:
+                    type: object
+                    properties:
+                      beta_testers:
+                        type: integer
+                      beta_users_with_photo:
+                        type: integer
+                      beta_users_with_case:
+                        type: integer
+                      beta_users_survey_completed:
+                        type: integer
+                      beta_users_followup_answered:
+                        type: integer
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 tags:
   - name: diagnose
     description: Disease recognition
@@ -1509,9 +2179,13 @@ tags:
     description: SBP integration
   - name: limits
     description: User usage limits
+  - name: plans
+    description: Plan creation, sessions и автоплан
   - name: assistant
     description: Conversational assistant (чат, tool-calls)
   - name: partner
     description: External partner callbacks
   - name: expert
     description: Human expert questions
+  - name: beta
+    description: Beta houseplants metrics

@@ -45,3 +45,12 @@ ORDER BY day DESC;
 ```
 
 Эта выборка показывает дневную конверсию по каждому шагу и служит базой для дашборда в Metabase/Grafana.
+
+## Power BI витрины
+
+Для BI используется набор SQL-витрин:
+
+- `vw_funnel_daily` — дневная воронка по UTM (start/photo_sent/diagnosis_shown/paywall/payment).
+- `vw_campaign_summary_7d` — сводка по кампаниям за 7 дней с конверсиями.
+- `vw_campaign_summary_30d` — сводка по кампаниям за 30 дней с конверсиями.
+- `vw_retention_cohorts` — когорты retention D1/D7 по дню первой активации (photo_sent).

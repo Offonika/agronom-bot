@@ -13,18 +13,23 @@ const { processAutoplanContext, buildLocationDetails, pickLocationLabel } = requ
 
 const connection = { url: process.env.REDIS_URL || 'redis://localhost:6379' };
 const queueName = process.env.AUTOPLAN_QUEUE || 'autoplan';
-const BOT_TOKEN = process.env.BOT_TOKEN_DEV;
+const BOT_TOKEN =
+  process.env.BOT_TOKEN_PROD ||
+  process.env.BOT_TOKEN_DEV ||
+  process.env.BOT_TOKEN;
 const DEFAULT_TZ = process.env.AUTOPLAN_TIMEZONE || 'Europe/Moscow';
 const DB_URL = process.env.BOT_DATABASE_URL || process.env.DATABASE_URL;
 const POLL_INTERVAL_MS = Number(process.env.AUTOPLAN_POLL_MS || '15000');
 const LOCATION_WARN_TTL_HOURS = Number(process.env.LOCATION_WARN_TTL_HOURS || '12');
 const LOCATION_WARN_TTL_MS = Math.max(1, LOCATION_WARN_TTL_HOURS || 12) * 60 * 60 * 1000;
+const PREF_MIN_SLOTS = Number(process.env.AUTOPLAN_PREF_MIN_SLOTS || '3');
+const PREF_MAX_SLOTS = Number(process.env.AUTOPLAN_PREF_MAX_SLOTS || '50');
 
 if (!DB_URL) {
   throw new Error('BOT_DATABASE_URL or DATABASE_URL not set for autoplan worker');
 }
 if (!BOT_TOKEN) {
-  throw new Error('BOT_TOKEN_DEV not set for autoplan worker');
+  throw new Error('BOT_TOKEN_PROD or BOT_TOKEN_DEV not set for autoplan worker');
 }
 
 const pool = new Pool({ connectionString: DB_URL });
@@ -76,12 +81,14 @@ async function processAutoplan(runId) {
     console.warn('autoplan run not found', runId);
     return;
   }
+  const preferences = await loadUserPreferences(context.user?.id);
   await processAutoplanContext(context, {
     planner,
     db,
     strings,
     fallbackLat: process.env.WEATHER_LAT,
     fallbackLon: process.env.WEATHER_LON,
+    preferences,
     trackLocation: trackLocationSource,
     maybeNotifyDefaultLocation,
     sendSlotCard,
@@ -234,6 +241,33 @@ async function sendTelegramMessage(chatId, text, options = {}) {
   } catch (err) {
     console.error('Telegram send error', err);
   }
+}
+
+async function loadUserPreferences(userId) {
+  if (!userId || typeof db.listAcceptedSlotsForUser !== 'function') return null;
+  const rows = await db.listAcceptedSlotsForUser(userId, PREF_MAX_SLOTS);
+  if (!rows?.length || rows.length < PREF_MIN_SLOTS) return null;
+  const hourWeights = new Array(24).fill(0);
+  for (const row of rows) {
+    const date = row.slot_start instanceof Date ? row.slot_start : new Date(row.slot_start);
+    const hour = getLocalHour(date);
+    if (hour == null) continue;
+    hourWeights[hour] += 1;
+  }
+  const maxCount = Math.max(...hourWeights);
+  if (!maxCount) return null;
+  return { hourWeights, maxCount, total: rows.length };
+}
+
+function getLocalHour(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  const raw = new Intl.DateTimeFormat('ru-RU', {
+    hour: 'numeric',
+    hour12: false,
+    timeZone: DEFAULT_TZ,
+  }).format(date);
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
 }
 
 function buildManualFallbackKeyboard(context) {
