@@ -64,6 +64,11 @@ app = FastAPI(
 
 app.include_router(v1.router)
 
+@app.get("/healthz", include_in_schema=False)
+async def healthz() -> dict[str, str]:
+    # Lightweight health endpoint for container healthchecks.
+    return {"status": "ok"}
+
 # Protect /metrics when a token is configured.
 if settings.metrics_token:
     @app.middleware("http")
