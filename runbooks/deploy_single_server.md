@@ -34,6 +34,19 @@ Prereqs:
 - Create `.secrets/metrics_token` (same value as `METRICS_TOKEN` / `BOT_METRICS_TOKEN`).
 - Ensure `.env` contains `METRICS_TOKEN=...` (otherwise metrics will be unprotected and Prometheus auth is unnecessary).
 
+## Rotate Runtime Secrets (No Secret Values Printed)
+
+This rotates `JWT_SECRET`, `API_KEY`, `METRICS_TOKEN` and aligns `BOT_METRICS_TOKEN`.
+It also syncs `.secrets/metrics_token` for Prometheus.
+
+```bash
+cd /opt/agronom-bot
+./venv/bin/python scripts/rotate_runtime_secrets.py
+
+# env_file changes require container recreate; keep it stateless-only.
+docker compose up -d --no-deps --force-recreate api bot autoplan autopay usage_reset
+```
+
 Start:
 
 ```bash
