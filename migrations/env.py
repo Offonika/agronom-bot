@@ -2,15 +2,16 @@
 import os
 import sys
 from pathlib import Path
+
+# Add project root to PYTHONPATH before importing app modules
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 from dotenv import load_dotenv
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-# 1. .env
+# Load .env variables
 load_dotenv()
-
-# 2. PYTHONPATH до импорта app
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.models import Base  # noqa: E402
 
