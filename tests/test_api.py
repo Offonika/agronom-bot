@@ -72,6 +72,8 @@ def stub_upload(monkeypatch):
         return {
             "crop": "apple",
             "crop_ru": "яблоня",
+            "crop_confidence": 0.81,
+            "crop_candidates": ["яблоня", "груша"],
             "disease": "powdery_mildew",
             "disease_name_ru": "мучнистая роса",
             "confidence": 0.92,
@@ -180,6 +182,8 @@ def test_diagnose_json_success(client):
     body = resp.json()
     expected_keys = {
         "crop",
+        "crop_confidence",
+        "crop_candidates",
         "disease",
         "confidence",
         "reasoning",
@@ -192,6 +196,95 @@ def test_diagnose_json_success(client):
     }
     assert expected_keys.issubset(body.keys())
     assert body["roi"] == 1.9
+    assert body["crop_confidence"] == 0.81
+    assert body["crop_candidates"] == ["яблоня", "груша"]
+
+
+def test_diagnose_forces_clarify_crop_when_crop_confidence_low(monkeypatch, client):
+    async def fake_process(
+        contents: bytes | list[bytes],
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ) -> dict:
+        return {
+            "file_id": "stub",
+            "crop": "aloe",
+            "crop_ru": "алоэ",
+            "crop_confidence": 0.51,
+            "crop_candidates": ["алоэ", "сансевиерия"],
+            "disease": "abiotic_stress",
+            "confidence": 0.9,
+            "roi": 1.1,
+            "reasoning": ["Вытягивание и узкие листья"],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+            "need_clarify_crop": False,
+            "clarify_crop_variants": [],
+        }
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
+    monkeypatch.setattr("app.controllers.photos.CROP_CLARIFY_THRESHOLD", 0.75)
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["crop_confidence"] == 0.51
+    assert body["need_clarify_crop"] is True
+    assert body["clarify_crop_variants"] == ["алоэ", "сансевиерия"]
+
+
+def test_diagnose_parses_percent_crop_confidence(monkeypatch, client):
+    async def fake_process(
+        contents: bytes | list[bytes],
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ) -> dict:
+        return {
+            "file_id": "stub",
+            "crop": "aloe",
+            "crop_ru": "алоэ",
+            "crop_confidence": 62,
+            "crop_candidates": ["алоэ", "гастерия"],
+            "disease": "abiotic_stress",
+            "confidence": 0.58,
+            "roi": 1.0,
+            "reasoning": ["Сухие кончики"],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+            "need_clarify_crop": False,
+            "clarify_crop_variants": [],
+        }
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
+    monkeypatch.setattr("app.controllers.photos.CROP_CLARIFY_THRESHOLD", 0.6)
+
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": "dGVzdA==", "prompt_id": "v1"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["crop_confidence"] == 0.62
+    assert body["need_clarify_crop"] is False
 
 
 def test_recent_diagnosis_endpoint(client):
@@ -231,6 +324,65 @@ def test_diagnose_multipart_success(client):
         files={"image": ("leaf.jpg", b"x" * 10, "image/jpeg")},
     )
     assert resp.status_code == 200
+
+
+def test_diagnose_multipart_album_uses_all_images(monkeypatch, client):
+    async def fake_process(
+        contents: bytes | list[bytes],
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ) -> dict:
+        assert isinstance(contents, list)
+        assert len(contents) == 3
+        assert contents[0] == b"a"
+        assert contents[1] == b"b"
+        assert contents[2] == b"c"
+        return {
+            "file_id": "k",
+            "crop": "wheat",
+            "disease": "rust",
+            "confidence": 0.5,
+            "roi": 2.1,
+            "reasoning": ["Края листа рыжие"],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files=[
+            ("images", ("1.jpg", b"a", "image/jpeg")),
+            ("images", ("2.jpg", b"b", "image/jpeg")),
+            ("images", ("3.jpg", b"c", "image/jpeg")),
+        ],
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["crop"] == "wheat"
+    assert data["disease"] == "rust"
+
+
+def test_diagnose_multipart_album_too_many_images(client):
+    files = [("images", (f"{i}.jpg", b"x", "image/jpeg")) for i in range(9)]
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        files=files,
+    )
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["code"] == ErrorCode.BAD_REQUEST
+    assert body["message"] == "too many images"
 
 
 def test_plan_session_crud(client):
@@ -386,6 +538,100 @@ def test_diagnose_base64_uses_process(monkeypatch, client):
     assert data["confidence"] == 0.7
     assert data["roi"] == 3.3
     assert data["plan_missing_reason"]
+
+
+def test_diagnose_followup_case_uses_case_crop_as_hint(monkeypatch, client):
+    captured: dict[str, object] = {}
+
+    async def fake_process(
+        contents: bytes,
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ) -> dict:
+        captured["crop_hint"] = crop_hint
+        captured["same_case_id"] = same_case_id
+        return {
+            "file_id": "k",
+            "crop": "ficus",
+            "disease": "abiotic_stress",
+            "confidence": 0.82,
+            "roi": 1.4,
+            "reasoning": ["Желтеют нижние листья"],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+    monkeypatch.setattr(
+        "app.controllers.photos.get_recent_case_for_same_plant_sync",
+        lambda _user_id: {"case_id": 321, "crop": "фикус"},
+    )
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
+
+    encoded = base64.b64encode(b"xyz").decode()
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": encoded, "prompt_id": "v1", "case_id": 321},
+    )
+    assert resp.status_code == 200
+    assert captured["same_case_id"] == 321
+    assert captured["crop_hint"] == "фикус"
+    assert resp.json()["case_id"] == 321
+
+
+def test_diagnose_followup_case_mismatch_resets_case_and_hint(monkeypatch, client):
+    captured: dict[str, object] = {}
+
+    async def fake_process(
+        contents: bytes,
+        user_id: int,
+        crop_hint: str | None = None,
+        same_case_id: int | None = None,
+    ) -> dict:
+        captured["crop_hint"] = crop_hint
+        captured["same_case_id"] = same_case_id
+        return {
+            "file_id": "k",
+            "crop": "ficus",
+            "disease": "abiotic_stress",
+            "confidence": 0.82,
+            "roi": 1.4,
+            "reasoning": ["Желтеют нижние листья"],
+            "treatment_plan": None,
+            "next_steps": None,
+            "need_reshoot": False,
+            "reshoot_tips": [],
+        }
+
+    monkeypatch.setattr("app.controllers.photos._process_image", fake_process)
+    monkeypatch.setattr(
+        "app.controllers.photos.get_recent_case_for_same_plant_sync",
+        lambda _user_id: {"case_id": 999, "crop": "томаты"},
+    )
+
+    async def _fake_proto(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("app.controllers.photos.async_find_protocol", _fake_proto)
+
+    encoded = base64.b64encode(b"xyz").decode()
+    resp = client.post(
+        "/v1/ai/diagnose",
+        headers=HEADERS,
+        json={"image_base64": encoded, "prompt_id": "v1", "case_id": 321},
+    )
+    assert resp.status_code == 200
+    assert captured["same_case_id"] is None
+    assert captured["crop_hint"] is None
+    assert resp.json()["case_id"] is None
 
 
 def test_diagnose_missing_api_version(client):

@@ -1,0 +1,1079 @@
+<!-- INF10\startRequest.cfm -->
+
+<!-- page-view-home-and-landscape\index.cfm -->
+
+<!-- ck:4540 --><!-- rp:/home-and-landscape/scales --> 
+
+<!-- // Debug: ~infVer:10.0.0~/home-and-landscape/scales~ck:4540~sk:9~v:0~pk:HLS~pv:01~tn:pn-qt-2x8~tv:2025~tk:1~ -->
+
+<!-- INF10\header-v5.cfm -->
+
+
+
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	
+	
+	
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700&amp;subset=latin,latin-ext" type="text/css" />
+	
+	
+	
+	<link rel="stylesheet" href="/assets_v7/styles/bootstrap-1.css" type="text/css" />
+	<link rel="icon" type="image/png" href="/assets_v7/images/favicon.ico" />
+			
+	
+	
+	
+	
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+	
+		<script src="https://unpkg.com/htmx.org@1.6.1"></script>
+	
+		<link href="/assets_v7/fontawesome7_1_0/css/fontawesome.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/brands.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/solid.min.css" rel="stylesheet">
+	
+		<!-- Google Tag Manager -->
+		<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NPR7B4');</script>
+		<!-- End Google Tag Manager -->
+	
+	
+	
+
+	<script async src="https://cse.google.com/cse.js?cx=005318318591192111806:oa2cd9kjx8k"></script>
+
+	<style>	
+		.icon-bar {
+		position: fixed;
+		z-index: 500;
+		top: calc(100vh - (100vh - 40%));
+		right: 0;
+		left: calc(100vw - 105px);
+		width: 140px;
+		-webkit-transform: translateY(-50%);
+		-ms-transform: translateY(-50%);
+		transform: translateY(-50%);
+		transform: rotate(-90deg);
+		}
+
+		.icon-bar a {
+		display: block;
+		text-align: center;
+		padding: 14px;
+		transition: all 0.3s ease;
+		color: white !important;
+		font-size: 14px;
+		border-bottom: none;
+		}
+		
+		.icon-bar a:hover {
+		background-color: #000;
+		}
+		
+		.pdf {
+		background: #bb0000;
+		color: white;
+		}
+
+		.print {
+		background: #008EAA;
+		color: white;
+		}
+		
+		.feedback {
+		background: #008EAA;
+		color: white;
+		}
+
+		@media print { 
+			.icon-bar {
+				display: none !important;
+			}
+		}
+	</style>
+	
+	
+		
+	<title>Scales / Home and Landscape / UC Statewide IPM Program (UC IPM)</title>
+</head>
+
+<body>
+	
+		<!-- Google Tag Manager (noscript) -->
+		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NPR7B4" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+		<!-- End Google Tag Manager (noscript) -->
+	<!-- WWW03\Templates\WWW_headerNav_3_2023.cfm -->
+
+<div class="modal fade" id="notificationsModal" tabindex="-1" aria-labelledby="notificationsModal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" >
+            <div class="modal-header flex-wrap">
+                <div class="modal-title" id="notificationsModalLabel">Notifications</div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="notificationsModalContent">
+                Loading...
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<nav class="navbar navbar-expand-lg navbar-light shadow megamenu-nav" id="nav"  >
+    <div class="container-fluid">
+        
+            <a class="navbar-brand" href="/" onclick="_sz.push(['event', 'Mega Menu', 'Logo', 'UC IPM']);"><img src="/assets_v7/images/logo/header-logo-ipm.png" width="150px" alt="UC IPM logo"></a>
+            
+        <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-content" aria-label="mobile menu" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', 'Collapsed']);">
+            <div class="hamburger-toggle">
+                <div class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-content">
+            <ul class="navbar-nav mr-auto mb-2 mb-lg-0">
+                <li class="nav-item dropdown dropdown-mega position-static">
+                    <a class="nav-link dropdown-toggle toggle-animation" href="#" data-bs-toggle="dropdown" data-bs-auto-close="outside" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/scales/']);">Manage
+                        Pests<i class="fas fa-chevron-down ms-1"></i></a>
+                    <div class="nav-dropdown dropdown-menu">
+                        <div class="mega-content">
+                            <div class="container-fluid">
+                                <div class="row">
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-1" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Home &amp; Landscape<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-1">
+
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/" class="dropdown-item">Home, Garden, Turf and Landscape Pests</a>
+                                            <a href="https://ucanr.edu/blogs/UCIPMurbanpests/" class="dropdown-item">Blog</a>
+                                            <a href="https://ucanr.edu/site/urban-community-ipm-webinars" class="dropdown-item">Webinars</a>
+                                            <a href="https://ipm.ucanr.edu/IPMPROJECT/videolibrary.html" class="dropdown-item">Video</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/" class="dropdown-item">Pesticide Active Ingredient Database</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/plant-problem-diagnostic-tool/" class="dropdown-item">Plant Problem Diagnostic Tool</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Seasonal Landscape IPM Checklist</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/wildlife-pest-identification/" class="dropdown-item">Wildlife Identification Tool</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                            <h6 class="dropdown-header mt-4">Resources</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Landscape Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-multi-unit-housing-managers/" class="dropdown-item">Multi-unit Housing Managers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/retail-nursery-and-garden-center-ipm-news/" class="dropdown-item">Retail Nurseries and Garden Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-schools-and-child-care-centers/" class="dropdown-item">Schools and Child Care Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-structural-pest-management-professionals/" class="dropdown-item">Structural Pest Management Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/master-gardeners/" class="dropdown-item">UC Master Gardeners</a>
+                                            
+                                            
+                                            
+                                            
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-2" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Agriculture<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-2">
+
+                                            <a href="https://ipm.ucanr.edu/agriculture/" class="dropdown-item">Pest Management Guidelines</a>
+
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <a href="https://ipm.ucanr.edu/GENERAL/pesticides.html" class="dropdown-item">Pesticide
+                                                Information</a>
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            <a href="https://ipm.ucanr.edu/bee-precaution-pesticide-ratings/" class="dropdown-item">Bee
+                                                Precaution Pesticide Ratings</a>
+                                            <a href="https://ipm.ucanr.edu/agriculture/decision-support-tool/" class="dropdown-item">Decision
+                                                Support</a>
+                                            <a href="https://ipm.ucanr.edu/WEATHER/" class="dropdown-item">Weather, Models and Degree
+                                                Days</a>
+                                            <span class="border-top"></span>
+                                            <h6 class="dropdown-header mt-4 mb-2">Resources</h6>
+                                            <a href="https://ipm.ucanr.edu/PMG/glossary.html" class="dropdown-item">Glossary</a>
+                                            <a href="https://ipm.ucanr.edu/mitigation/" class="dropdown-item">Mitigating Pesticides</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies
+                                                Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/GENERAL/links.html" class="dropdown-item">Pest Management
+                                                Sites</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-3" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Natural Areas<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-3">
+                                            <a href="https://ipm.ucanr.edu/natural-area-pests/" class="dropdown-item">Natural Area Pests</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/events/" onclick="_sz.push(['event', 'Mega Menu', 'Events and Trainings', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/scales/']);">Events
+                        and Trainings</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/about/" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'About', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/scales/']);">About</a>
+                </li>
+            </ul>
+            <ul class="navbar-nav d-flex ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#searchModal" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'Search', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/scales/']);"><i class="fa-solid fa-magnifying-glass me-2"></i>Search</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/make-a-gift/" onclick="_sz.push(['event', 'Mega Menu', 'Donate', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/scales/']);">Donate</a>
+                </li>
+                
+                
+                
+                
+                
+            </ul>
+        </div>
+    </div>
+</nav>
+<!-- Account Settings Modal -->
+<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content" >
+            <div class="modal-header" >
+                <div class="modal-title" id="accountSettingsModalLabel">Account Settings</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="accountSettingsModalBody">
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal" aria-label="Close">Close</button>
+                <button type="button" class="btn btn-primary float-end" hx-trigger="click" hx-post="htmx-INF-10-htmx-accountSettingsModalContent.cfm?submit=submit" hx-target="#accountSettingsModalBody" name="submit" value="submit" hx-include="[name='firstName'],[name='lastName']">
+                    Save
+                </button>
+            </div>
+		</div>
+	</div>
+</div>
+
+<script>
+    document.addEventListener('click', function (e) {
+        // Hamburger menu
+        if (e.target.classList.contains('hamburger-toggle')) {
+            e.target.children[0].classList.toggle('active');
+        }
+    })
+    var dropDownToggle = document.querySelectorAll('.toggle-animation');
+    dropDownToggle.forEach((dropdown) => {
+        dropdown.addEventListener('click', function () {
+            var icon = this.querySelector('.fas');
+            icon.classList.toggle('fa-chevron-down');
+            icon.classList.toggle('fa-chevron-up');
+        });
+    });
+    //change for medium and below
+    var adjustIconFloat = () => {
+        var breakpoint = 992;
+        var icons = document.querySelectorAll('.fa-chevron-down');
+        if (window.innerWidth <= breakpoint) {
+            icons.forEach(icon => {
+                icon.style.float = 'right';
+            });
+        } else {
+            icons.forEach(icon => {
+                icon.style.float = '';
+            });
+        }
+    }
+    window.addEventListener('resize', adjustIconFloat);
+    adjustIconFloat();
+</script>
+
+	
+
+	
+
+	<!-- Search Modal -->
+	<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-xl modal-dialog-scrollable">
+			<div class="modal-content">
+				<div class="modal-header">
+					<p class="h1 modal-title fs-5" id="searchModalLabel">Search</p>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="_sz.push(['event', 'Search Modal', 'Button', 'X']);"></button>
+				</div>
+				<div class="modal-body">
+					<form class="row g-3" onsubmit="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; return false;">
+						<div class="col">
+							<label for="searchInput" class="visually-hidden">search</label>
+							<input type="search" class="form-control" id="searchInput" placeholder="What's your pest problem?">
+						</div>
+						<div class="col-auto">
+							<button type="button" class="btn btn-primary" onclick="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; _sz.push(['event', 'Search Modal', 'Button', 'Search']);">Search</button>
+						</div>
+					</form>
+					<div class="gcse-searchresults-only"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	
+
+<!-- HLS01\Templates\HLS_pn-qt-2x8_1_2025.cfm -->
+
+<!-- INF10\inf_contents-v10.cfm -->
+
+
+
+ 
+<main>
+    <div class="content-header-wrap urban">
+       <!-- INF10\inf_breadcrumb-v10.cfm -->
+
+
+
+<div class="breadcrumb-wrapper">
+	<div class="container">
+		<div class="row justify-content-center">
+			<div class="col-md-10 col-sm-12">
+				<nav aria-label="breadcrumb">
+					<ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="/">UC IPM</a></li><li class="breadcrumb-item"><a href="/home-and-landscape">Home and Landscape</a></li>
+					</ol>
+				</nav>
+			</div>
+		</div>
+	</div>
+</div>
+
+       
+        <header>
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-10 col-sm-12">
+                        <p class="eyebrow">Home and Landscape</p>
+                        <h1>Scales</h1>
+                        <div class="info">
+                            
+                            
+                            
+                            <!--<div>Published on January 25, 2022</div>-->
+                            <div>Updated: 09/2014</div>
+                        </div>
+                        <div class="icons">
+                            <a href="https://ipm.ucanr.edu/PDF/PESTNOTES/pnscales.pdf"><i class="fa-solid fa-file-pdf" aria-label="PDF file"></i></a> 
+            <a href="https://www.linkedin.com/shareArticle/?mini=true&url=https://ipm.ucanr.edu/home-and-landscape/scales/" target="_blank"><i class="fab fa-linkedin" aria-label="LinkedIn"></i></a>
+        
+            <a href="https://bsky.app/intent/compose?text=Learn%20about%20Scales%20at%20UC%20IPM%2E%20https%3A%2F%2Fipm%2Eucanr%2Eedu%2Fhome%2Dand%2Dlandscape%2Fscales%2F" target="_blank"><i class="fa-brands fa-square-bluesky" aria-label="Bluesky"></i></a>
+        
+            <a href="https://www.facebook.com/sharer/sharer.php?u=https://ipm.ucanr.edu/home-and-landscape/scales/" target="_blank"><i class="fab fa-facebook-square" aria-label="FaceBook"></i></a>
+        
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+            <div class="banner mb-5">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-md-10 col-sm-12">
+                            <img class="img-fluid" src='/PMG/IMAGES/C/I-HO-CHES-MF.003banner.jpg' width="100%" height="100%" border="0" alt='Brown soft scale with emergence holes of parasitoid Credit: Jack Kelly Clark, UC IPM' title='Brown soft scale Credit: Jack Kelly Clark, UC IPM'>
+                            
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-2 col-md-2 d-none d-md-block">
+                <div class="position-sticky sticky-top side-nav-wrap-scroll" style="top:30px; z-index:0;">
+                    <nav id="navbar-example3" class="side-nav">
+                        <div class="h3 mb-3">On this page</div>
+                            
+                                <a class="nav-link" href="#QUICK_233_1">Quick Tips</a>
+                                <a class="nav-link" href="#INTRODUCTION_65_1">Pest Notes: Introduction</a>
+                            
+                                <a class="nav-link" href="#IDENTIFICATION_247_1">Identification</a>
+                            
+                                <a class="nav-link" href="#LIFE_241_1">Life Cycle</a>
+                            
+                                <a class="nav-link" href="#DAMAGE_51_1">Damage</a>
+                            
+                                <a class="nav-link" href="#MANAGEMENT_52_1">Management</a>
+                            
+                                <a class="nav-link" href="#REFERENCES_266_1">References</a>
+                            
+                            <a class="nav-link" href="#RESOURCES">Resources</a>
+                            <a class="nav-link" href="#PUBLICATIONINFORMATION">Publication Information</a>
+                    </nav>
+                </div>
+            </div>
+            <div class="col-md-8 col-lg-8 col-sm-12 content-body">
+                <span class="in-nav-mobile d-block d-md-none">
+                    <a class="heading" data-bs-toggle="collapse" href="#HeaderSection" aria-expanded="false" aria-controls="HeaderSection">On this page<i class="fas fa-chevron-down float-end"></i>
+                    </a>
+                    <ul class="collapse" id="HeaderSection">
+                        
+                            <li class="nav-item"><a href="#QUICK_233_1">Quick Tips</a></li>
+                            <li class="nav-item"><a href="#INTRODUCTION_65_1">Pest Notes: Introduction</a></li>
+                        
+                            <li class="nav-item"><a href="#IDENTIFICATION_247_1">Identification</a></li>
+                        
+                            <li class="nav-item"><a href="#LIFE_241_1">Life Cycle</a></li>
+                        
+                            <li class="nav-item"><a href="#DAMAGE_51_1">Damage</a></li>
+                        
+                            <li class="nav-item"><a href="#MANAGEMENT_52_1">Management</a></li>
+                        
+                            <li class="nav-item"><a href="#REFERENCES_266_1">References</a></li>
+                        
+                        <li class="nav-item"><a href="#RESOURCES">Resources</a></li>
+                        <li class="nav-item"><a href="#PUBLICATIONINFORMATION">Publication Information</a></li>
+                    </ul>
+                </span>
+                
+                <div data-bs-spy="scroll" data-bs-target="#navbar-example3" data-bs-offset="0" tabindex="0">
+                     
+                        <div class="callout" id="item-0">
+                            <div class="callout-title">
+                                <span id="QUICK_233_1"></span>
+                                <p class="h3">Quick Tips</p>
+                            </div>
+                            <div class="callout-body" id="calloutBody">
+                                <p><b>Scales are immobile insects that suck plant juices from many types of trees, shrubs, and houseplants.</b> Scale infestations can cause yellowing or premature dropping of leaves, sticky honeydew, and blackish sooty mold. Plant parts can distort or die back, depending on the species and abundance of scales. Management includes proper plant care, protecting beneficial insects and applying less toxic insecticides when needed. Most plants tolerate low to moderate numbers of scales.</p>
+<p class="h3">What does scale damage look like?</p>
+<ul>
+  <li>Similar      to that of aphids and whiteflies</li>
+  <li>Wet      or sticky honeydew on leaves, pavement, cars, or anything else underneath      the infested plants</li>
+  <li>Black      sooty mold growing on the honeydew</li>
+  <li>Discolored,      distorted, or dying leaves, twigs, or branches, especially with armored      scale infestations</li>
+</ul>
+<p class="h3">What do scales look like?</p>
+<ul>
+  <li>Scales lack an obvious head or      legs and don’t resemble most other insects. </li>
+</ul>
+<ul>
+  <li>Adults may appear as circular, elongate, or oval discolorations or bumps on bark, leaves, or fruit. Their coverings range from 1/25 to 1/4 inch long.</li>
+  <li>Immature scales (crawlers) are often yellow to orangish. They are called crawlers because they are the life stage that has legs and move. Once the crawlers settle down, their legs drop off and they become immobile adults. </li>
+</ul>
+<p class="h3">Distinguish the two most common types of scales—armored and soft.</p>
+<ul>
+  <li>Armored      scales are tiny and flat, have covers that usually can be removed      from the body, and don’t secrete sticky honeydew. Common species include      San José scale and California red scale.</li>
+  <li>Soft      scales are larger, excrete honeydew, and are more rounded and      convex with covers that don’t lift off. Common species include black      scale, lecanium scale, and brown soft scale.</li>
+  <li>Consult      the UC IPM website for help identifying other scale species. </li>
+</ul>
+<p class="h3">To reduce problems, use an integrated approach.</p>
+<ul>
+  <li>Provide      plants with proper care, especially irrigation.</li>
+  <li>Monitor      plants to look for scale predators such as lady beetles or lacewings and      parasite emergence holes in scale covers.</li>
+  <li>Use      sticky barriers or insecticide baits to selectively control scale-tending      ants.</li>
+  <li>Consider      replacing problem-prone plants. Most scales are highly specific to certain      plants.</li>
+</ul>
+<p class="h3">What about pesticides?</p>
+<ul>
+  <li>Insecticides      are not necessary unless damage from scales is intolerable.</li>
+  <li>When      possible, avoid broad-spectrum insecticides that kill beneficial insects.</li>
+  <li>For infestations      on fruit trees and smaller plants, make a well-timed and thorough spray      using horticultural oil during the dormant season or when scale crawlers      are active in the growing season.</li>
+  <li>For larger      plants, consider soil-applied imidacloprid. This material is not effective      against some scales, including armored scales, and may cause outbreaks of      cottony cushion scale. Always read the label.</li>
+</ul> <p>Download a <a href="https://ipm.ucanr.edu/PDF/QT/qtscales.pdf">PDF of this Quick Tips</a>. Descargue un <a href="https://ipm.ucanr.edu/PDF/QTSP/qtspscales.pdf">PDF de estos Notas Breves</a>.</p>
+                            </div>
+                            <div class="p-3 text-center">
+                                <a href="#" data-bs-toggle="collapse" data-bs-target="#collapseExample" aria-expanded="false" aria-controls="collapseExample" class="gradient-vertical" id="expandContent"  onclick="expandQuickTips(event, 'calloutBody', 'expandContent', 'gradient-vertical')">
+                                    Read more Quick Tips for this pest
+                                </a>
+                            </div>
+                        </div>
+                    
+                                        <h2 id="INTRODUCTION_65_1">Pest Notes: Introduction</h2>
+                                    
+                                <!-- cot:1/cse:65/muc:1-->
+                                <p>Scales are sucking insects that insert their tiny, strawlike mouthparts into bark, fruit, or leaves, mostly on trees and shrubs and other perennial plants. Some scales can seriously damage their host, while other species do no apparent damage to plants even when scales are very abundant. The presence of scales can be easily overlooked, in part because they do not resemble most other insects.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/S/I-HO-SOLE-AD.006.jpg' alt='Adult females and nymphs on twig; Credit: Jack Kelly Clark, UC IPM' title='Black scales. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Black scales. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="IDENTIFICATION_247_1">Identification</h2>
+                                    
+                                <!-- cot:1/cse:247/muc:1-->
+                                <p>Adult female scales and immatures (nymphs) of most species are circular to oval, wingless, and lack a separate head or other easily recognizable body parts. Some scales change greatly in appearance as they grow, and some species have males and females that differ in shape, size, and color. Adult males are rarely seen and are tiny, delicate, white to yellow insects with one pair of wings and a pair of long antennae. Some scale species lack males and the females reproduce without mating.</p>
+            
+<p>Armored scales and soft scales are the most common types (or families). Scales in other families include important pests of cactus, elm, oak, sycamore, and various conifers. Common scales and their tree and shrub hosts are listed in <a href="#TABLE1">Tables 1–3</a>. Color photographs for 200 scale species and detailed discussion of these and others are available in the California Department of Food and Agriculture publications by Gill listed in References.</p>
+
+<p>Cottony cushion scale, European elm scale, soft scales, and certain other scales secrete sticky honeydew. Armored scales, oak pit scales, and sycamore scale do not excrete honeydew. It is important to correctly distinguish the scale family (e.g., armored versus soft scale) and often the particular species of scale to determine whether control is warranted; and if so, what methods and timing of control action are effective. For example, sago palms can be infested by the similar-looking cycad scale and oleander scale. Even very high populations of oleander scale are harmless to most plants, but cycad scale warrants control because it causes serious damage and can kill sago palms. Insecticides differ in their effectiveness for certain scale types. imidacloprid, a popular systemic insecticide (discussed below), controls soft scales and certain other scales but does not control armored scales or cottony cushion scale.</p>
+            
+<h3>Armored Scales</h3>
+<p><a href="/PMG/PESTNOTES/pni7408-3a.html">Armored scales</a>, family Diaspididae, have a flattened, platelike cover that is less than 1/8 inch in diameter. The covers often have a differently colored, slight protuberance (exuviae or “nipple”) and concentric rings may form as nymphs (immatures) grow and their cover enlarges. The actual insect body is underneath the cover; if you remove the cover, the insect body will remain on the plant. Armored scales do not produce honeydew. Damaging species include cycad scale, euonymus scale, oystershell scale, and San Jose scale.</p> 
+                                <!-- cot:1/cse:247/muc:2-->
+                                <table class="table table-bordered table-striped table-content-wrap">
+    <caption>TABLE 1. Some Common Armored Scales (Diaspididae), Their Impact in California, and the Principal Hosts. (<a href="/PMG/PESTNOTES/pni7408-1.html">see photo gallery</a>) </caption>
+     <thead>
+  
+  <tr>
+    <th scope="col">Common Name </th>
+    <th scope="col">Scientific Name</th>
+    <th scope="col">Susceptible Hosts and Impact</th>
+    <th scope="col">Hosts That Usually are not Damaged</th>
+  </tr>
+         </thead>
+        <tbody>
+  <tr>
+    <th><a href="/PMG/A/I-HO-AAUR-CD.003.html">California red scale</a> </th>
+    <td><em>Aonidiella aurantii</em></td>
+    <td>citrus highly   susceptible in Central Valley, biologically controlled in Southern California</td>
+    <td>acacia, boxwood,   eugenia, euonymus, grape, magnolia, mulberry, olive, palm, podocarpus,   privet, rose</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/F/I-HO-FZAM-CD.002.html">cycad scale</a> </th>
+    <td><em>Furchadaspis zamiae</em></td>
+    <td>cycads (sago palm)   severely damaged</td>
+    <td>bird-of-paradise </td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/U/I-HO-UEUO-CO.002.html">euonymus scale</a> </th>
+    <td><em>Unaspis euonymi</em></td>
+    <td><em>Euonymus japonica</em> highly susceptible</td>
+    <td><em>Euonymus kiautschovica</em> (=<em>E. sieboldiana</em>) tolerant, <em>E. alata</em> unaffected</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/H/I-HO-HRAP-CO.004.html">greedy scale</a> </th>
+    <td><em>Hemiberlesia rapax</em></td>
+    <td>generally not   damaging</td>
+    <td>acacia, bay,   boxwood, ceanothus, fruit trees, holly, ivy, laurel, magnolia, manzanita,   palm, pepper tree, pittosporum, pyracantha, redbud, strawberry tree, willow   and others</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/H/I-HO-HLAT-CO.011.html">latania scale</a> </th>
+    <td><em>Hemiberlesia lataniae</em></td>
+    <td>generally not   damaging, except on kiwifruit </td>
+    <td>acacia, avocado, <em>Cedrus</em>,   English ivy, euonymus, <em>Fatsia</em>, fuchsia, gladiolus, grevillea, <em>Kentia</em>,   philodendron, rose, <em>Rubus</em>, <em>Salix</em>, yucca and others</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/C/I-HO-CMIN-CO.001.html">minute cypress scale</a> </th>
+    <td><em>Carulaspis minima</em></td>
+    <td><em>Cupressus sempervirens</em> highly susceptible</td>
+    <td>arborvitae,   cypress, juniper</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/M/I-HO-MOBS-IF.001.html">obscure scale</a> </th>
+    <td><em>Melanaspis obscura</em></td>
+    <td>not damaging,   biologically controlled</td>
+    <td>chestnut, oaks,   pecan</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/A/I-HO-ASNE-CO.001.html">oleander scale</a> </th>
+    <td><em>Aspidiotus nerii</em></td>
+    <td>generally not   damaging, prefers aucuba, cycad or sago palm, ivy, oleander, and olive</td>
+    <td>bay, boxwood,   holly, laurel, magnolia, manzanita, maple, mulberry, pepper tree, redbud,   yew, yucca</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/P/I-HO-POLE-AD.001.html">olive scale</a> </th>
+    <td><em>Parlatoria oleae</em></td>
+    <td>not damaging,   biologically controlled</td>
+    <td>olive</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/L/I-HO-LULM-AD.002.html">oystershell scale</a> </th>
+    <td><em>Lepidosaphes ulmi</em></td>
+    <td>poplars and   willows especially susceptible</td>
+    <td>alder, aspen, box   elder, boxwood, ceanothus, cottonwood, most deciduous fruit and nuts, holly,   maple, sycamore</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/L/I-HO-LBEC-AD.015.html">purple scale</a> </th>
+    <td><em>Lepidosaphes beckii</em></td>
+    <td>not damaging,   biologically controlled</td>
+    <td>citrus</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/Q/I-HO-QPER-AD.014.html">San Jose scale</a> </th>
+    <td><em>Quadraspidiotus perniciosus</em></td>
+    <td>nut and stone   fruit trees can be seriously damaged, also rose growing near these other   hosts</td>
+    <td>acacia, aspen,   citrus, cottonwood, most maple, mulberry, poplar, pyracantha, strawberry   tree, willow</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/Q/I-HO-QJUG-AD.001.html">walnut scale</a> </th>
+    <td><em>Quadraspidiotus juglansregiae</em></td>
+    <td>not damaging,   biologically controlled</td>
+    <td>walnut</td>
+  </tr>
+            </tbody>
+</table> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/Q/I-HO-QPER-NM.021.jpg' alt='Nymph showing yellow coloration, 15X; . Credit: Jack Kelly Clark, UC IPM' title='Tiny crawlers of San Jose scale. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Tiny crawlers of San Jose scale. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                <!-- cot:1/cse:247/muc:3-->
+                                <h3>Soft Scales</h3>
+<p><a href="/PMG/PESTNOTES/pni7408-3b.html">Soft scales</a>,  family Coccidae, grow up to 1?4 inch long and have a smooth, cottony, or waxy surface. At maturity, soft scales are usually larger and more rounded and convex (humped) than armored scales. Their surface is the actual body wall of the insect and cannot be removed; flipping the cover removes the insect body and cover together. Soft scales and certain other types feed on phloem sap and excrete abundant, sticky honeydew, which drips on plants and surfaces underneath and promotes the growth of blackish sooty mold. Soft scales include black scale, brown soft scale, Kuno scale, lecanium scales, and tuliptree scale.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/P/I-HO-PCOR-EG.004.jpg' alt='Eggs and female on stem (2x), UCD campus Credit: Jack Kelly Clark, UC IPM' title='Female European fruit lecanium scale, one overturned to reveal eggs. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Female European fruit lecanium scale, one overturned to reveal eggs. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                <!-- cot:1/cse:247/muc:4-->
+                                <table class="table table-bordered table-striped table-content-wrap">
+    <caption>TABLE 2. Some Common Soft Scales (Coccidae), Their Impact in California, and the Principal Hosts. (<a href="/PMG/PESTNOTES/pni7408-2.html">see photo gallery</a>) </caption>
+     <thead>
+  
+  <tr>
+    <th scope="col">Common Name </th>
+    <th scope="col">Scientific Name</th>
+    <th scope="col">Susceptible Hosts and Impact</th>
+    <th scope="col">Hosts That Usually are not Damaged</th>
+  </tr>
+         </thead>
+    <tbody>
+  <tr>
+    <th><a href="/PMG/S/I-HO-SOLE-AD.005.html">black scale</a> </th>
+    <td><em>Saissetia oleae</em></td>
+    <td>sometimes   annoyingly abundant on its hosts away from the coast and if ant-tended</td>
+    <td>aspen, bay,   citrus, cottonwood, coyote bush, holly, maple, mayten, oleander, olive, palm,   pear, pepper tree, pistachio, poplar, privet, stone fruit, strawberry tree</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/C/I-HO-CHES-CO.015.html">brown soft scale</a> </th>
+    <td><em>Coccus hesperidum</em></td>
+    <td>annoyingly   abundant if ant-tended, on avocado, citrus, holly, manzanita, palm</td>
+    <td>aspen, cottonwood,   poplar, stone fruit, strawberry tree, willow</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/E/I-HO-ECER-AD.010.html">calico scale</a> </th>
+    <td><em>Eulecanium cerasorum</em></td>
+    <td>liquidambar   sometimes damaged</td>
+    <td>box elder, maple,   stone fruit, walnut</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/C/I-HO-CPSE-CO.006.html">citricola scale</a> </th>
+    <td><em>Coccus pseudomagnoliarum</em></td>
+    <td>citrus and   hackberry sometimes damaged in Central Valley</td>
+    <td>biologically   controlled in Southern California </td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/P/I-HO-PCOR-AD.007.html">European fruit lecanium</a>, also called brown apricot scale</th>
+    <td><em>Parthenolecanium corni</em></td>
+    <td>annoyingly   abundant sometimes</td>
+    <td>alder, almond,   aspen, cottonwood, elm, grape, pear, pistachio, poplar, stone fruit, toyon,   walnut</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/L/I-HO-LPRU-AD.010.html">frosted scale</a> </th>
+    <td><em>Parthenolecanium pruinosum</em></td>
+    <td>walnut sometimes   damaged</td>
+    <td>ash, birch, elm,   laurel, locust, pistachio, rose, sycamore</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/P/I-HO-PPSI-EG.003.html">green shield scale</a> </th>
+    <td><em>Pulvinaria psidii</em></td>
+    <td>occasional pest on   its hosts in Los Angeles and Orange Counties</td>
+    <td>aralia, begonia,   camellia, croton, eugenia, gardenia, hibiscus, laurel fig or Indian laurel (<em>Ficus   retusa</em>), pepper tree, pittosporum, plumeria, <em>Schefflera</em></td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/T/I-HO-TPIN-AD.001.html">irregular pine scale</a> </th>
+    <td><em>Toumeyella pinicola</em></td>
+    <td>Monterey pine   infested, mostly in Bay Area</td>
+    <td>other pines</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/E/I-HO-EKUN-AD.007.html">Kuno scale</a> </th>
+    <td><em>Eulecanium kunoense</em></td>
+    <td>stone fruit   sometimes damaged, especially plum</td>
+    <td>cotoneaster,   pyracantha, rose, walnut</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/P/I-HO-PQUE-AD.005.html">oak lecanium</a> </th>
+    <td><em>Parthenolecanium quercifex</em></td>
+    <td>coast live oak</td>
+    <td>other oaks</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/T/I-HO-TLIR-IF.001.html">tuliptree scale</a> </th>
+    <td><em>Toumeyella liriodendri</em></td>
+    <td>deciduous   magnolias and tuliptree (yellow poplar) highly susceptible</td>
+    <td>linden</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/C/I-HO-CIRR-AD.004.html">wax scale</a>, including barnacle and Chinese wax scales</th>
+    <td><em>Ceroplastes</em> spp. </td>
+    <td>annoyingly   abundant sometimes on <em>Escallonia</em>, gardenia, <em>Geijera parviflora</em>,   and mayten</td>
+    <td>California bay,   coyote bush, holly, <em>Mahonia</em>, pepper tree</td>
+  </tr>
+        </tbody>
+</table>
+
+
+<table class="table table-bordered table-striped table-content-wrap">
+    <caption>TABLE 3. Some Common Scales in Other Families, Their Importance in California, and the Principal Hosts. (<a href="/PMG/PESTNOTES/pni7408-3.html">see photo gallery</a>) </caption>
+    <thead>
+  <tr>
+    <th scope="col">Common Name </th>
+    <th scope="col">Scientific Name</th>
+    <th scope="col">Susceptible Hosts and Impact</th>
+    <th scope="col">Hosts That Usually are not Damaged</th>
+  </tr>
+        </thead>
+    <tbody>
+  <tr>
+    <th><a href="/PMG/D/I-HO-DCOC-AD.005.html">cochineal scale</a> </th>
+    <td><em>Dactylopius</em> spp. (Dactylopiidae)</td>
+    <td>prickly pear, <em>Opuntia</em> and <em>Nopalea</em> species; severe decline and death</td>
+    <td>other cacti</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/I/I-HO-IPUR-CO.014.html">cottony cushion scale</a> </th>
+    <td><em>Icerya purchasi</em> (Monophlebidae)<sup>1</sup></td>
+    <td><em>Cocculus laurifolius</em>; abundant honeydew and sooty mold, possible decline</td>
+    <td>citrus, nandina,   pittosporum, and many others; usually biologically controlled<sup>2</sup></td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/M/I-HO-MEHR-CO.001.html">Ehrhorn’s oak scale</a> </th>
+    <td><em>Mycetococcus ehrhorni</em> (Asterolecaniidae)</td>
+    <td>evergreen oaks in   southern California; unhealthy looking canopy, slow growth, pale fungal mass</td>
+    <td> </td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/G/I-HO-GSPU-AD.009.html">European elm scale</a> </th>
+    <td><em>Eriococcus spurius</em> (Eriococcidae)</td>
+    <td>American and   Chinese elms; leaf yellowing, plant decline, and dieback</td>
+    <td>other elms</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/X/I-HO-XMAC-AD.001.html">incense-cedar scale or Monterey   cypress scale</a> </th>
+    <td><em>Xylococculus macrocarpae</em> (Xylococcidae)</td>
+    <td>Incense-cedar,   Monterey cypress and other <em>Cupressus </em>species, and junipers; foliage   discoloring and dieback in native stands </td>
+    <td>conifers in urban   areas</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/K/I-HO-KQUE-CO.001.html">Kuwana oak scale</a> </th>
+    <td><em>Kuwania quercus</em> (Kuwaniidae)</td>
+    <td>blue oak; bark   roughening and flaking off </td>
+    <td> </td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/A/I-HO-AVAR-CD.009.html">oak pit scale</a> </th>
+    <td><em>Asterodiaspis</em> spp. (Asterolecaniidae)<sup>3</sup></td>
+    <td><em>Quercus lobata, Q. douglasii, and Q. rober</em>; distorted terminals, dieback, and   severe decline</td>
+    <td>other oaks</td>
+  </tr>
+  <tr>
+    <th><a href="/PMG/S/I-HO-SPLA-CD.010.html">sycamore scale</a> </th>
+    <td><em>Stomacoccus platani</em> (Steingeliidae)<sup>4</sup></td>
+    <td>California   sycamore, London plane; premature leaf drop, dieback, bark roughening and   flaking off</td>
+    <td>American sycamore</td>
+  </tr>
+        </tbody>
+</table>
+    <p class="visually-hidden">Footnotes</p>
+<ul class="list-no-bullet ms-0">
+<li><sup>1</sup> See <em>Pest Notes: </em><a href="/PMG/PESTNOTES/pn7410.html"><em>Cottony Cushion Scale</em></a>, UC ANR Publication 7410</li>
+ <li><sup>2</sup> Cottony cushion scale can harm “Hosts Usually Not Damaged” if natural enemies are disrupted, such as by application of certain persistent insecticides. </li>
+<li><sup>3</sup> See <em>Pest Notes: </em><a href="/PMG/PESTNOTES/pn7470.html"><em>Oak Pit Scales</em></a>, UC ANR Publication 7470</li>
+<li><sup>4</sup> See <em>Pest Notes: </em><a href="/PMG/PESTNOTES/pn7409.html"><em>Sycamore Scale</em></a>, UC ANR Publication 7409 </li>
+</ul> 
+                                <!-- cot:1/cse:247/muc:5-->
+                                <h3>Scale Look-Alikes</h3>
+<p>Various other organisms resemble scales but have different biology and management. These include <a href="/PMG/E/I-HO-EUMB-CO.008.html">California laurel aphid</a> <em>(Euthoracaphis umbellulariae)</em>, <a href="/PMG/N/I-HO-NNIP-CO.001.html">coconut mealybug</a> <em>(Nipaecoccus nipae)</em>, <a href="/PMG/E/I-HO-ECUP-AD.001.html">cypress bark mealybug</a> <em>(Ehrhornia cupressi)</em>, <a href="/PMG/C/I-HO-CBRA-CO.001.html">palm aphid</a> <em>(Cerataphis brasiliensis</em>), whitefly nymphs, and psyllids, such as <a href="/PMG/E/I-HO-EMAI-CD.003.html">lemongum lerp psyllid</a> <em>(Cryptoneossa triangula)</em> and <a href="/PMG/G/I-HO-GBRI-CO.006.html">redgum lerp psyllid</a> <em>(Glycaspis brimblecombei</em>). <a href="/PMG/S/D-WO-SNEO-FU.002.html">Diamond “scale</a>,” which infests palms, is actually the fruiting bodies of a blackish fungus (<em>Phaeochoropsis neowashingtoniae)</em>.</p> 
+                                        <h2 id="LIFE_241_1">Life Cycle</h2>
+                                    
+                                <!-- cot:1/cse:241/muc:1-->
+                                <p>Scales hatch from an egg and typically develop through two nymphal instars (growth stages) before maturing into an adult. Each instar can change greatly as it ages, so many scales appear to have more than two growth stages. At maturity, adult females produce eggs that are usually hidden under their bodies, although some species secrete their eggs externally under prominent cottony or waxy covers. Eggs hatch into tiny crawlers (mobile first instar nymphs), which are yellow to orangish in most species. Crawlers walk over the plant surface, are moved to other plants by wind, or are inadvertently transported by people or birds. Crawlers settle down and begin feeding within a day or two after emergence.</p>
+
+<p>Settled nymphs may spend their entire life in the same spot without moving as they mature into adults. Nymphs of some species can move slowly, such as soft scales that feed on deciduous hosts and move from foliage to bark in the fall before leaves drop. For species with multiple generations, all scale life stages may be present throughout the year in areas with mild winters.</p>
+
+<h3>Armored Scales</h3><p>Most species of armored scales have several generations a year and overwinter primarily as first instar nymphs and adult females. Except for crawlers and adult males, armored scales lack obvious appendages and spend their entire life feeding at the same spot.</p>
+
+<h3>Soft Scales</h3>
+<p>Most soft scales have one generation each year and overwinter as second instar nymphs. The brown soft scale is an exception; it has multiple generations and females and nymphs can be present throughout the year. Most immature soft scales retain their barely visible legs and antennae after settling and are able to move, although slowly.</p> 
+                                        <h2 id="DAMAGE_51_1">Damage</h2>
+                                    
+                                <!-- cot:1/cse:51/muc:1-->
+                                <p>Some scale species, when abundant, weaken a plant and cause it to grow slowly. <a href="/PMG/A/I-HO-AAUR-CD.021.html">Infested plants</a> appear water stressed, leaves turn yellow and may drop prematurely, and plant parts that remain heavily infested may die. The dead brownish leaves may remain on scale-killed branches, giving plants a scorched appearance. If the scale produces honeydew, this sticky excrement, sooty mold, and the ants attracted to <a href="/PMG/S/I-HO-SPHI-CD.003.html">honeydew</a> can annoy people even when scales are not harming the plant.</p>
+            
+<p>The importance of infestations depends on the scale species, the plant species and cultivar, environmental factors, and <a href="/PMG/P/I-HO-PCOR-CL.007.html">natural enemies</a>. Populations of some scales can increase dramatically within a few months when the weather is warm, and honeydew-seeking ants protect scales from their natural enemies. Plants are not harmed by a few scales and even high populations of certain species apparently do not damage plants.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/U/D-WO-UNKS-FO.002.jpg' alt='Sooty mold on oak leaves infested with aphids. U.C. Gill Tract, Albany, CA Credit: Jack Kelly Clark, UC IPM' title='Sooty mold on oak leaves. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Sooty mold on oak leaves. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="MANAGEMENT_52_1">Management</h2>
+                                    
+                                <!-- cot:1/cse:52/muc:1-->
+                                <p>Many species are usually well controlled by beneficial predators and parasites (natural enemies). Exceptions are when natural enemies are disrupted by <a href="/PMG/C/I-HO-CHES-CO.017.html">ants</a>, dust, or the application of persistent broad-spectrum insecticides. Preserving (conserving) parasites and predators (such as by controlling pest-tending ants) may be enough to bring about gradual control of certain scales as natural enemies become more abundant.</p>
+            
+<p>A well-timed and thorough spray of horticultural (narrow-range) oil during the dormant season, or soon after scale crawlers are active in late winter to early summer, can provide good control of most species of scale. Certain scale problems on large plants and hosts especially sensitive to scale damage may warrant the application of a systemic insecticide. If plants perform poorly or are repeatedly damaged by pests, the best course of action may be to replace the plant with a pest-resistant species or cultivar that is better adapted to the site conditions.</p>
+        
+<h3>Monitoring</h3>
+<p>Periodically check to ensure that plants have a good growing environment and are receiving appropriate cultural care. Inspect plants to determine whether female scales, nymphs, honeydew, sooty mold, or ants and other pests are present. Before applying insecticide, examine a portion of the scales to determine whether they are dead or parasitized as described below; for example, they fail to exude fluid when squished. If a large proportion of scales are dead or parasitized by natural enemies, consider delaying a treatment decision and monitor the population again later before deciding whether to apply pesticide. Tape traps for crawlers and honeydew monitoring are useful in certain situations for determining the need and best timing for pesticide application.</p>
+
+<p>Inspect trunks for ants periodically during the growing season. If the descending ants have swollen, almost translucent abdomens, they may be feeding on honeydew produced by scales or other insects. Trace back trail-making ants to locate colonies of the honeydew-producing insects.</p>
+
+<p>There are no quantitative action guidelines for deciding whether pesticide application for scales is warranted. Monitor and record scale densities and use the density that caused damage (dieback or unacceptable honeydew) as your preliminary control action threshold. As you gain experience, refine this threshold over time for your local situation.</p>
+
+<h4>Tape Traps</h4>
+<p>Transparent double-sided sticky tape can be used to effectively time a foliar insecticide application. During the spring before crawlers begin to emerge, tightly encircle each of several scale-infested twigs or branches with transparent tape that is sticky on both sides, available at fabric or craft stores. Double over the loose end of the tape several times to make it easier to remove. Place a tag or flagging near each tape so you can readily find it. Change the tapes at weekly intervals. After removing the old tape, wrap the twig at the same location with fresh tape. Preserve the old sticky tapes by sandwiching them between a sheet of white paper and clear plastic. Label the tapes with the date, location, and host plant from which they were collected.</p>
+
+<p><a href="/PMG/P/I-HO-PCOR-MO.007.html">Scale crawlers</a> get stuck on the tape and appear as yellow or orange specks. Examine the tape with a hand lens to distinguish the crawlers (which are round or oblong and have very short appendages) from pollen and dust. Use a hand lens to examine the crawlers beneath mature female scales on bark or foliage to be certain of crawler appearance. Other tiny creatures, including mites, may also be caught in the tape.</p>
+
+<p>Visually compare the tapes collected on each sample date. If a spring or summer foliar insecticide application is planned, unless another time is recommended for that species, spray after crawler production (abundance in traps) has peaked and definitely begun to decline, which is soon after most crawlers have settled.</p>
+
+<h4>Honeydew Monitoring</h4>
+<p> Honeydew drippings from plants can be efficiently monitored using water-sensitive paper, which is commonly used for monitoring insecticide droplets and calibrating sprayers. Products include bright yellow cards that produce distinct blue dots upon contact with honeydew or water. Regularly monitoring honeydew beneath plants, such as the number of drops during four hours on the same time of day once a week, can help to develop thresholds and evaluate effectiveness of the treatment. Honeydew monitoring is useful where there is a low tolerance for dripping honeydew, when managing many trees, such as along city streets or in parks, and on tall trees where the honeydew-producing insects may be located too high to easily observe. For more information on monitoring honeydew, see the book  <em><a href="/IPMPROJECT/ADS/manual_landscape.html">Pests of Landscape Trees and Shrubs</a></em>.</p>
+
+
+            <h3>Cultural Control</h3>
+            
+            <p>Provide plants with good growing conditions and proper cultural care, especially appropriate irrigation, so they are more resistant to scale damage. You can prune off heavily infested twigs and branches, if they are limited to a few parts of small plants. In areas with hot summers, pruning to open up canopies can reduce populations of black scale, citricola scale, cottony cushion scale, and possibly other scales by increasing scale mortality from exposure to heat and parasites. Consider replacing problem-prone plants.</p>
+            
+<h3>Biological Control</h3>
+
+<p>Scales are preyed upon by small parasitic wasps and many predators, including certain beetles, <a href="/natural-enemies/minute-pirate-bugs/">bugs</a>, <a href="/natural-enemies/green-lacewings/">lacewings</a>, and mites. Predatory lady beetle (ladybug) species of <em>Chilocorus</em>, <em>Hyperaspis</em>, and <em>Rhyzobius</em>, can easily be overlooked because the adults of many species are tiny or colored and shaped like scales, and their larvae may feed hidden beneath scales. <em>Hyperaspis</em> species are tiny, shiny, black lady beetles with several red, orange, or yellow spots on the back. <a href="/PMG/R/I-CO-RLOP-AD.002.html"><em>Rhyzobius lophanthae</em></a> has a reddish head and underside and a grayish back densely covered with tiny hairs. The <a href="/natural-enemies/twicestabbed-lady-beetle/">twicestabbed lady beetle</a>, <em>Chilocorus orbus</em>, is shiny black with two red spots on its back.</p>
+<p>Often the most important natural enemies of scales are parasitic wasps, including species of <a href="/natural-enemies/california-red-scale-aphytis-parasitoid/"><em>Aphytis</em></a>, <a href="/PMG/P/I-HO-PCOR-CL.016.html"><em>Coccophagus</em></a>, <a href="/PMG/Q/I-HO-QPER-EP.002.html"><em>Encarsia</em></a>, and <a href="/PMG/S/I-HO-SOLE-MH.002.html"><em>Metaphycus</em></a>. The female wasp lays one or several eggs in or on each scale, where the tiny maggotlike <a href="/PMG/PESTNOTES/pni7408-1a.html">wasp larvae</a> feed. <a href="/PMG/P/I-HO-PCOR-CL.001.html">Parasitized scales</a> may become puffy or darken in comparison with unparasitized scales. Sometimes the <a href="/PMG/C/I-HO-CHES-MS.003.html">immature parasites</a> are visible through the scale surface. After completing the larval stage and pupating, the emerging adult of internal parasites typically leaves a round exit hole in the scale it killed. With external parasites that feed outside the scale body, but under the cover of armored scales, their maggotlike larvae may be observed by prying off the scale cover.</p>
+<p>Natural enemies are commercially available for release against California red scale and perhaps certain other scales. However, conserving resident natural enemies is a more efficient and longer lasting strategy than buying and releasing beneficials in gardens and landscapes.</p>
+
+<p>Ant control, habitat manipulation, and pesticide management are the key natural enemy conservation strategies. If ants are abundant, selectively control them. Grow a variety of flowering plants to help attract and support natural enemies. Adults of predatory bugs, lacewings, lady beetles, and parasitic wasps live longer, lay more eggs, and kill more scales when they have plant nectar or pollen and insect honeydew to feed on. Avoid creating dust because it interferes with natural enemies. For example, rinse small plants when foliage becomes dusty.</p>
+
+<p>Depending on the scale species and the extent to which biological control has been disrupted, it will take several months of conservation efforts (such as controlling ants and dust and avoiding application of persistent insecticides) or until the next season or longer before scale populations are reduced by biological control. If current levels of scales are intolerable, spray insecticidal oils to reduce scale populations while conserving natural enemies.</p>
+
+<h3>Ant Control</h3>
+
+<p>Because ants attack and feed on scale parasites and predators, control ants if they are <a href="/PMG/P/I-HY-PIMP-AD.010.html">tending scales</a>. To deny ants access to plant canopies, prune branches or weeds that provide a bridge between buildings or the ground and apply a sticky material (Tanglefoot) to trunks. Wrap the trunk with a collar of fabric tree wrap, heavy paper, or masking tape to avoid injury to bark; wedge pliable wrap snugly into cracks and crevices; and coat the wrap with the <a href="/PMG/A/C-NC-APPL-LS.005.html">sticky material</a>. A barrier band about 2 to 6 inches wide should be adequate in most situations. Inspect wraps at least several times a year for damage to bark and remove and relocate any wrap at least once a year to minimize bark injury. Periodically stir sticky material with a stick to prevent ants from crossing on collected debris. Avoid applying sticky material to horizontal surfaces where birds may roost.</p>
+
+<p>Place enclosed pesticide baits (insecticide mixed with an attractant) near nests or on ant trails beneath plants. Effective, slow-acting bait insecticides work over a period of days so that before ants die they will spread the toxicant among many other ants during food sharing. Boric acid, fipronil, and hydramethylnon are examples of insecticides used in ant baits. Although baits require users to be patient, they can be much more effective than sprays. Sprays only kill foraging workers, while ant baits are carried back to the nests where reproductive queens and the entire colony underground can be killed. See <em>Pest Notes: <a href="/PMG/PESTNOTES/pn7411.html">Ants</a></em> for more information.</p>
+
+<h3>Chemical Control</h3>
+<p>Before applying insecticide, make sure plants are receiving appropriate cultural care and take steps to conserve natural enemies. Check a portion of the scales to be certain they are alive and to evaluate the extent of parasitism as described above. To know how and when to effectively make an application, learn more about the available insecticides and the biology of your pest species. Completely read and follow the product label instructions for the safe and effective use of the insecticide. Insecticides can have unintended effects, such as contaminating water, poisoning natural enemies and pollinators, and causing secondary pest outbreaks. </p>
+<h4>Nonresidual, Contact Insecticides</h4>
+<p>Where plants can be sprayed, complete spray coverage of infested plant parts with <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142">horticultural oil</a> at the proper time provides good control of most scales. Horticultural oils (e.g., Bonide Horticultural Oil and Monterey Horticultural Oil) are specially refined petroleum products, often called narrow-range, superior, or supreme oils. Other nonpersistent, contact sprays for garden and landscape plants include <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soap</a> (Safer Brand Insect Killing Soap Concentrate II), <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=38">neem oil</a> (Bayer Advanced Natria Neem Oil Concentrate, Green Light Neem, Garden Safe Brand Neem), <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=108">canola oil</a> (Bayer Advanced Natria Multi-Insect Control), and other botanical (plant-derived) oils.</p>
+<p>These insecticides have low toxicity to people and pets and relatively little adverse impact on the populations of pollinators and natural enemies and the benefits they provide. To obtain adequate control, thoroughly wet the infested plant parts with spray, typically shoot terminals and the underside of leaves. More than one application per growing season may be needed, especially if the targeted pest has more than one generation a year. Thorough spray coverage is especially critical when treating armored scales and oak pit scales as these scales are generally less susceptible to pesticides than soft scales.</p>
+<h4>Dormant Season</h4>
+<p>To control most scales overwintering on deciduous woody plants, thoroughly spray the bark of terminal shoots with oil during winter. For oak pit scales, sycamore scale, and other harder to control species, spray during the plant’s delayed-dormant period, which is after the buds swell but before buds open. Do not spray oystershell or olive scales during the dormant season because susceptible stages of these species are not present during winter.</p>
+<h4>Foliage Spray</h4>
+<p>Horticultural oil is effective in spring or summer on deciduous plants when sprayed soon after most crawlers have emerged and most scales are in the young nymph stage. Late spring and summer are also the times to spray avocado, citrus, and many other broadleaf evergreens. Thoroughly cover with spray the plant parts where scales occur, typically on twig terminals and the underside of leaves.</p>
+<h4>Precautions on Using Oils</h4>
+<p>Follow product labels, which may say to not spray certain plant species or mix oil with certain other products. For example, oil will remove the desirable bluish tinge from blue spruce foliage, although the plant’s health is not impaired. Do not mix oil with <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=115">chlorothalonil</a>, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=70">sulfur</a>, and certain other fungicides; and do not apply oil within 3 weeks of an application of sulfur-containing compounds, such as wettable sulfur. Do not apply oil or other insecticides when it is foggy, freezing (under 32°F), hot (over 90°F), when relative humidity is above 90%, or if rain is expected in the next 24 hours. Especially at locations with hot weather, be sure plants are well irrigated before spraying foliage.</p>
+<h4>Systemic Insecticides</h4>
+<p>Systemic insecticides are absorbed by one plant part (e.g., trunks or roots) and moved (translocated) to leaves and other plant parts. In comparison with systemics that are sprayed onto foliage, products labeled for soil drench or injection, or for trunk injection or spray minimize environmental contamination and may be more effective than contact insecticides. Trunk application of an effective systemic insecticide can provide relatively rapid control. There is a longer time delay between soil application and insecticide action. Some uses require hiring a professional pesticide applicator. Certain home-use products can easily be drenched into soil around the tree trunk using the mix-and-pour method.</p>
+<p>Systemic insecticides for use on landscape plants include neonicotinoids (<a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=87">acetamiprid</a>, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=140">dinotefuran</a>, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=22">imidacloprid</a>, and <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=73">thiamethoxam</a>) and the organophosphate <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=86">acephate</a> (Lilly Miller Ready-to-Use Systemic, Orthene). Properly applied, one application of an effective product may provide season-long control. However, neonicotinoids vary in effectiveness for scale control. For example, acetamiprid (Ortho Flower, Fruit & Vegetable Insect Killer) controls soft scales but is not very effective on armored scales and can only be applied by spraying foliage. Imidacloprid controls European elm scale and most soft scales but does not control cottony cushion scale and most armored scales. Dinotefuran (Green Light Tree and Shrub Insect Control with Safari 2G, Safari) controls most types of scales. Some of these products are for licensed professional applicators only.</p>
+<p>Some systemic insecticides can cause spider mite outbreaks. Foliage sprays of systemics can be toxic to beneficial insects that contact spray or treated leaves. Systemics can translocate into flowers and have adverse effects on natural enemies and pollinators that feed on nectar and pollen. Do not apply systemic insecticides to plants during flowering or shortly before flowering; wait until after plants have completed their seasonal flowering unless the product’s label directions say otherwise. With foliage spraying and soil application, when possible, wait until nearby plants also have completed flowering as spray can drift onto nearby plants or their roots may take up some of the soil-applied insecticide.</p>
+<p>When applying <a href="/PMG/PESTNOTES/pni74111-2.html">systemic insecticide</a>, use soil application or a trunk spray whenever possible . With trunk injection and implantation it is difficult to repeatedly place insecticide at the proper depth. Trunk injection and implantation also injure woody plants and can spread plant pathogens on contaminated tools. When injecting or implanting into multiple plants, scrub any plant sap from tools or equipment that penetrate bark and disinfect tools with a registered disinfectant (e.g., bleach) before moving to work on each new plant. At least one to two minutes of disinfectant contact time between contaminated uses is generally required. Consider rotating work among several tools and using a freshly disinfected tool while the most recently used tools are being soaked in disinfectant. Avoid methods that cause large wounds, such as implants placed in holes drilled in trunks. Do not implant or inject into roots or trunks more than once a year.</p>
+<h4>Residual, Foliar Sprays</h4>
+<p>Foliar sprays of broad-spectrum insecticides with residues that can persist for weeks are not recommended for scale control in landscapes and gardens. Pesticides to avoid include carbamates (<a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=111">carbaryl</a>* or Sevin), nonsystemic organophosphates (<a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=28">malathion</a>), and pyrethroids (<a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=101">bifenthrin</a>, fluvalinate, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=47">permethrin</a>). These are highly toxic to natural enemies and pollinators and can cause outbreaks of spider mites or other pests. Because their use in landscapes and gardens can run or wash off into storm drains and contaminate municipal wastewater, these insecticides are being found in surface water and are adversely affecting nontarget, aquatic organisms.</p>
+
+		<p>*As of August 1, 2020, pesticides containing the active ingredient carbaryl are restricted use materials in California. A valid pesticide applicator’s license is required for their possession and use. For more information see the <a href="https://www.cdpr.ca.gov/docs/county/cacltrs/penfltrs/penf2020/202010.htm">California Department of Pesticide Regulation website</a>.</p> 
+                                            <div class="alert alert-warning mt-3">The pesticide information on this page may become out of date as products and active ingredients change or become unavailable. Some of the pesticides listed are only available for use by licensed pesticide applicators. No endorsements of named products are intended, nor is criticism implied of products not mentioned.</div>
+                                        
+                                        <h2 id="REFERENCES_266_1">References</h2>
+                                    
+                                <!-- cot:1/cse:266/muc:1-->
+                                <p>Dreistadt, S. H., J. K. Clark, and M. L. Flint. 2004. <em><a href="/IPMPROJECT/ADS/manual_landscape.html">Pests of Landscape Trees and Shrubs: An Integrated Pest Management Guide</a></em>. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3359.</p>
+            
+<p>Fichtner, E.J., M.W. Johnson. 2012.  <a href="/PMG/PESTNOTES/pn74160.html"><em>Pest Notes: Black Scale</em></a>. Oakland: Univ. Calif. Agric. Nat Res. Publ. 74160. </p>
+
+<p>Flint, M. L. 1998. <em>Pests of the Garden and Small Farm: A Grower?s Guide to Using Less Pesticide</em>.
+              UC Statewide IPM Program. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3332.</p>
+              
+<p>Flint, M. L., and S. H. Dreistadt. 1998. <em><a href="/IPMPROJECT/ADS/manual_naturalenemies.html">Natural Enemies Handbook: The Illustrated Guide to Biological Pest Control</a>.</em> Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3386.</p>
+
+<p>Flint, M.L., and K. Windbiel-Rojas.  <em><a href="/PDF/PUBS/retailpmnews.2014.mar.pdf">Retail Nursery and Garden Center IPM News</a></em>.  <span class="footertext">(PDF)</span> 4(1) March 2014. </p>
+
+<p>Geisel, P., and E. Perry. 2013.  <a href="/PMG/PESTNOTES/pn7470.html"><em>Pest Notes: Oak Pit Scales</em></a>. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 7470. </p>
+
+<p>Gill, R. J. 1988. <em><a href="http://www.cdfa.ca.gov/plant/ppd/PDF/Technical_Series_01.pdf">The Scale Insects of California Part 1: The Soft Scales</a></em>. <span class="footertext">(PDF)</span> Sacramento: Calif. Dept. Food Agric. </p>
+
+<p>Gill, R. J. 1993. <em><a href="http://www.cdfa.ca.gov/phpps/PPD/PDF/Technical_Series_02.pdf">The Scale Insects of California Part 2: The Minor Families</a>.</em> <span class="footertext">(PDF)</span> Sacramento: Calif. Dept. Food Agric. </p>
+
+<p>Gill, R. J. 1997. <em><a href="http://www.cdfa.ca.gov/phpps/PPD/PDF/Technical_Series_03.pdf">The Scale Insects of California Part 3: The Armored Scales</a>.</em> <span class="footertext">(PDF)</span> Sacramento: Calif. Dept. Food Agric. </p>
+
+<p>Grafton-Cardwell, E. E. 2012.  <a href="/PMG/PESTNOTES/pn7410.html"><em>Pest Notes: Cottony Cushion Scale</em></a>. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 7410.</p>
+
+<p>Rust, M. K., and D. -H. Choe. 2012.  <a href="/PMG/PESTNOTES/pn7411.html"><em>Pest Notes: Ants</em></a>. Oakland: Univ. Calif. Div. Agric. Nat. Res. Publ. 7411. </p>
+
+<p>Dreistadt, S. H. 2010.  <a href="/PMG/PESTNOTES/pn7409.html"><em>Pest Notes: Sycamore Scale</em></a>. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 7409. </p>
+
+ <p>Revised from a previous edition by J. G. Morse, Entomology, UC Riverside; P. A. Phillips, UC IPM Program, emeritus, Ventura Co.; and R. E. Rice, Entomology, emeritus, Kearney Agricultural Center, Parlier.</p> 
+
+                    <h2 id="RESOURCES">Resources</h2>
+                    <ul>
+                        <li><a href="/IPMPROJECT/about_urban.html">About Pest Notes</a></li>
+                        <li><a href="/PMG/glossary.html">Glossary</a></li>
+                        <li><a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/compare-active-ingredients/?conKey=4540">Compare Risks from Pesticides Mentioned</a></li>
+                        <li><a href="/PMG/PESTNOTES/warning.html">WARNING ON THE USE OF PESTICIDES</a></li>
+                        <li><a href="/PMG/PESTNOTES/index.html">List of other Pest Notes</a></li>
+                    </ul>
+
+					
+
+                    <h2 id="PUBLICATIONINFORMATION">Publication Information</h2>
+                    <div class="authors bg-color-light-blue">
+                        <img src="https://ipm.ucanr.edu/assets_v7/images/uc-peer-reviewed.png" title="UC Peer Reviewed Logo" alt="UC Peer Reviewed Logo">
+                        <p><strong>Pest Notes</strong>: Scales</p>
+                        <p><strong>UC ANR Publication 7408</strong></p>
+                        
+                            <p><strong>Author(s)</strong></p>
+                            
+                                    <p><a href="https://ucanr.edu/people/john-n-kabashima">J.N. Kabashima</a> (emeritus), UC Cooperative Extension, Orange and Los Angeles Counties</p>
+                                
+                                    <p><a href="https://ucanr.edu/people/steve-h-dreistadt">S.H. Dreistadt</a>, UC Statewide IPM Program</p>
+                                
+                    </div>
+                </div>
+            </div>
+        </div>
+</main>
+
+<meta property="og:url"                content="https://ipm.ucanr.edu/home-and-landscape/scales/" />
+<meta property="og:type"               content="website" />
+<meta property="og:title"              content="Scales / Home and Landscape / UC Statewide IPM Program (UC IPM)" />
+<meta property="og:description"        content="Scales are sucking insects that insert their tiny, strawlike mouthparts into bark, fruit, or leaves, mostly on trees and shrubs and other perennial plants. Some scales can seriously damage their host, while other species do no apparent damage to plants even when scales are very abundant. The presence of scales can be easily overlooked, in part because they do not resemble most other insects." />
+<meta property="og:image"              content="https://ipm.ucanr.edu/PMG/IMAGES/Q/I-HO-QPER-NM.021.jpg" />
+
+<script>
+    //$(document).ready(function () {
+       // /*
+       // $("#collapseExample").on("hide.bs.collapse", function(){
+       //   $("#multiCollapseExampleText").html('<span class="glyphicon glyphicon-collapse-down"></span> Open');
+       // });
+       // */
+        //$("#collapseExample").on("show.bs.collapse", function () {
+            //$("#multiCollapseExampleText").html('');
+        //});
+    //}); 
+
+    const expandQuickTips = (e, contentId, expandLinkId, gradientClass) => {
+    e.preventDefault();
+    const content = document.getElementById(contentId); //content div to expand/collapse
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+
+    content.classList.remove(gradientClass); // css for gradient
+    content.style.maxHeight = 'none';
+    expandLink.style.display = 'none';
+};
+
+// intially hide content
+const setInitQuickTipsHeight = (contentId,expandLinkId) => {
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+    const content = document.getElementById(contentId); 
+    const totalHeight = content.scrollHeight; 
+    const initialHeight = totalHeight * 0.25; 
+    const threshold = 200;
+    if (totalHeight > threshold) {
+        content.style.maxHeight = initialHeight + 'px';
+        content.style.overflow = 'hidden';
+    } else {
+        content.style.maxHeight = totalHeight + 'px'; 
+        expandLink.style.display = 'none';
+    }
+};
+setInitQuickTipsHeight('calloutBody','expandContent');
+</script><!-- INF10\footer-v5.cfm -->
+
+<!-- # WWW03\Templates\WWW_footerNav_3_2023.cfm -->
+
+
+
+
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Managing Pests</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/agriculture/">Agriculture</a></li>
+          <li><a href="/home-and-landscape/">Home and Landscape</a></li>
+          <li><a href="/natural-area-pests/">Natural Area Pests</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Safety</a></li>
+          <li><a href="/invasive-and-exotic-pests/">Invasive and Exotic Pests</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">About</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/about/">About UC IPM</a></li>
+          <li><a href="/highlights/">Annual Reports</a></li>
+          <li><a href="/strategic-plan/">UC IPM Strategic Plan</a></li>
+          <li><a href="/IPMPROJECT/programs.html">UC IPM Programs</a></li>
+          <li><a href="/what-is-ipm/">What is IPM?</a></li>
+          <li><a href="/whats-new/">What's New</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Resources</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/PMG/glossary.html">Glossary</a></li>
+          <li><a href="/GENERAL/links.html">Links</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Information</a></li>
+          <li><a href="/IPMPROJECT/pubsmenu.html">Publications and Newsletter</a></li>
+          <li><a href="/IPMPROJECT/recursos-espanol.html"><span lang="es">Recursos en espa&ntilde;ol</span></a></li>
+          <li><a href="/IPMPROJECT/workshops.html">Trainings and Events</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Get In Touch</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=RE: Scales">Contact Us</a></li>
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=Feedback: Scales">Feedback</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</footer>
+<div class="footer-secondary">
+  <div class="container">
+    <div class="row">
+      <div class="col-12 footer-secondary-content-wrap">
+        <img src="/assets_v7/images/logo/anr.png" alt="UC IPM logo with an outline of the state of california in the back drop and the UC ANR logo below." width="500px" class="mt-3 mb-3">
+        <div>
+          <div class="footer-icons">
+            
+            <a href="https://www.linkedin.com/showcase/uc-integrated-pest-management/" aria-label="Follow UC IPM on Linkedin"><i class="fab fa-linkedin"></i></a>
+            <a href="https://www.youtube.com/user/UCIPM" aria-label="Follow UC IPM on Youtube"><i class="fab fa-youtube"></i></a>
+            <a href="https://www.instagram.com/ucipm/" aria-label="Follow UC IPM on Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="https://www.facebook.com/UCIPM/" aria-label="Follow UC IPM on Facebook"><i class="fab fa-facebook-square"></i></a>
+          </div>
+        </div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="UC IPM Home and Landscape specific social media options">
+          <span class="footer-secondary-bolded-text">Home and Landscape: </span><a href="https://www.instagram.com/ucipmurban/">Instagram</a> | <a href="https://www.facebook.com/ucipmurban/">Facebook</a></div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="Copyright, usage notices and other links.">
+          <a href="/GENERAL/copyright.html">Use Permissions and Citations</a>
+          |
+          <a href="/nondiscrimination-statements/">Nondiscrimination Statement</a>
+          |
+          <a href="/GENERAL/acknowledgments.html">Acknowledgements</a>
+          |
+          <a href="/accessibility/">Accessibility</a>
+          |
+          <a href="https://ucanr.edu/?privacyStatement">Privacy Statement</a>
+          |
+          <a href="/ADMIN/">Staff-Only Page</a>
+          
+          <p class="small fc-uc-dark-blue mt-5">&copy;1996&mdash;2026 Statewide IPM Program, Agriculture and Natural Resources, University of California Regents of the University of California unless otherwise noted.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+" crossorigin="anonymous"></script>
+
+
+<script async src="https://siteimproveanalytics.com/js/siteanalyze_8343.js"></script>
+
+
+
+</body>
+</html>

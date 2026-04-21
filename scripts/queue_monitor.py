@@ -22,6 +22,11 @@ def check_queue(threshold_minutes: int = 60) -> None:
         logging.info("queue empty")
         return
 
+    if isinstance(oldest_ts, str):
+        oldest_ts = datetime.fromisoformat(oldest_ts)
+    if oldest_ts.tzinfo is None:
+        oldest_ts = oldest_ts.replace(tzinfo=timezone.utc)
+
     age = datetime.now(timezone.utc) - oldest_ts
     if age > timedelta(minutes=threshold_minutes):
         logging.warning(

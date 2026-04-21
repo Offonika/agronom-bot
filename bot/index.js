@@ -12,6 +12,8 @@ const {
   replyFaq,
   handleClarifySelection,
   getLastDiagnosis,
+  getDiagnosisContextForMessage,
+  extractDiagnosisIdFromReplyMessage,
   rememberDiagnosis,
   buildDiagnosisObjectList,
 } = require('./diagnosis');
@@ -38,6 +40,7 @@ const { createPlanTriggerHandler } = require('./callbacks/plan_trigger');
 const { createPlanLocationHandler } = require('./callbacks/plan_location');
 const { createPlanManualSlotHandlers } = require('./callbacks/plan_manual_slot');
 const { createPlanSlotHandlers } = require('./callbacks/plan_slot');
+const { createDiagDetailsHandler } = require('./callbacks/diag_details');
 const { createAssistantChat } = require('./assistantChat');
 const { createReminderScheduler } = require('./reminders');
 const { createOverdueNotifier } = require('./overdueNotifier');
@@ -54,17 +57,28 @@ const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessa
 const { replyUserError } = require('./userErrors');
 const { logFunnelEvent } = require('./funnel');
 const photoTips = require('./photoTips');
+const { createQaIntake } = require('./qaIntake');
 const { getDocVersion, sendConsentScreen } = require('./privacyNotice');
 const { requirePrivacyConsent } = require('./consentGate');
 const support = require('./support');
+const { configurePersistence: configureLocationSessionPersistence } = require('./locationSession');
+const { createObjectDetailsHandler } = require('./objectDetailsHandler');
+const { configurePersistence: configureObjectDetailsPersistence } = require('./objectDetailsSession');
+const { configurePersistence: configureRegionPromptPersistence } = require('./regionPromptState');
 const {
-  addPhoto,
+  configurePersistence: configurePhotoCollectorPersistence,
+  addPhotoAsync,
   getState: getPhotoState,
+  getStateAsync: getPhotoStateAsync,
   getSamePlantPending,
+  clearSamePlantPending,
   pickPrimary: pickPhotoForAnalysis,
-  clearSession: clearPhotoSession,
+  clearSessionAsync: clearPhotoSessionAsync,
+  startFollowupSessionAsync,
   setSamePlantPending,
-  skipOptional: skipOptionalPhotos,
+  skipOptionalAsync: skipOptionalPhotosAsync,
+  confirmSamePlantAsync,
+  denySamePlantAsync,
   MIN_PHOTOS,
   MAX_PHOTOS,
   SAME_PLANT_CHECK_DAYS,
@@ -83,6 +97,12 @@ const photoReplyTimers = new Map();
 const photoLastStatus = new Map();
 const photoLastStatusMessage = new Map();
 const PHOTO_STATUS_EDIT_WINDOW_MS = Number(process.env.PHOTO_STATUS_EDIT_WINDOW_MS || `${5 * 60 * 1000}`);
+const rawFollowupWindowHours = Number(process.env.FOLLOWUP_CASE_WINDOW_HOURS || '72');
+const FOLLOWUP_CASE_WINDOW_HOURS =
+  Number.isFinite(rawFollowupWindowHours) && rawFollowupWindowHours > 0
+    ? rawFollowupWindowHours
+    : 72;
+const FOLLOWUP_CASE_WINDOW_MS = FOLLOWUP_CASE_WINDOW_HOURS * HOUR_IN_MS;
 const consentVersions = {
   privacy: getDocVersion('privacy'),
   offer: getDocVersion('offer'),
@@ -140,6 +160,12 @@ const redis = new Redis(redisUrl);
 redis.on('error', (err) => {
   console.error('Redis error', err);
 });
+configurePhotoCollectorPersistence({ redis });
+configureLocationSessionPersistence({ redis });
+configureObjectDetailsPersistence({ redis });
+configureRegionPromptPersistence({ redis });
+betaSurvey.configurePersistence({ redis });
+support.configurePersistence({ redis });
 const autoplanQueue = new Queue('autoplan', {
   connection: { url: redisUrl },
 });
@@ -155,6 +181,7 @@ bot.catch((err, ctx) => {
   console.error('Bot error', err, ctx?.update);
 });
 const db = createDb(pool);
+const qaIntake = createQaIntake({ db });
 const catalog = createCatalog(pool);
 const reminderScheduler = createReminderScheduler({ bot, db });
 const overdueNotifier = createOverdueNotifier({ bot, db });
@@ -173,9 +200,10 @@ const planTriggerHandler = createPlanTriggerHandler({ db, reminderScheduler });
 const planSessionsApi = createPlanSessionsApi();
 const planFlow = createPlanFlow({ db, catalog, planWizard, geocoder, planSessions: planSessionsApi });
 const objectChips = createObjectChips({ bot, db, planFlow });
-const assistantChat = createAssistantChat({ db, pool });
-const pendingObjectDetails = new Map();
+const assistantChat = createAssistantChat({ db, pool, redis });
+const diagDetailsHandler = createDiagDetailsHandler({ db, rememberDiagnosis, safeAnswerCbQuery });
 const DETAILS_PROMPT_TTL_MS = Number(process.env.OBJECT_DETAILS_PROMPT_TTL_MS || `${24 * 60 * 60 * 1000}`);
+const objectDetailsHandler = createObjectDetailsHandler({ db, objectChips });
 if (typeof planFlow.attachObjectChips === 'function') {
   planFlow.attachObjectChips(objectChips);
 }
@@ -384,76 +412,32 @@ async function handleBetaCreateIndoorObject(ctx) {
   }
 }
 
-function setDetailsSession(userId, objectId, field) {
-  pendingObjectDetails.set(userId, { objectId, field, createdAt: now() });
-}
-
-function clearDetailsSession(userId) {
-  pendingObjectDetails.delete(userId);
-}
-
-async function handleObjectDetailsText(ctx) {
-  const userId = ctx.from?.id;
-  const text = ctx.message?.text?.trim();
-  if (!userId || !text) return false;
-  const session = pendingObjectDetails.get(userId);
-  if (!session) return false;
-  if (text.startsWith('/')) return false;
-  let object = await getObjectSafe(session.objectId);
-  if (!object || Number(object.user_id) !== Number(userId)) {
-    const user = await db.ensureUser(userId);
-    const list = (await db.listObjects(user.id)) || [];
-    const fallback =
-      list.find((o) => Number(o.id) === Number(user.last_object_id)) ||
-      list.find((o) => Number(o.id) !== Number(session.objectId)) ||
-      list[0];
-    if (!fallback) {
-      clearDetailsSession(userId);
-      await ctx.reply(msg('objects_not_found'));
-      return true;
-    }
-    object = fallback;
-  }
-  const patch =
-    session.field === 'variety'
-      ? { variety: text, details_prompted_at: new Date().toISOString() }
-      : session.field === 'note'
-        ? { note: text, details_prompted_at: new Date().toISOString() }
-        : null;
-  if (session.field === 'rename') {
-    const cleaned = text.trim();
-    const sanitizedName = sanitizeObjectName(cleaned, '');
-    if (!sanitizedName || sanitizedName.length < 2 || sanitizedName.length > 64) {
-      await ctx.reply(msg('object_rename_invalid'));
-      return true;
-    }
-    if (typeof db.updateObjectName === 'function') {
-      await db.updateObjectName(object.user_id, object.id, sanitizedName);
-    }
-    clearDetailsSession(userId);
-    await ctx.reply(msg('object_rename_saved', { name: sanitizedName }));
-    if (objectChips) {
-      await objectChips.send(ctx);
-    }
-    return true;
-  }
-  if (patch && typeof db.updateObjectMeta === 'function') {
-    await db.updateObjectMeta(object.id, patch);
-  }
-  clearDetailsSession(userId);
-  const key = session.field === 'variety' ? 'object_details_saved_variety' : 'object_details_saved_note';
-  await ctx.reply(msg(key, { value: text }));
-  if (objectChips) {
-    await objectChips.send(ctx);
-  }
-  return true;
-}
-
 function buildPhotoStatusPayload(state) {
   if (!state) return null;
+  const minPhotos = Number.isFinite(Number(state.minPhotos)) && Number(state.minPhotos) > 0
+    ? Number(state.minPhotos)
+    : MIN_PHOTOS;
+  if (state.followupMode) {
+    const parts = [
+      msg('photo_followup_status', { count: state.count || 0, min: minPhotos, max: MAX_PHOTOS }),
+    ];
+    if (state.overflow) {
+      parts.push(msg('photo_album_overflow', { max: MAX_PHOTOS }));
+    }
+    if (state.ready) {
+      parts.push(msg('photo_followup_ready', { max: MAX_PHOTOS }));
+    } else {
+      const need = Math.max(0, minPhotos - (state.count || 0));
+      parts.push(msg('photo_followup_not_ready', { need }));
+    }
+    return {
+      text: parts.filter(Boolean).join('\n'),
+      reply_markup: buildPhotoKeyboard(state.ready, true, (state.count || 0) < MAX_PHOTOS),
+    };
+  }
   const checklist = buildPhotoChecklist(state.count || 0);
   const parts = [
-    msg('photo_album_status', { count: state.count || 0, min: MIN_PHOTOS, max: MAX_PHOTOS }),
+    msg('photo_album_status', { count: state.count || 0, min: minPhotos, max: MAX_PHOTOS }),
   ];
   if (state.overflow) {
     parts.push(msg('photo_album_overflow', { max: MAX_PHOTOS }));
@@ -467,13 +451,26 @@ function buildPhotoStatusPayload(state) {
   if (state.ready) {
     parts.push(msg('photo_album_ready', { max: MAX_PHOTOS }));
   } else {
-    const need = Math.max(0, MIN_PHOTOS - (state.count || 0));
+    const need = Math.max(0, minPhotos - (state.count || 0));
     parts.push(msg('photo_album_not_ready', { need }));
   }
   const text = parts.filter(Boolean).join('\n');
   return {
     text,
     reply_markup: buildPhotoKeyboard(state.ready, state.optionalSkipped, (state.count || 0) < MAX_PHOTOS),
+  };
+}
+
+function buildActivePhotoTextPayload(state) {
+  if (!state || !(state.count > 0)) return null;
+  const payload = buildPhotoStatusPayload(state);
+  const introKey = state.followupMode ? 'photo_followup_text_guard' : 'photo_album_text_guard';
+  const intro = msg(introKey);
+  const text = [intro, payload?.text].filter(Boolean).join('\n\n');
+  if (!text) return null;
+  return {
+    text,
+    reply_markup: payload?.reply_markup,
   };
 }
 
@@ -566,7 +563,7 @@ async function maybeAskSamePlant(ctx, userId) {
     }
     return true;
   }
-  const state = getPhotoState(userId);
+  const state = await getPhotoStateAsync(userId);
   if (state?.samePlantChecked) {
     return false;
   }
@@ -578,9 +575,13 @@ async function maybeAskSamePlant(ctx, userId) {
     return false;
   }
   if (!user) return false;
+  const activeObjectId =
+    Number.isFinite(Number(user.last_object_id)) && Number(user.last_object_id) > 0
+      ? Number(user.last_object_id)
+      : null;
   let recent = null;
   try {
-    recent = await db.getRecentCaseForSamePlantCheck(user.id, SAME_PLANT_CHECK_DAYS);
+    recent = await db.getRecentCaseForSamePlantCheck(user.id, SAME_PLANT_CHECK_DAYS, activeObjectId);
   } catch (err) {
     console.error('same_plant.fetch failed', err);
     return false;
@@ -617,22 +618,35 @@ async function maybeAskSamePlant(ctx, userId) {
 }
 
 async function resumePhotoAnalysis(ctx, userId) {
-  const state = getPhotoState(userId);
+  const state = await getPhotoStateAsync(userId);
+  const minPhotos = Number.isFinite(Number(state?.minPhotos)) && Number(state?.minPhotos) > 0
+    ? Number(state.minPhotos)
+    : MIN_PHOTOS;
   if (!state?.ready || !userId) {
-    const need = Math.max(0, MIN_PHOTOS - (state?.count || 0));
-    await ctx.reply(msg('photo_album_not_ready', { need }));
+    const need = Math.max(0, minPhotos - (state?.count || 0));
+    const key = state?.followupMode ? 'photo_followup_not_ready' : 'photo_album_not_ready';
+    await ctx.reply(msg(key, { need }));
     return false;
   }
   const photo = pickPhotoForAnalysis(userId);
   if (!photo) {
-    await ctx.reply(msg('photo_album_not_ready', { need: MIN_PHOTOS }));
+    const key = state?.followupMode ? 'photo_followup_not_ready' : 'photo_album_not_ready';
+    await ctx.reply(msg(key, { need: minPhotos }));
     return false;
   }
   try {
-    await analyzePhoto(deps, ctx, photo, { linkedCaseId: state.linkedCaseId });
-    clearPhotoSession(userId);
-    clearPhotoStatus(userId);
-    return true;
+    const result = await analyzePhoto(deps, ctx, photo, {
+      linkedCaseId: state.linkedCaseId,
+      linkedObjectId: state.linkedObjectId,
+      photos: state.photos,
+      source: state.followupMode ? 'photo_album_followup_done' : 'photo_album_done',
+    });
+    if (result?.ok) {
+      await clearPhotoSessionAsync(userId);
+      clearPhotoStatus(userId);
+      return true;
+    }
+    return false;
   } catch (err) {
     console.error('photo_album_done analyze failed', err);
     await ctx.reply(msg('diagnose_error'));
@@ -695,6 +709,264 @@ function describeRecentAge(record) {
   }
   const days = Math.max(1, Math.round(hours / 24));
   return msg('plan_recent_age_days', { days });
+}
+
+function isFollowupDiagnosisFresh(record) {
+  const created = toDate(record?.created_at);
+  if (!created) return false;
+  return Date.now() - created.getTime() <= FOLLOWUP_CASE_WINDOW_MS;
+}
+
+async function logUserFunnelEventByTg(tgUserId, payload = {}) {
+  if (!tgUserId || !payload?.event || typeof db?.ensureUser !== 'function') return;
+  try {
+    const dbUser = await db.ensureUser(tgUserId);
+    if (!dbUser?.id) return;
+    await logFunnelEvent(db, {
+      event: payload.event,
+      userId: dbUser.id,
+      objectId: payload.objectId || null,
+      planId: payload.planId || null,
+      data: payload.data || null,
+    });
+  } catch (err) {
+    console.error('logUserFunnelEventByTg failed', err);
+  }
+}
+
+async function maybeActivateFollowupFromReply(ctx) {
+  const userId = ctx.from?.id;
+  const replyMessage = ctx.message?.reply_to_message;
+  if (!userId || !replyMessage) return false;
+  const replyMessageId = Number(replyMessage?.message_id);
+  const chatId = Number(ctx?.chat?.id || ctx?.message?.chat?.id);
+  const current = await getPhotoStateAsync(userId);
+  if (current?.followupMode) return false;
+  const context = getDiagnosisContextForMessage(ctx, userId, { allowFallback: false });
+  const diagnosis = context?.diagnosis || null;
+  let source = context?.source || null;
+  let sourceDiagnosisId =
+    Number.isFinite(Number(diagnosis?.recent_diagnosis_id)) && Number(diagnosis.recent_diagnosis_id) > 0
+      ? Number(diagnosis.recent_diagnosis_id)
+      : Number.isFinite(Number(diagnosis?.id)) && Number(diagnosis.id) > 0
+        ? Number(diagnosis.id)
+        : null;
+  if (!sourceDiagnosisId) {
+    sourceDiagnosisId = extractDiagnosisIdFromReplyMessage(replyMessage);
+    if (sourceDiagnosisId) {
+      source = 'reply_markup';
+    }
+  }
+  if (
+    !db?.ensureUser ||
+    (typeof db.getRecentDiagnosisById !== 'function' &&
+      typeof db.getRecentDiagnosisByMessageContext !== 'function')
+  ) {
+    return false;
+  }
+
+  let dbUser = null;
+  try {
+    dbUser = await db.ensureUser(userId);
+  } catch (err) {
+    console.error('photo_followup_reply.ensure_user_failed', err);
+    return false;
+  }
+  if (!dbUser?.id) return false;
+
+  let record = null;
+  if (
+    !sourceDiagnosisId &&
+    Number.isFinite(chatId) &&
+    Number.isFinite(replyMessageId) &&
+    typeof db.getRecentDiagnosisByMessageContext === 'function'
+  ) {
+    try {
+      record = await db.getRecentDiagnosisByMessageContext(
+        dbUser.id,
+        chatId,
+        replyMessageId,
+        FOLLOWUP_CASE_WINDOW_HOURS,
+      );
+      if (record?.id) {
+        sourceDiagnosisId = Number(record.id);
+        source = 'message_context_db';
+      }
+    } catch (err) {
+      console.error('photo_followup_reply.fetch_context_failed', err);
+    }
+  }
+  if (!record && sourceDiagnosisId && typeof db.getRecentDiagnosisById === 'function') {
+    try {
+      record = await db.getRecentDiagnosisById(dbUser.id, sourceDiagnosisId);
+    } catch (err) {
+      console.error('photo_followup_reply.fetch_failed', err);
+      return false;
+    }
+  }
+  if (!record || !isFollowupDiagnosisFresh(record)) {
+    return false;
+  }
+
+  const payload = record.diagnosis_payload || {};
+  const linkedCaseId =
+    (Number.isFinite(Number(record.case_id)) && Number(record.case_id) > 0 ? Number(record.case_id) : null) ||
+    (Number.isFinite(Number(payload.case_id)) && Number(payload.case_id) > 0 ? Number(payload.case_id) : null);
+  const linkedObjectId =
+    (Number.isFinite(Number(record.object_id)) && Number(record.object_id) > 0 ? Number(record.object_id) : null) ||
+    (Number.isFinite(Number(payload.object_id)) && Number(payload.object_id) > 0 ? Number(payload.object_id) : null);
+
+  clearSamePlantPending(userId);
+  await startFollowupSessionAsync(userId, {
+    linkedCaseId,
+    linkedObjectId,
+    sourceDiagnosisId: Number(record.id),
+  });
+  clearPhotoStatus(userId);
+
+  await logFunnelEvent(db, {
+    event: 'followup_auto_activated_from_reply',
+    userId: dbUser.id,
+    objectId: linkedObjectId,
+    data: {
+      sourceDiagnosisId: Number(record.id),
+      source: source || 'reply',
+      linkedCaseId,
+    },
+  });
+  return true;
+}
+
+async function activateDiagnosisFollowup(ctx, diagnosisId) {
+  const tgUserId = ctx.from?.id;
+  if (!tgUserId || !diagnosisId || !db?.ensureUser || !db?.getRecentDiagnosisById) {
+    await ctx.reply(msg('diag_followup_invalid'));
+    return false;
+  }
+  let dbUser = null;
+  try {
+    dbUser = await db.ensureUser(tgUserId);
+  } catch (err) {
+    console.error('diag_followup.ensure_user_failed', err);
+  }
+  if (!dbUser) {
+    await ctx.reply(msg('diag_followup_invalid'));
+    return false;
+  }
+  let record = null;
+  try {
+    record = await db.getRecentDiagnosisById(dbUser.id, diagnosisId);
+  } catch (err) {
+    console.error('diag_followup.fetch_failed', err);
+  }
+  if (!record || !isFollowupDiagnosisFresh(record)) {
+    await ctx.reply(msg('diag_followup_expired'));
+    return false;
+  }
+  const payload = record.diagnosis_payload || {};
+  let objectId =
+    (Number.isFinite(Number(record.object_id)) && Number(record.object_id) > 0
+      ? Number(record.object_id)
+      : null) ||
+    (Number.isFinite(Number(payload.object_id)) && Number(payload.object_id) > 0
+      ? Number(payload.object_id)
+      : null);
+  let objectName = null;
+  if (objectId && typeof db.getObjectById === 'function') {
+    try {
+      const object = await db.getObjectById(objectId);
+      if (object && Number(object.user_id) === Number(dbUser.id)) {
+        objectName = sanitizeObjectName(object.name, null);
+      } else {
+        objectId = null;
+      }
+    } catch (err) {
+      console.error('diag_followup.object_failed', err);
+    }
+  }
+  const caseId =
+    (Number.isFinite(Number(record.case_id)) && Number(record.case_id) > 0
+      ? Number(record.case_id)
+      : null) ||
+    (Number.isFinite(Number(payload.case_id)) && Number(payload.case_id) > 0
+      ? Number(payload.case_id)
+      : null);
+  clearSamePlantPending(tgUserId);
+  await startFollowupSessionAsync(tgUserId, {
+    linkedCaseId: caseId,
+    linkedObjectId: objectId,
+    sourceDiagnosisId: record.id,
+  });
+  clearPhotoStatus(tgUserId);
+  const intro = msg('diag_followup_ready', {
+    name: objectName || sanitizeObjectName(payload.crop_ru || payload.crop, msg('object.default_name')),
+    hours: FOLLOWUP_CASE_WINDOW_HOURS,
+  });
+  if (intro) {
+    await ctx.reply(intro);
+  }
+  const state = await getPhotoStateAsync(tgUserId);
+  const payloadStatus = buildPhotoStatusPayload(state);
+  if (payloadStatus?.text) {
+    await ctx.reply(payloadStatus.text, { reply_markup: payloadStatus.reply_markup });
+  }
+  return true;
+}
+
+async function activateActiveObjectFollowup(ctx) {
+  const tgUserId = ctx.from?.id;
+  if (!tgUserId || !db?.ensureUser) {
+    await ctx.reply(msg('diag_followup_invalid'));
+    return false;
+  }
+  let dbUser = null;
+  try {
+    dbUser = await db.ensureUser(tgUserId);
+  } catch (err) {
+    console.error('diag_followup_active.ensure_user_failed', err);
+  }
+  if (!dbUser) {
+    await ctx.reply(msg('diag_followup_invalid'));
+    return false;
+  }
+  const activeObjectId =
+    Number.isFinite(Number(dbUser.last_object_id)) && Number(dbUser.last_object_id) > 0
+      ? Number(dbUser.last_object_id)
+      : null;
+  if (!activeObjectId) {
+    await ctx.reply(msg('diag_followup_no_recent_object'));
+    return false;
+  }
+  let record = null;
+  try {
+    if (typeof db.getLatestRecentDiagnosisByObject === 'function') {
+      record = await db.getLatestRecentDiagnosisByObject(dbUser.id, activeObjectId);
+    } else if (typeof db.getLatestRecentDiagnosis === 'function') {
+      const fallback = await db.getLatestRecentDiagnosis(dbUser.id);
+      if (fallback && Number(fallback.object_id) === activeObjectId) {
+        record = fallback;
+      }
+    }
+  } catch (err) {
+    console.error('diag_followup_active.fetch_failed', err);
+  }
+  if (!record?.id) {
+    await ctx.reply(msg('diag_followup_no_recent_object'));
+    return false;
+  }
+  return activateDiagnosisFollowup(ctx, Number(record.id));
+}
+
+async function handleActivePhotoSessionText(ctx) {
+  const userId = ctx.from?.id;
+  const text = typeof ctx.message?.text === 'string' ? ctx.message.text.trim() : '';
+  if (!userId || !text || text.startsWith('/')) return false;
+  const state = await getPhotoStateAsync(userId);
+  if (!(state?.count > 0)) return false;
+  const payload = buildActivePhotoTextPayload(state);
+  if (!payload?.text) return false;
+  await ctx.reply(payload.text, payload.reply_markup ? { reply_markup: payload.reply_markup } : undefined);
+  return true;
 }
 
 function buildPlanDedupKey(diagnosis, record) {
@@ -906,6 +1178,19 @@ async function handlePlanTreatment(ctx, opts = {}) {
     expired,
     planId: record?.plan_id || null,
   });
+  if (requireRecentId && dbUser?.id) {
+    await logFunnelEvent(db, {
+      event: 'plan_treatment_bound_to_diagnosis',
+      userId: dbUser.id,
+      objectId: record?.object_id || diagnosis?.object_id || dbUser.last_object_id || null,
+      planId: record?.plan_id || null,
+      data: {
+        diagnosisId: record?.id || requireRecentId,
+        source: context.source || null,
+        expired,
+      },
+    });
+  }
   if (hasPlan && !opts.allowExistingPlan) {
     await ctx.reply(msg('plan_recent_existing', { plan: record.plan_id }), {
       reply_markup: buildExistingPlanKeyboard(record),
@@ -1055,9 +1340,12 @@ async function resumeAutoplanLookup(ctx, session) {
         runContext.run?.stage_option_id || state.stageOptionId || null,
       );
       const keyboard = mergeKeyboards(locationKb, manualKb);
+      const reason = runContext.run?.reason || 'unknown';
+      const messageKey = needsLocation ? 'plan_autoplan_none_with_location' : 'plan_autoplan_none';
       await ctx.reply(
-        msg('plan_autoplan_none', {
+        msg(messageKey, {
           stage: runContext.stage?.title || msg('reminder_stage_fallback'),
+          reason: msg(`plan_autoplan_none_reason_${reason}`) || msg('plan_autoplan_none_reason_unknown'),
         }),
         keyboard ? { reply_markup: keyboard } : undefined,
       );
@@ -1210,11 +1498,20 @@ async function init() {
     });
 
     bot.command('feedback', (ctx) => feedbackHandler(ctx, pool));
+    bot.command('qa', async (ctx) => {
+      await qaIntake.handleCommand(ctx);
+    });
     bot.command('beta_add', (ctx) => adminCommands.handleBetaAdd(ctx, db));
     bot.command('beta_remove', (ctx) => adminCommands.handleBetaRemove(ctx, db));
     bot.command('beta_list', (ctx) => adminCommands.handleBetaList(ctx, db));
 
     bot.action(/^pick_opt\|/, planPickHandler);
+    bot.action(/^qa_/, async (ctx) => {
+      const handled = await qaIntake.handleCallback(ctx);
+      if (!handled) {
+        await safeAnswerCbQuery(ctx);
+      }
+    });
     bot.action(/^plan_slot_accept\|/, planSlotHandlers.accept);
     bot.action(/^plan_slot_cancel\|/, planSlotHandlers.cancel);
     bot.action(/^plan_slot_reschedule\|/, planSlotHandlers.reschedule);
@@ -1522,11 +1819,14 @@ async function init() {
     });
 
     bot.on('text', async (ctx, next) => {
+      const handledQaText = await qaIntake.handleText(ctx);
+      if (handledQaText) return undefined;
+      if (qaIntake.isQaChat(ctx.chat?.id)) return undefined;
       const handledSupport = await support.handleSupportText(ctx);
       if (handledSupport) return undefined;
       const handledSurvey = await betaSurvey.handleComment(ctx, db);
       if (handledSurvey) return undefined;
-      const handledDetails = await handleObjectDetailsText(ctx);
+      const handledDetails = await objectDetailsHandler.handleText(ctx);
       if (handledDetails) return undefined;
       const handledLocation = await planCommands.handleLocationText(ctx);
       if (!handledLocation) {
@@ -1549,12 +1849,20 @@ async function init() {
           }
         }
       }
+      if (!handledLocation) {
+        const handledPhotoText = await handleActivePhotoSessionText(ctx);
+        if (handledPhotoText) return undefined;
+      }
       if (!handledLocation && typeof next === 'function') {
         return next();
       }
       return undefined;
     });
     bot.on('photo', async (ctx) => {
+      if (qaIntake.isQaChat(ctx.chat?.id)) {
+        await qaIntake.handlePhoto(ctx);
+        return;
+      }
       const allowed = await requirePrivacyConsent(ctx, db, {
         privacy: consentVersions.privacy,
         offer: consentVersions.offer,
@@ -1562,11 +1870,34 @@ async function init() {
       if (!allowed) return;
       await photoTips.offerHint(ctx);
       const userId = ctx.from?.id;
-      addPhoto(userId, ctx.message);
+      const autoActivatedFromReply = await maybeActivateFollowupFromReply(ctx);
+      await addPhotoAsync(userId, ctx.message);
+      const state = await getPhotoStateAsync(userId);
+      if (state?.followupMode) {
+        await logUserFunnelEventByTg(userId, {
+          event: 'photo_routed_to_followup',
+          objectId: state.linkedObjectId || null,
+          data: {
+            source: autoActivatedFromReply ? 'reply_auto' : 'followup_session',
+            linkedCaseId: state.linkedCaseId || null,
+            sourceDiagnosisId: state.sourceDiagnosisId || null,
+          },
+        });
+      }
       schedulePhotoStatus(ctx);
     });
 
     bot.on('message', async (ctx) => {
+      if (qaIntake.isQaChat(ctx.chat?.id)) {
+        const handled = await qaIntake.handleAnyMessage(ctx);
+        if (handled) return;
+        return;
+      }
+      const activePhotoState = await getPhotoStateAsync(ctx.from?.id);
+      const messageText = typeof ctx.message?.text === 'string' ? ctx.message.text.trim() : '';
+      if (messageText && !messageText.startsWith('/') && activePhotoState?.count > 0) {
+        return;
+      }
       const handled = await assistantChat.handleMessage(ctx);
       if (!handled) {
         await messageHandler({ pool }, ctx);
@@ -1576,6 +1907,16 @@ async function init() {
     bot.action('plan_treatment', async (ctx) => {
       await ctx.answerCbQuery();
       await handlePlanTreatment(ctx);
+    });
+
+    bot.action(/^plan_treatment\|(\d+)$/, async (ctx) => {
+      await ctx.answerCbQuery();
+      const diagnosisId = Number(ctx.match?.[1]);
+      if (!diagnosisId) {
+        await replyUserError(ctx, 'BUTTON_EXPIRED');
+        return;
+      }
+      await handlePlanTreatment(ctx, { requireRecentId: diagnosisId });
     });
 
     bot.action(/^plan_recent_use\|/, async (ctx) => {
@@ -1658,28 +1999,7 @@ async function init() {
       await ctx.answerCbQuery();
       const objectId = Number(objectIdRaw);
       if (!objectId || !field) return;
-      let object = await getObjectSafe(objectId);
-      if (!object || Number(object.user_id) !== Number(ctx.from?.id)) {
-        const user = await db.ensureUser(ctx.from.id);
-        const list = (await db.listObjects(user.id)) || [];
-        object =
-          list.find((o) => Number(o.id) === Number(user.last_object_id)) ||
-          list.find((o) => Number(o.id) === Number(objectId)) ||
-          list[0];
-      }
-      if (!object) {
-        await ctx.reply(msg('objects_not_found'));
-        return;
-      }
-      setDetailsSession(ctx.from.id, object.id, field);
-      const promptKey =
-        field === 'variety'
-          ? 'object_details_prompt_variety'
-          : field === 'note'
-            ? 'object_details_prompt_note'
-            : 'object_rename_prompt';
-      const objectName = sanitizeObjectName(object.name, msg('object.default_name'));
-      await ctx.reply(msg(promptKey, { name: objectName }));
+      await objectDetailsHandler.startPrompt(ctx, { field, objectId });
     });
 
     bot.action(/^obj_delete_confirm\|(\d+)/, async (ctx) => {
@@ -2047,7 +2367,7 @@ async function init() {
       // Generate share text
       const shareText = disease
         ? msg('share.text', { disease }) || `🌱 Нашёл проблему у растения: ${disease}\n\nПроверь своё → @AgronommAI_bot`
-        : '🌱 Проверил своё растение с AI-агрономом! Попробуй и ты → @AgronommAI_bot';
+        : '🌱 Проверил своё растение с AI-агрономом! Попробуйте тоже → @AgronommAI_bot';
 
       await ctx.reply(shareText, {
         reply_markup: {
@@ -2056,33 +2376,35 @@ async function init() {
           ],
         },
       });
-    });
-    bot.action('assistant_entry', async (ctx) => {
-      await ctx.answerCbQuery();
-      await assistantChat.start(ctx);
-    });
-    bot.action('assistant_choose_object', async (ctx) => {
-      await ctx.answerCbQuery();
-      await assistantChat.chooseObject(ctx);
-    });
-    bot.action('assistant_clear_context', async (ctx) => {
-      await assistantChat.clearContext(ctx);
-    });
-    bot.action(/^assistant_object\|/, async (ctx) => {
-      const [, objectId] = ctx.callbackQuery.data.split('|');
-      await ctx.answerCbQuery();
-      await assistantChat.pickObject(ctx, objectId);
-    });
-    bot.action(/^assistant_pin\|/, async (ctx) => {
-      const [, proposalId, objectIdRaw] = ctx.callbackQuery.data.split('|');
-      await ctx.answerCbQuery();
-      const objectId = objectIdRaw ? Number(objectIdRaw) : null;
-      await assistantChat.confirm(ctx, proposalId, objectId);
-    });
-    bot.action('assistant_continue', async (ctx) => {
-      await ctx.answerCbQuery();
-      await assistantChat.continueChat(ctx);
-    });
+	    });
+	    bot.action('assistant_entry', async (ctx) => {
+	      // Callback queries can go stale if the bot is busy (e.g. waiting for OpenAI).
+	      // Never fail the whole handler just because Telegram rejected the callback ack.
+	      await safeAnswerCbQuery(ctx);
+	      await assistantChat.start(ctx);
+	    });
+	    bot.action('assistant_choose_object', async (ctx) => {
+	      await safeAnswerCbQuery(ctx);
+	      await assistantChat.chooseObject(ctx);
+	    });
+	    bot.action('assistant_clear_context', async (ctx) => {
+	      await assistantChat.clearContext(ctx);
+	    });
+	    bot.action(/^assistant_object\|/, async (ctx) => {
+	      const [, objectId] = ctx.callbackQuery.data.split('|');
+	      await safeAnswerCbQuery(ctx);
+	      await assistantChat.pickObject(ctx, objectId);
+	    });
+	    bot.action(/^assistant_pin\|/, async (ctx) => {
+	      const [, proposalId, objectIdRaw] = ctx.callbackQuery.data.split('|');
+	      await safeAnswerCbQuery(ctx);
+	      const objectId = objectIdRaw ? Number(objectIdRaw) : null;
+	      await assistantChat.confirm(ctx, proposalId, objectId);
+	    });
+	    bot.action('assistant_continue', async (ctx) => {
+	      await safeAnswerCbQuery(ctx);
+	      await assistantChat.continueChat(ctx);
+	    });
 
     bot.action('reshoot_photo', async (ctx) => {
       await ctx.answerCbQuery();
@@ -2091,6 +2413,23 @@ async function init() {
       return ctx.reply(text);
     });
 
+    bot.action(/^diag_followup\|(\d+)$/, async (ctx) => {
+      await safeAnswerCbQuery(ctx);
+      const diagnosisId = Number(ctx.match?.[1]);
+      if (!diagnosisId) {
+        await ctx.reply(msg('diag_followup_invalid'));
+        return;
+      }
+      await activateDiagnosisFollowup(ctx, diagnosisId);
+    });
+
+    bot.action('diag_followup_active', async (ctx) => {
+      await safeAnswerCbQuery(ctx);
+      await activateActiveObjectFollowup(ctx);
+    });
+
+    bot.action(/^diag_details\|(\d+)$/, diagDetailsHandler);
+
     bot.action('photo_tips', async (ctx) => {
       await photoTips.sendTips(ctx);
     });
@@ -2098,10 +2437,15 @@ async function init() {
     bot.action('photo_album_done', async (ctx) => {
       await ctx.answerCbQuery();
       const userId = ctx.from?.id;
-      const state = getPhotoState(userId);
+      const state = await getPhotoStateAsync(userId);
       if (!state.ready || !userId) {
-        const need = Math.max(0, MIN_PHOTOS - (state.count || 0));
-        await ctx.reply(msg('photo_album_not_ready', { need }));
+        const minPhotos =
+          Number.isFinite(Number(state?.minPhotos)) && Number(state?.minPhotos) > 0
+            ? Number(state.minPhotos)
+            : MIN_PHOTOS;
+        const need = Math.max(0, minPhotos - (state.count || 0));
+        const key = state?.followupMode ? 'photo_followup_not_ready' : 'photo_album_not_ready';
+        await ctx.reply(msg(key, { need }));
         return;
       }
       const allowed = await requirePrivacyConsent(ctx, db, {
@@ -2126,8 +2470,8 @@ async function init() {
     bot.action('photo_album_skip_optional', async (ctx) => {
       await ctx.answerCbQuery();
       const userId = ctx.from?.id;
-      if (userId) skipOptionalPhotos(userId);
-      const state = getPhotoState(userId);
+      if (userId) await skipOptionalPhotosAsync(userId);
+      const state = await getPhotoStateAsync(userId);
       const payload = buildPhotoStatusPayload(state);
       const ack = msg('photo_album_skip_optional_done');
       const parts = [ack];
@@ -2145,7 +2489,7 @@ async function init() {
     bot.action('photo_album_reset', async (ctx) => {
       await ctx.answerCbQuery();
       const userId = ctx.from?.id;
-      const cleared = clearPhotoSession(userId);
+      const cleared = await clearPhotoSessionAsync(userId);
       clearPhotoStatus(userId);
       const reply = cleared ? msg('photo_album_reset_done') : msg('photo_album_reset_empty');
       if (reply) {
@@ -2173,11 +2517,9 @@ async function init() {
     bot.action(/^same_plant_yes:(\d+)$/, async (ctx) => {
       await ctx.answerCbQuery();
       const caseId = parseInt(ctx.match?.[1], 10);
-      const {
-        confirmSamePlant: confirmSP,
-      } = require('./photoCollector');
-
-      confirmSP(ctx.from?.id, caseId);
+      const { getSamePlantPending: getPendingSamePlant } = require('./photoCollector');
+      const pending = getPendingSamePlant(ctx.from?.id);
+      await confirmSamePlantAsync(ctx.from?.id, caseId, pending?.objectId || null);
       await ctx.reply(msg('same_plant.using_same') || 'Отлично, продолжаю с прошлым кейсом.');
       await resumePhotoAnalysis(ctx, ctx.from?.id);
 
@@ -2201,11 +2543,7 @@ async function init() {
 
     bot.action('same_plant_no', async (ctx) => {
       await ctx.answerCbQuery();
-      const {
-        denySamePlant: denySP,
-      } = require('./photoCollector');
-
-      denySP(ctx.from?.id);
+      await denySamePlantAsync(ctx.from?.id);
       await ctx.reply(msg('same_plant.new_case') || 'Хорошо, начинаю новый разбор.');
       await resumePhotoAnalysis(ctx, ctx.from?.id);
 
@@ -2297,6 +2635,24 @@ async function init() {
       scope: { type: 'all_private_chats' },
       language_code: 'ru',
     });
+    const qaChatIds = String(process.env.QA_INTAKE_CHAT_ID || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (qaChatIds.length) {
+      const qaMenuCommands = [
+        ...menuCommands,
+        { command: 'qa', description: msg('command_qa_desc') || 'QA intake' },
+      ];
+      for (const chatIdRaw of qaChatIds) {
+        const chatId = Number(chatIdRaw);
+        if (!Number.isFinite(chatId)) continue;
+        await bot.telegram.setMyCommands(qaMenuCommands, {
+          scope: { type: 'chat', chat_id: chatId },
+          language_code: 'ru',
+        });
+      }
+    }
     await bot.launch();
     await reminderScheduler.start();
     await overdueNotifier.start();

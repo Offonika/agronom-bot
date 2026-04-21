@@ -28,12 +28,32 @@ function normalizeDays(value) {
 async function logEvent(pool, userId, ev, data = {}) {
   if (!pool) return;
   try {
-    const utmSource = data.utm_source || data.utmSource || null;
-    const utmMedium = data.utm_medium || data.utmMedium || null;
-    const utmCampaign = data.utm_campaign || data.utmCampaign || null;
+    // analytics_events.user_id stores internal users.id (not Telegram tg_id).
+    // Most call-sites pass ctx.from.id (tg_id), so we resolve/ensure the user first.
+    let user = null;
+    if (typeof pool.ensureUser === 'function') {
+      user = await pool.ensureUser(userId);
+    } else {
+      try {
+        const db = createDb(pool);
+        user = await db.ensureUser(userId);
+      } catch (err) {
+        // If we cannot resolve internal user id, skip logging to avoid mixing id spaces.
+        console.error('event log resolve user failed', err);
+        return;
+      }
+    }
+    if (!user?.id) return;
+
+    const utmSource =
+      data.utm_source || data.utmSource || user.utm_source || null;
+    const utmMedium =
+      data.utm_medium || data.utmMedium || user.utm_medium || null;
+    const utmCampaign =
+      data.utm_campaign || data.utmCampaign || user.utm_campaign || null;
     await pool.query(
       'INSERT INTO analytics_events (user_id, event, utm_source, utm_medium, utm_campaign) VALUES ($1, $2, $3, $4, $5)',
-      [userId, ev, utmSource, utmMedium, utmCampaign],
+      [user.id, ev, utmSource, utmMedium, utmCampaign],
     );
   } catch (err) {
     console.error('event log error', err);

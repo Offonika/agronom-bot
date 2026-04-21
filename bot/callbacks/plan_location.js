@@ -3,9 +3,9 @@
 const { msg, sanitizeObjectName } = require('../utils');
 const { replyUserError } = require('../userErrors');
 const {
-  rememberLocationRequest,
-  clearLocationRequest,
-  peekLocationRequest,
+  rememberLocationRequestAsync,
+  clearLocationRequestAsync,
+  peekLocationRequestAsync,
 } = require('../locationSession');
 
 function parsePayload(data, prefix) {
@@ -90,18 +90,20 @@ function createPlanLocationHandler({ db }) {
         await replyUserError(ctx, 'OBJECT_NOT_OWNED');
         return;
       }
-      const pending = peekLocationRequest(user.id);
+      const pending = await peekLocationRequestAsync(user.id);
       if (pending?.entry && pending.entry.objectId === object.id && pending.entry.mode === 'geo') {
         await safeAnswer(ctx, 'location_request_in_progress');
         return;
       }
-      const ok = rememberLocationRequest(user.id, object.id, 'geo');
+      const ok = await rememberLocationRequestAsync(user.id, object.id, 'geo');
       if (!ok) {
         await safeAnswer(ctx, 'location_request_limit', true);
         return;
       }
       await safeAnswer(ctx, 'location_geo_toast');
-      await ctx.reply(msg('location_geo_instructions'));
+      await ctx.reply(msg('location_geo_instructions'), {
+        reply_markup: buildRequestLocationKeyboard(),
+      });
       await ctx.reply(msg('location_pending'));
     } catch (err) {
       console.error('plan_location.geo error', err);
@@ -124,12 +126,12 @@ function createPlanLocationHandler({ db }) {
         await replyUserError(ctx, 'OBJECT_NOT_OWNED');
         return;
       }
-      const pending = peekLocationRequest(user.id);
+      const pending = await peekLocationRequestAsync(user.id);
       if (pending?.entry && pending.entry.objectId === object.id && pending.entry.mode === 'address') {
         await safeAnswer(ctx, 'location_request_in_progress');
         return;
       }
-      const ok = rememberLocationRequest(user.id, object.id, 'address');
+      const ok = await rememberLocationRequestAsync(user.id, object.id, 'address');
       if (!ok) {
         await safeAnswer(ctx, 'location_request_limit', true);
         return;
@@ -152,7 +154,7 @@ function createPlanLocationHandler({ db }) {
     }
     try {
       const user = await db.ensureUser(ctx.from?.id);
-      clearLocationRequest(user?.id);
+      await clearLocationRequestAsync(user?.id);
       await safeAnswer(ctx, 'location_manual_skipped');
     } catch (err) {
       console.error('plan_location.cancel error', err);
@@ -178,6 +180,15 @@ function createPlanLocationHandler({ db }) {
 function validateOwnership(object, userId) {
   if (!object || !userId) return false;
   return String(object.user_id) === String(userId);
+}
+
+function buildRequestLocationKeyboard() {
+  return {
+    keyboard: [[{ text: msg('location_request_location_button'), request_location: true }]],
+    resize_keyboard: true,
+    one_time_keyboard: true,
+    selective: true,
+  };
 }
 
 async function safeAnswer(ctx, key, alert = false) {

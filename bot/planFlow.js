@@ -5,7 +5,7 @@ const { logFunnelEvent } = require('./funnel');
 const { LOW_CONFIDENCE_THRESHOLD } = require('./messageFormatters/diagnosisMessage');
 const { replyUserError } = require('./userErrors');
 const { remember: rememberLocationPrompt } = require('./locationThrottler');
-const { rememberLocationRequest } = require('./locationSession');
+const { rememberLocationRequestAsync } = require('./locationSession');
 
 const PLAN_KIND_DEFAULT = 'PLAN_NEW';
 const ROW_SIZE = Math.max(1, Number(process.env.OBJECT_CHIPS_ROW_SIZE || '1'));
@@ -189,6 +189,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
 
   async function ensurePrimaryObject(user, diagnosis, options = {}) {
     const shouldUpdateLastObject = options.updateLastObject !== false;
+    const allowFallbackToLastObject = options.allowFallbackToLastObject !== false;
     let allowCreate = options.allowCreate !== false;
     let objects = await db.listObjects(user.id);
     if (!objects.length) {
@@ -208,6 +209,13 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       } catch (err) {
         console.error('plan_flow.fetch_object_failed', err);
       }
+    }
+    if (!primary && requestedObjectId && !allowFallbackToLastObject) {
+      return {
+        primary: null,
+        objects,
+        requestedObjectMissing: true,
+      };
     }
     if (!primary && cropKey) {
       primary =
@@ -244,7 +252,18 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       }
     }
     if (!primary) {
-      primary = objects.find((obj) => obj.id === user.last_object_id) || objects[0];
+      if (allowFallbackToLastObject) {
+        primary = objects.find((obj) => obj.id === user.last_object_id) || objects[0];
+      } else {
+        primary = objects[0] || null;
+      }
+    }
+    if (!primary) {
+      return {
+        primary: null,
+        objects,
+        requestedObjectMissing: Boolean(requestedObjectId),
+      };
     }
     if (requestedObjectId && primary && Number(primary.id) === requestedObjectId) {
       objects = [primary];
@@ -268,7 +287,7 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       primary = enriched;
       objects = objects.map((obj) => (obj.id === primary.id ? primary : obj));
     }
-    return { primary, objects };
+    return { primary, objects, requestedObjectMissing: false };
   }
 
   function hasCoordinates(meta = {}) {
@@ -332,8 +351,8 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       await ctx.reply(msg('location_prompt_limit'));
       return;
     }
-    if (userId && typeof rememberLocationRequest === 'function') {
-      rememberLocationRequest(userId, object.id, 'geo');
+    if (userId && typeof rememberLocationRequestAsync === 'function') {
+      await rememberLocationRequestAsync(userId, object.id, 'geo');
     }
     const meta = object.meta || {};
     const promptedAt = meta.location_prompted_at ? new Date(meta.location_prompted_at) : null;
@@ -481,10 +500,39 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
     }
     try {
       const hadExplicitObject = Boolean(payload?.object_id);
+      const requestedObjectId = hadExplicitObject ? Number(payload.object_id) : null;
       const { primary, objects } = await ensurePrimaryObject(user, payload, {
         updateLastObject: hadExplicitObject,
-        allowCreate: hadExplicitObject,
+        allowCreate: !hadExplicitObject,
+        allowFallbackToLastObject: !hadExplicitObject,
       });
+      if (hadExplicitObject && (!primary || Number(primary.id) !== Number(requestedObjectId))) {
+        const available = Array.isArray(objects) ? objects.filter(Boolean) : [];
+        if (!available.length) {
+          await ctx.reply(msg('plan_object_not_found'));
+          return;
+        }
+        const token = generateToken();
+        const preferred =
+          available.find((obj) => Number(obj.id) === Number(user.last_object_id)) || available[0];
+        const payloadForChoice = { ...payload, object_id: preferred.id };
+        const session = await createPlanSessionRecord(
+          user,
+          payloadForChoice,
+          token,
+          'choose_object',
+          preferred.id,
+        );
+        if (!session) return;
+        await ctx.reply(
+          formatStepPrompt(
+            'plan_step_choose_object',
+            msg('plan_object_mismatch_prompt') || msg('plan_object_choose_prompt'),
+          ),
+          { reply_markup: { inline_keyboard: buildChooseKeyboard(available, token) } },
+        );
+        return;
+      }
       if (primary?.id) {
         payload.object_id = primary.id;
       }
@@ -901,6 +949,20 @@ function createPlanFlow({ db, catalog, planWizard, geocoder = null, planSessions
       const stageResult = await collectStageDefinitions(catalog, diagnosis, object);
       const stageDefs = stageResult?.stages || [];
       const fallbackNotices = stageResult?.fallbackNotices || [];
+      const policy = stageResult?.policy || null;
+      if (policy?.filteredCount > 0) {
+        await logFunnelEvent(db, {
+          event: 'indoor_stage_filtered',
+          userId: user.id,
+          objectId: object.id,
+          planId: plan.id,
+          data: {
+            habitat: policy.habitat || null,
+            filteredCount: policy.filteredCount,
+            source: policy.source || null,
+          },
+        });
+      }
       await logFunnelEvent(db, {
         event: 'object_selected',
         userId: user.id,
@@ -1117,12 +1179,122 @@ function buildPlanTitle(object, data) {
   return `${crop} — ${disease}`;
 }
 
+const WEATHER_TRIGGER_RE = /(rain|rain_mm|дожд|осад|ливн)/i;
+
+function normalizeHabitat(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (
+    normalized === 'indoor' ||
+    normalized.includes('комнат') ||
+    normalized.includes('home') ||
+    normalized.includes('room')
+  ) {
+    return 'indoor';
+  }
+  if (
+    normalized === 'outdoor' ||
+    normalized.includes('улиц') ||
+    normalized.includes('сад') ||
+    normalized.includes('огород') ||
+    normalized.includes('ground') ||
+    normalized.includes('теплиц')
+  ) {
+    return 'outdoor';
+  }
+  return null;
+}
+
+function resolveHabitatFromObject(object) {
+  const direct = normalizeHabitat(object?.type);
+  if (direct) return direct;
+  const meta = object?.meta || {};
+  const metaHabitat = normalizeHabitat(meta.habitat || meta.location_mode || meta.location_type || meta.location_tag);
+  if (metaHabitat) return metaHabitat;
+  const tagged = normalizeHabitat(object?.location_tag);
+  if (tagged) return tagged;
+  return 'outdoor';
+}
+
+function stageLooksWeatherBound(stage) {
+  const trigger = String(stage?.meta?.trigger || '').trim();
+  const title = String(stage?.title || '').trim();
+  const note = String(stage?.note || '').trim();
+  if (WEATHER_TRIGGER_RE.test(trigger)) return true;
+  if (WEATHER_TRIGGER_RE.test(title)) return true;
+  if (WEATHER_TRIGGER_RE.test(note)) return true;
+  return false;
+}
+
+function filterIndoorStages(stages = [], habitat = 'outdoor') {
+  if (habitat !== 'indoor') {
+    return { filtered: stages, removedCount: 0 };
+  }
+  const filtered = [];
+  let removedCount = 0;
+  for (const stage of stages) {
+    if (stageLooksWeatherBound(stage)) {
+      removedCount += 1;
+      continue;
+    }
+    filtered.push(stage);
+  }
+  return { filtered, removedCount };
+}
+
+function formatStageOption(opt, stageKind) {
+  return {
+    product: opt.product,
+    ai: opt.ai,
+    dose_value: opt.dose_value,
+    dose_unit: opt.dose_unit,
+    method: opt.meta?.method || opt.method || null,
+    meta: { ...opt.meta, stage_kind: stageKind },
+  };
+}
+
+function buildIndoorFallbackStage(diagnosis) {
+  const stage = {
+    title: msg('plan_stage_default') || 'Этап',
+    kind: 'adhoc',
+    note:
+      msg('plan_indoor_fallback_note') ||
+      'Контроль состояния листа и щадящий уход без погодных триггеров.',
+    phi_days: Number.isFinite(Number(diagnosis?.treatment_plan?.phi_days))
+      ? Number(diagnosis.treatment_plan.phi_days)
+      : null,
+    meta: { source: 'indoor_policy_fallback', habitat: 'indoor' },
+  };
+  const fallback = buildFallbackOptionFromDiagnosis(stage, diagnosis);
+  const options = fallback ? [formatStageOption(fallback, stage.kind)] : [];
+  return {
+    title: stage.title,
+    kind: stage.kind,
+    note: stage.note,
+    phi_days: stage.phi_days,
+    meta: stage.meta,
+    options,
+  };
+}
+
 async function collectStageDefinitions(catalog, data, object) {
+  const habitat = resolveHabitatFromObject(object);
   const productRulesEnabled = catalog?.productRulesEnabled !== false;
   if (data?.plan_machine?.stages?.length) {
+    const fromMachine = buildDefinitionsFromMachinePlan(data);
+    const policy = filterIndoorStages(fromMachine, habitat);
+    const stages =
+      habitat === 'indoor' && !policy.filtered.length
+        ? [buildIndoorFallbackStage(data)]
+        : policy.filtered;
     return {
-      stages: buildDefinitionsFromMachinePlan(data),
+      stages,
       fallbackNotices: [],
+      policy: {
+        habitat,
+        filteredCount: policy.removedCount,
+        source: 'machine_plan',
+      },
     };
   }
   const fallbackNotices = [];
@@ -1130,6 +1302,8 @@ async function collectStageDefinitions(catalog, data, object) {
     const stages = (await catalog.suggestStages({
       crop: data?.crop,
       disease: data?.disease,
+      habitat,
+      objectType: object?.type || null,
     })) || [];
     const region = object?.location_tag || null;
     const defs = [];
@@ -1166,20 +1340,35 @@ async function collectStageDefinitions(catalog, data, object) {
         note: stage.note,
         phi_days: stage.phi_days,
         meta: stage.meta,
-        options: (options || []).map((opt) => ({
-          product: opt.product,
-          ai: opt.ai,
-          dose_value: opt.dose_value,
-          dose_unit: opt.dose_unit,
-          method: opt.meta?.method || null,
-          meta: { ...opt.meta, stage_kind: stage.kind },
-        })),
+        options: (options || []).map((opt) => formatStageOption(opt, stage.kind)),
       });
     }
-    return { stages: defs, fallbackNotices };
+    const policy = filterIndoorStages(defs, habitat);
+    let resultStages = policy.filtered;
+    if (habitat === 'indoor' && !resultStages.length) {
+      resultStages = [buildIndoorFallbackStage(data)];
+    }
+    return {
+      stages: resultStages,
+      fallbackNotices,
+      policy: {
+        habitat,
+        filteredCount: policy.removedCount,
+        source: 'catalog',
+      },
+    };
   } catch (err) {
     console.error('collectStageDefinitions error', err);
-    return { stages: [], fallbackNotices };
+    const fallbackStage = habitat === 'indoor' ? [buildIndoorFallbackStage(data)] : [];
+    return {
+      stages: fallbackStage,
+      fallbackNotices,
+      policy: {
+        habitat,
+        filteredCount: 0,
+        source: 'catalog_error',
+      },
+    };
   }
 }
 

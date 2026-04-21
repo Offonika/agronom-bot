@@ -1,0 +1,518 @@
+UC IPM
+Home and Landscape
+Home and Landscape
+Scales
+Updated: 09/2014
+On this page
+Quick Tips
+Pest Notes: Introduction
+Identification
+Life Cycle
+Damage
+Management
+References
+Resources
+Publication Information
+On this page
+Quick Tips
+Pest Notes: Introduction
+Identification
+Life Cycle
+Damage
+Management
+References
+Resources
+Publication Information
+Quick Tips
+Scales are immobile insects that suck plant juices from many types of trees, shrubs, and houseplants.
+Scale infestations can cause yellowing or premature dropping of leaves, sticky honeydew, and blackish sooty mold. Plant parts can distort or die back, depending on the species and abundance of scales. Management includes proper plant care, protecting beneficial insects and applying less toxic insecticides when needed. Most plants tolerate low to moderate numbers of scales.
+What does scale damage look like?
+Similar to that of aphids and whiteflies
+Wet or sticky honeydew on leaves, pavement, cars, or anything else underneath the infested plants
+Black sooty mold growing on the honeydew
+Discolored, distorted, or dying leaves, twigs, or branches, especially with armored scale infestations
+What do scales look like?
+Scales lack an obvious head or legs and don’t resemble most other insects.
+Adults may appear as circular, elongate, or oval discolorations or bumps on bark, leaves, or fruit. Their coverings range from 1/25 to 1/4 inch long.
+Immature scales (crawlers) are often yellow to orangish. They are called crawlers because they are the life stage that has legs and move. Once the crawlers settle down, their legs drop off and they become immobile adults.
+Distinguish the two most common types of scales—armored and soft.
+Armored scales are tiny and flat, have covers that usually can be removed from the body, and don’t secrete sticky honeydew. Common species include San José scale and California red scale.
+Soft scales are larger, excrete honeydew, and are more rounded and convex with covers that don’t lift off. Common species include black scale, lecanium scale, and brown soft scale.
+Consult the UC IPM website for help identifying other scale species.
+To reduce problems, use an integrated approach.
+Provide plants with proper care, especially irrigation.
+Monitor plants to look for scale predators such as lady beetles or lacewings and parasite emergence holes in scale covers.
+Use sticky barriers or insecticide baits to selectively control scale-tending ants.
+Consider replacing problem-prone plants. Most scales are highly specific to certain plants.
+What about pesticides?
+Insecticides are not necessary unless damage from scales is intolerable.
+When possible, avoid broad-spectrum insecticides that kill beneficial insects.
+For infestations on fruit trees and smaller plants, make a well-timed and thorough spray using horticultural oil during the dormant season or when scale crawlers are active in the growing season.
+For larger plants, consider soil-applied imidacloprid. This material is not effective against some scales, including armored scales, and may cause outbreaks of cottony cushion scale. Always read the label.
+Download a
+PDF of this Quick Tips
+. Descargue un
+PDF de estos Notas Breves
+.
+Read more Quick Tips for this pest
+Pest Notes: Introduction
+Scales are sucking insects that insert their tiny, strawlike mouthparts into bark, fruit, or leaves, mostly on trees and shrubs and other perennial plants. Some scales can seriously damage their host, while other species do no apparent damage to plants even when scales are very abundant. The presence of scales can be easily overlooked, in part because they do not resemble most other insects.
+Black scales. Credit: Jack Kelly Clark, UC IPM
+Identification
+Adult female scales and immatures (nymphs) of most species are circular to oval, wingless, and lack a separate head or other easily recognizable body parts. Some scales change greatly in appearance as they grow, and some species have males and females that differ in shape, size, and color. Adult males are rarely seen and are tiny, delicate, white to yellow insects with one pair of wings and a pair of long antennae. Some scale species lack males and the females reproduce without mating.
+Armored scales and soft scales are the most common types (or families). Scales in other families include important pests of cactus, elm, oak, sycamore, and various conifers. Common scales and their tree and shrub hosts are listed in
+Tables 1–3
+. Color photographs for 200 scale species and detailed discussion of these and others are available in the California Department of Food and Agriculture publications by Gill listed in References.
+Cottony cushion scale, European elm scale, soft scales, and certain other scales secrete sticky honeydew. Armored scales, oak pit scales, and sycamore scale do not excrete honeydew. It is important to correctly distinguish the scale family (e.g., armored versus soft scale) and often the particular species of scale to determine whether control is warranted; and if so, what methods and timing of control action are effective. For example, sago palms can be infested by the similar-looking cycad scale and oleander scale. Even very high populations of oleander scale are harmless to most plants, but cycad scale warrants control because it causes serious damage and can kill sago palms. Insecticides differ in their effectiveness for certain scale types. imidacloprid, a popular systemic insecticide (discussed below), controls soft scales and certain other scales but does not control armored scales or cottony cushion scale.
+Armored Scales
+Armored scales
+, family Diaspididae, have a flattened, platelike cover that is less than 1/8 inch in diameter. The covers often have a differently colored, slight protuberance (exuviae or “nipple”) and concentric rings may form as nymphs (immatures) grow and their cover enlarges. The actual insect body is underneath the cover; if you remove the cover, the insect body will remain on the plant. Armored scales do not produce honeydew. Damaging species include cycad scale, euonymus scale, oystershell scale, and San Jose scale.
+TABLE 1. Some Common Armored Scales (Diaspididae), Their Impact in California, and the Principal Hosts. (
+see photo gallery
+)
+Common Name
+Scientific Name
+Susceptible Hosts and Impact
+Hosts That Usually are not Damaged
+California red scale
+Aonidiella aurantii
+citrus highly susceptible in Central Valley, biologically controlled in Southern California
+acacia, boxwood, eugenia, euonymus, grape, magnolia, mulberry, olive, palm, podocarpus, privet, rose
+cycad scale
+Furchadaspis zamiae
+cycads (sago palm) severely damaged
+bird-of-paradise
+euonymus scale
+Unaspis euonymi
+Euonymus japonica
+highly susceptible
+Euonymus kiautschovica
+(=
+E. sieboldiana
+) tolerant,
+E. alata
+unaffected
+greedy scale
+Hemiberlesia rapax
+generally not damaging
+acacia, bay, boxwood, ceanothus, fruit trees, holly, ivy, laurel, magnolia, manzanita, palm, pepper tree, pittosporum, pyracantha, redbud, strawberry tree, willow and others
+latania scale
+Hemiberlesia lataniae
+generally not damaging, except on kiwifruit
+acacia, avocado,
+Cedrus
+, English ivy, euonymus,
+Fatsia
+, fuchsia, gladiolus, grevillea,
+Kentia
+, philodendron, rose,
+Rubus
+,
+Salix
+, yucca and others
+minute cypress scale
+Carulaspis minima
+Cupressus sempervirens
+highly susceptible
+arborvitae, cypress, juniper
+obscure scale
+Melanaspis obscura
+not damaging, biologically controlled
+chestnut, oaks, pecan
+oleander scale
+Aspidiotus nerii
+generally not damaging, prefers aucuba, cycad or sago palm, ivy, oleander, and olive
+bay, boxwood, holly, laurel, magnolia, manzanita, maple, mulberry, pepper tree, redbud, yew, yucca
+olive scale
+Parlatoria oleae
+not damaging, biologically controlled
+olive
+oystershell scale
+Lepidosaphes ulmi
+poplars and willows especially susceptible
+alder, aspen, box elder, boxwood, ceanothus, cottonwood, most deciduous fruit and nuts, holly, maple, sycamore
+purple scale
+Lepidosaphes beckii
+not damaging, biologically controlled
+citrus
+San Jose scale
+Quadraspidiotus perniciosus
+nut and stone fruit trees can be seriously damaged, also rose growing near these other hosts
+acacia, aspen, citrus, cottonwood, most maple, mulberry, poplar, pyracantha, strawberry tree, willow
+walnut scale
+Quadraspidiotus juglansregiae
+not damaging, biologically controlled
+walnut
+Tiny crawlers of San Jose scale. Credit: Jack Kelly Clark, UC IPM
+Soft Scales
+Soft scales
+, family Coccidae, grow up to 1?4 inch long and have a smooth, cottony, or waxy surface. At maturity, soft scales are usually larger and more rounded and convex (humped) than armored scales. Their surface is the actual body wall of the insect and cannot be removed; flipping the cover removes the insect body and cover together. Soft scales and certain other types feed on phloem sap and excrete abundant, sticky honeydew, which drips on plants and surfaces underneath and promotes the growth of blackish sooty mold. Soft scales include black scale, brown soft scale, Kuno scale, lecanium scales, and tuliptree scale.
+Female European fruit lecanium scale, one overturned to reveal eggs. Credit: Jack Kelly Clark, UC IPM
+TABLE 2. Some Common Soft Scales (Coccidae), Their Impact in California, and the Principal Hosts. (
+see photo gallery
+)
+Common Name
+Scientific Name
+Susceptible Hosts and Impact
+Hosts That Usually are not Damaged
+black scale
+Saissetia oleae
+sometimes annoyingly abundant on its hosts away from the coast and if ant-tended
+aspen, bay, citrus, cottonwood, coyote bush, holly, maple, mayten, oleander, olive, palm, pear, pepper tree, pistachio, poplar, privet, stone fruit, strawberry tree
+brown soft scale
+Coccus hesperidum
+annoyingly abundant if ant-tended, on avocado, citrus, holly, manzanita, palm
+aspen, cottonwood, poplar, stone fruit, strawberry tree, willow
+calico scale
+Eulecanium cerasorum
+liquidambar sometimes damaged
+box elder, maple, stone fruit, walnut
+citricola scale
+Coccus pseudomagnoliarum
+citrus and hackberry sometimes damaged in Central Valley
+biologically controlled in Southern California
+European fruit lecanium
+, also called brown apricot scale
+Parthenolecanium corni
+annoyingly abundant sometimes
+alder, almond, aspen, cottonwood, elm, grape, pear, pistachio, poplar, stone fruit, toyon, walnut
+frosted scale
+Parthenolecanium pruinosum
+walnut sometimes damaged
+ash, birch, elm, laurel, locust, pistachio, rose, sycamore
+green shield scale
+Pulvinaria psidii
+occasional pest on its hosts in Los Angeles and Orange Counties
+aralia, begonia, camellia, croton, eugenia, gardenia, hibiscus, laurel fig or Indian laurel (
+Ficus retusa
+), pepper tree, pittosporum, plumeria,
+Schefflera
+irregular pine scale
+Toumeyella pinicola
+Monterey pine infested, mostly in Bay Area
+other pines
+Kuno scale
+Eulecanium kunoense
+stone fruit sometimes damaged, especially plum
+cotoneaster, pyracantha, rose, walnut
+oak lecanium
+Parthenolecanium quercifex
+coast live oak
+other oaks
+tuliptree scale
+Toumeyella liriodendri
+deciduous magnolias and tuliptree (yellow poplar) highly susceptible
+linden
+wax scale
+, including barnacle and Chinese wax scales
+Ceroplastes
+spp.
+annoyingly abundant sometimes on
+Escallonia
+, gardenia,
+Geijera parviflora
+, and mayten
+California bay, coyote bush, holly,
+Mahonia
+, pepper tree
+TABLE 3. Some Common Scales in Other Families, Their Importance in California, and the Principal Hosts. (
+see photo gallery
+)
+Common Name
+Scientific Name
+Susceptible Hosts and Impact
+Hosts That Usually are not Damaged
+cochineal scale
+Dactylopius
+spp. (Dactylopiidae)
+prickly pear,
+Opuntia
+and
+Nopalea
+species; severe decline and death
+other cacti
+cottony cushion scale
+Icerya purchasi
+(Monophlebidae)
+1
+Cocculus laurifolius
+; abundant honeydew and sooty mold, possible decline
+citrus, nandina, pittosporum, and many others; usually biologically controlled
+2
+Ehrhorn’s oak scale
+Mycetococcus ehrhorni
+(Asterolecaniidae)
+evergreen oaks in southern California; unhealthy looking canopy, slow growth, pale fungal mass
+European elm scale
+Eriococcus spurius
+(Eriococcidae)
+American and Chinese elms; leaf yellowing, plant decline, and dieback
+other elms
+incense-cedar scale or Monterey cypress scale
+Xylococculus macrocarpae
+(Xylococcidae)
+Incense-cedar, Monterey cypress and other
+Cupressus
+species, and junipers; foliage discoloring and dieback in native stands
+conifers in urban areas
+Kuwana oak scale
+Kuwania quercus
+(Kuwaniidae)
+blue oak; bark roughening and flaking off
+oak pit scale
+Asterodiaspis
+spp. (Asterolecaniidae)
+3
+Quercus lobata, Q. douglasii, and Q. rober
+; distorted terminals, dieback, and severe decline
+other oaks
+sycamore scale
+Stomacoccus platani
+(Steingeliidae)
+4
+California sycamore, London plane; premature leaf drop, dieback, bark roughening and flaking off
+American sycamore
+Footnotes
+1
+See
+Pest Notes:
+Cottony Cushion Scale
+, UC ANR Publication 7410
+2
+Cottony cushion scale can harm “Hosts Usually Not Damaged” if natural enemies are disrupted, such as by application of certain persistent insecticides.
+3
+See
+Pest Notes:
+Oak Pit Scales
+, UC ANR Publication 7470
+4
+See
+Pest Notes:
+Sycamore Scale
+, UC ANR Publication 7409
+Scale Look-Alikes
+Various other organisms resemble scales but have different biology and management. These include
+California laurel aphid
+(Euthoracaphis umbellulariae)
+,
+coconut mealybug
+(Nipaecoccus nipae)
+,
+cypress bark mealybug
+(Ehrhornia cupressi)
+,
+palm aphid
+(Cerataphis brasiliensis
+), whitefly nymphs, and psyllids, such as
+lemongum lerp psyllid
+(Cryptoneossa triangula)
+and
+redgum lerp psyllid
+(Glycaspis brimblecombei
+).
+Diamond “scale
+,” which infests palms, is actually the fruiting bodies of a blackish fungus (
+Phaeochoropsis neowashingtoniae)
+.
+Life Cycle
+Scales hatch from an egg and typically develop through two nymphal instars (growth stages) before maturing into an adult. Each instar can change greatly as it ages, so many scales appear to have more than two growth stages. At maturity, adult females produce eggs that are usually hidden under their bodies, although some species secrete their eggs externally under prominent cottony or waxy covers. Eggs hatch into tiny crawlers (mobile first instar nymphs), which are yellow to orangish in most species. Crawlers walk over the plant surface, are moved to other plants by wind, or are inadvertently transported by people or birds. Crawlers settle down and begin feeding within a day or two after emergence.
+Settled nymphs may spend their entire life in the same spot without moving as they mature into adults. Nymphs of some species can move slowly, such as soft scales that feed on deciduous hosts and move from foliage to bark in the fall before leaves drop. For species with multiple generations, all scale life stages may be present throughout the year in areas with mild winters.
+Armored Scales
+Most species of armored scales have several generations a year and overwinter primarily as first instar nymphs and adult females. Except for crawlers and adult males, armored scales lack obvious appendages and spend their entire life feeding at the same spot.
+Soft Scales
+Most soft scales have one generation each year and overwinter as second instar nymphs. The brown soft scale is an exception; it has multiple generations and females and nymphs can be present throughout the year. Most immature soft scales retain their barely visible legs and antennae after settling and are able to move, although slowly.
+Damage
+Some scale species, when abundant, weaken a plant and cause it to grow slowly.
+Infested plants
+appear water stressed, leaves turn yellow and may drop prematurely, and plant parts that remain heavily infested may die. The dead brownish leaves may remain on scale-killed branches, giving plants a scorched appearance. If the scale produces honeydew, this sticky excrement, sooty mold, and the ants attracted to
+honeydew
+can annoy people even when scales are not harming the plant.
+The importance of infestations depends on the scale species, the plant species and cultivar, environmental factors, and
+natural enemies
+. Populations of some scales can increase dramatically within a few months when the weather is warm, and honeydew-seeking ants protect scales from their natural enemies. Plants are not harmed by a few scales and even high populations of certain species apparently do not damage plants.
+Sooty mold on oak leaves. Credit: Jack Kelly Clark, UC IPM
+Management
+Many species are usually well controlled by beneficial predators and parasites (natural enemies). Exceptions are when natural enemies are disrupted by
+ants
+, dust, or the application of persistent broad-spectrum insecticides. Preserving (conserving) parasites and predators (such as by controlling pest-tending ants) may be enough to bring about gradual control of certain scales as natural enemies become more abundant.
+A well-timed and thorough spray of horticultural (narrow-range) oil during the dormant season, or soon after scale crawlers are active in late winter to early summer, can provide good control of most species of scale. Certain scale problems on large plants and hosts especially sensitive to scale damage may warrant the application of a systemic insecticide. If plants perform poorly or are repeatedly damaged by pests, the best course of action may be to replace the plant with a pest-resistant species or cultivar that is better adapted to the site conditions.
+Monitoring
+Periodically check to ensure that plants have a good growing environment and are receiving appropriate cultural care. Inspect plants to determine whether female scales, nymphs, honeydew, sooty mold, or ants and other pests are present. Before applying insecticide, examine a portion of the scales to determine whether they are dead or parasitized as described below; for example, they fail to exude fluid when squished. If a large proportion of scales are dead or parasitized by natural enemies, consider delaying a treatment decision and monitor the population again later before deciding whether to apply pesticide. Tape traps for crawlers and honeydew monitoring are useful in certain situations for determining the need and best timing for pesticide application.
+Inspect trunks for ants periodically during the growing season. If the descending ants have swollen, almost translucent abdomens, they may be feeding on honeydew produced by scales or other insects. Trace back trail-making ants to locate colonies of the honeydew-producing insects.
+There are no quantitative action guidelines for deciding whether pesticide application for scales is warranted. Monitor and record scale densities and use the density that caused damage (dieback or unacceptable honeydew) as your preliminary control action threshold. As you gain experience, refine this threshold over time for your local situation.
+Tape Traps
+Transparent double-sided sticky tape can be used to effectively time a foliar insecticide application. During the spring before crawlers begin to emerge, tightly encircle each of several scale-infested twigs or branches with transparent tape that is sticky on both sides, available at fabric or craft stores. Double over the loose end of the tape several times to make it easier to remove. Place a tag or flagging near each tape so you can readily find it. Change the tapes at weekly intervals. After removing the old tape, wrap the twig at the same location with fresh tape. Preserve the old sticky tapes by sandwiching them between a sheet of white paper and clear plastic. Label the tapes with the date, location, and host plant from which they were collected.
+Scale crawlers
+get stuck on the tape and appear as yellow or orange specks. Examine the tape with a hand lens to distinguish the crawlers (which are round or oblong and have very short appendages) from pollen and dust. Use a hand lens to examine the crawlers beneath mature female scales on bark or foliage to be certain of crawler appearance. Other tiny creatures, including mites, may also be caught in the tape.
+Visually compare the tapes collected on each sample date. If a spring or summer foliar insecticide application is planned, unless another time is recommended for that species, spray after crawler production (abundance in traps) has peaked and definitely begun to decline, which is soon after most crawlers have settled.
+Honeydew Monitoring
+Honeydew drippings from plants can be efficiently monitored using water-sensitive paper, which is commonly used for monitoring insecticide droplets and calibrating sprayers. Products include bright yellow cards that produce distinct blue dots upon contact with honeydew or water. Regularly monitoring honeydew beneath plants, such as the number of drops during four hours on the same time of day once a week, can help to develop thresholds and evaluate effectiveness of the treatment. Honeydew monitoring is useful where there is a low tolerance for dripping honeydew, when managing many trees, such as along city streets or in parks, and on tall trees where the honeydew-producing insects may be located too high to easily observe. For more information on monitoring honeydew, see the book
+Pests of Landscape Trees and Shrubs
+.
+Cultural Control
+Provide plants with good growing conditions and proper cultural care, especially appropriate irrigation, so they are more resistant to scale damage. You can prune off heavily infested twigs and branches, if they are limited to a few parts of small plants. In areas with hot summers, pruning to open up canopies can reduce populations of black scale, citricola scale, cottony cushion scale, and possibly other scales by increasing scale mortality from exposure to heat and parasites. Consider replacing problem-prone plants.
+Biological Control
+Scales are preyed upon by small parasitic wasps and many predators, including certain beetles,
+bugs
+,
+lacewings
+, and mites. Predatory lady beetle (ladybug) species of
+Chilocorus
+,
+Hyperaspis
+, and
+Rhyzobius
+, can easily be overlooked because the adults of many species are tiny or colored and shaped like scales, and their larvae may feed hidden beneath scales.
+Hyperaspis
+species are tiny, shiny, black lady beetles with several red, orange, or yellow spots on the back.
+Rhyzobius lophanthae
+has a reddish head and underside and a grayish back densely covered with tiny hairs. The
+twicestabbed lady beetle
+,
+Chilocorus orbus
+, is shiny black with two red spots on its back.
+Often the most important natural enemies of scales are parasitic wasps, including species of
+Aphytis
+,
+Coccophagus
+,
+Encarsia
+, and
+Metaphycus
+. The female wasp lays one or several eggs in or on each scale, where the tiny maggotlike
+wasp larvae
+feed.
+Parasitized scales
+may become puffy or darken in comparison with unparasitized scales. Sometimes the
+immature parasites
+are visible through the scale surface. After completing the larval stage and pupating, the emerging adult of internal parasites typically leaves a round exit hole in the scale it killed. With external parasites that feed outside the scale body, but under the cover of armored scales, their maggotlike larvae may be observed by prying off the scale cover.
+Natural enemies are commercially available for release against California red scale and perhaps certain other scales. However, conserving resident natural enemies is a more efficient and longer lasting strategy than buying and releasing beneficials in gardens and landscapes.
+Ant control, habitat manipulation, and pesticide management are the key natural enemy conservation strategies. If ants are abundant, selectively control them. Grow a variety of flowering plants to help attract and support natural enemies. Adults of predatory bugs, lacewings, lady beetles, and parasitic wasps live longer, lay more eggs, and kill more scales when they have plant nectar or pollen and insect honeydew to feed on. Avoid creating dust because it interferes with natural enemies. For example, rinse small plants when foliage becomes dusty.
+Depending on the scale species and the extent to which biological control has been disrupted, it will take several months of conservation efforts (such as controlling ants and dust and avoiding application of persistent insecticides) or until the next season or longer before scale populations are reduced by biological control. If current levels of scales are intolerable, spray insecticidal oils to reduce scale populations while conserving natural enemies.
+Ant Control
+Because ants attack and feed on scale parasites and predators, control ants if they are
+tending scales
+. To deny ants access to plant canopies, prune branches or weeds that provide a bridge between buildings or the ground and apply a sticky material (Tanglefoot) to trunks. Wrap the trunk with a collar of fabric tree wrap, heavy paper, or masking tape to avoid injury to bark; wedge pliable wrap snugly into cracks and crevices; and coat the wrap with the
+sticky material
+. A barrier band about 2 to 6 inches wide should be adequate in most situations. Inspect wraps at least several times a year for damage to bark and remove and relocate any wrap at least once a year to minimize bark injury. Periodically stir sticky material with a stick to prevent ants from crossing on collected debris. Avoid applying sticky material to horizontal surfaces where birds may roost.
+Place enclosed pesticide baits (insecticide mixed with an attractant) near nests or on ant trails beneath plants. Effective, slow-acting bait insecticides work over a period of days so that before ants die they will spread the toxicant among many other ants during food sharing. Boric acid, fipronil, and hydramethylnon are examples of insecticides used in ant baits. Although baits require users to be patient, they can be much more effective than sprays. Sprays only kill foraging workers, while ant baits are carried back to the nests where reproductive queens and the entire colony underground can be killed. See
+Pest Notes:
+Ants
+for more information.
+Chemical Control
+Before applying insecticide, make sure plants are receiving appropriate cultural care and take steps to conserve natural enemies. Check a portion of the scales to be certain they are alive and to evaluate the extent of parasitism as described above. To know how and when to effectively make an application, learn more about the available insecticides and the biology of your pest species. Completely read and follow the product label instructions for the safe and effective use of the insecticide. Insecticides can have unintended effects, such as contaminating water, poisoning natural enemies and pollinators, and causing secondary pest outbreaks.
+Nonresidual, Contact Insecticides
+Where plants can be sprayed, complete spray coverage of infested plant parts with
+horticultural oil
+at the proper time provides good control of most scales. Horticultural oils (e.g., Bonide Horticultural Oil and Monterey Horticultural Oil) are specially refined petroleum products, often called narrow-range, superior, or supreme oils. Other nonpersistent, contact sprays for garden and landscape plants include
+insecticidal soap
+(Safer Brand Insect Killing Soap Concentrate II),
+neem oil
+(Bayer Advanced Natria Neem Oil Concentrate, Green Light Neem, Garden Safe Brand Neem),
+canola oil
+(Bayer Advanced Natria Multi-Insect Control), and other botanical (plant-derived) oils.
+These insecticides have low toxicity to people and pets and relatively little adverse impact on the populations of pollinators and natural enemies and the benefits they provide. To obtain adequate control, thoroughly wet the infested plant parts with spray, typically shoot terminals and the underside of leaves. More than one application per growing season may be needed, especially if the targeted pest has more than one generation a year. Thorough spray coverage is especially critical when treating armored scales and oak pit scales as these scales are generally less susceptible to pesticides than soft scales.
+Dormant Season
+To control most scales overwintering on deciduous woody plants, thoroughly spray the bark of terminal shoots with oil during winter. For oak pit scales, sycamore scale, and other harder to control species, spray during the plant’s delayed-dormant period, which is after the buds swell but before buds open. Do not spray oystershell or olive scales during the dormant season because susceptible stages of these species are not present during winter.
+Foliage Spray
+Horticultural oil is effective in spring or summer on deciduous plants when sprayed soon after most crawlers have emerged and most scales are in the young nymph stage. Late spring and summer are also the times to spray avocado, citrus, and many other broadleaf evergreens. Thoroughly cover with spray the plant parts where scales occur, typically on twig terminals and the underside of leaves.
+Precautions on Using Oils
+Follow product labels, which may say to not spray certain plant species or mix oil with certain other products. For example, oil will remove the desirable bluish tinge from blue spruce foliage, although the plant’s health is not impaired. Do not mix oil with
+chlorothalonil
+,
+sulfur
+, and certain other fungicides; and do not apply oil within 3 weeks of an application of sulfur-containing compounds, such as wettable sulfur. Do not apply oil or other insecticides when it is foggy, freezing (under 32°F), hot (over 90°F), when relative humidity is above 90%, or if rain is expected in the next 24 hours. Especially at locations with hot weather, be sure plants are well irrigated before spraying foliage.
+Systemic Insecticides
+Systemic insecticides are absorbed by one plant part (e.g., trunks or roots) and moved (translocated) to leaves and other plant parts. In comparison with systemics that are sprayed onto foliage, products labeled for soil drench or injection, or for trunk injection or spray minimize environmental contamination and may be more effective than contact insecticides. Trunk application of an effective systemic insecticide can provide relatively rapid control. There is a longer time delay between soil application and insecticide action. Some uses require hiring a professional pesticide applicator. Certain home-use products can easily be drenched into soil around the tree trunk using the mix-and-pour method.
+Systemic insecticides for use on landscape plants include neonicotinoids (
+acetamiprid
+,
+dinotefuran
+,
+imidacloprid
+, and
+thiamethoxam
+) and the organophosphate
+acephate
+(Lilly Miller Ready-to-Use Systemic, Orthene). Properly applied, one application of an effective product may provide season-long control. However, neonicotinoids vary in effectiveness for scale control. For example, acetamiprid (Ortho Flower, Fruit & Vegetable Insect Killer) controls soft scales but is not very effective on armored scales and can only be applied by spraying foliage. Imidacloprid controls European elm scale and most soft scales but does not control cottony cushion scale and most armored scales. Dinotefuran (Green Light Tree and Shrub Insect Control with Safari 2G, Safari) controls most types of scales. Some of these products are for licensed professional applicators only.
+Some systemic insecticides can cause spider mite outbreaks. Foliage sprays of systemics can be toxic to beneficial insects that contact spray or treated leaves. Systemics can translocate into flowers and have adverse effects on natural enemies and pollinators that feed on nectar and pollen. Do not apply systemic insecticides to plants during flowering or shortly before flowering; wait until after plants have completed their seasonal flowering unless the product’s label directions say otherwise. With foliage spraying and soil application, when possible, wait until nearby plants also have completed flowering as spray can drift onto nearby plants or their roots may take up some of the soil-applied insecticide.
+When applying
+systemic insecticide
+, use soil application or a trunk spray whenever possible . With trunk injection and implantation it is difficult to repeatedly place insecticide at the proper depth. Trunk injection and implantation also injure woody plants and can spread plant pathogens on contaminated tools. When injecting or implanting into multiple plants, scrub any plant sap from tools or equipment that penetrate bark and disinfect tools with a registered disinfectant (e.g., bleach) before moving to work on each new plant. At least one to two minutes of disinfectant contact time between contaminated uses is generally required. Consider rotating work among several tools and using a freshly disinfected tool while the most recently used tools are being soaked in disinfectant. Avoid methods that cause large wounds, such as implants placed in holes drilled in trunks. Do not implant or inject into roots or trunks more than once a year.
+Residual, Foliar Sprays
+Foliar sprays of broad-spectrum insecticides with residues that can persist for weeks are not recommended for scale control in landscapes and gardens. Pesticides to avoid include carbamates (
+carbaryl
+* or Sevin), nonsystemic organophosphates (
+malathion
+), and pyrethroids (
+bifenthrin
+, fluvalinate,
+permethrin
+). These are highly toxic to natural enemies and pollinators and can cause outbreaks of spider mites or other pests. Because their use in landscapes and gardens can run or wash off into storm drains and contaminate municipal wastewater, these insecticides are being found in surface water and are adversely affecting nontarget, aquatic organisms.
+*As of August 1, 2020, pesticides containing the active ingredient carbaryl are restricted use materials in California. A valid pesticide applicator’s license is required for their possession and use. For more information see the
+California Department of Pesticide Regulation website
+.
+The pesticide information on this page may become out of date as products and active ingredients change or become unavailable. Some of the pesticides listed are only available for use by licensed pesticide applicators. No endorsements of named products are intended, nor is criticism implied of products not mentioned.
+References
+Dreistadt, S. H., J. K. Clark, and M. L. Flint. 2004.
+Pests of Landscape Trees and Shrubs: An Integrated Pest Management Guide
+. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3359.
+Fichtner, E.J., M.W. Johnson. 2012.
+Pest Notes: Black Scale
+. Oakland: Univ. Calif. Agric. Nat Res. Publ. 74160.
+Flint, M. L. 1998.
+Pests of the Garden and Small Farm: A Grower?s Guide to Using Less Pesticide
+.
+UC Statewide IPM Program. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3332.
+Flint, M. L., and S. H. Dreistadt. 1998.
+Natural Enemies Handbook: The Illustrated Guide to Biological Pest Control
+.
+Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3386.
+Flint, M.L., and K. Windbiel-Rojas.
+Retail Nursery and Garden Center IPM News
+.
+(PDF)
+4(1) March 2014.
+Geisel, P., and E. Perry. 2013.
+Pest Notes: Oak Pit Scales
+. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 7470.
+Gill, R. J. 1988.
+The Scale Insects of California Part 1: The Soft Scales
+.
+(PDF)
+Sacramento: Calif. Dept. Food Agric.
+Gill, R. J. 1993.
+The Scale Insects of California Part 2: The Minor Families
+.
+(PDF)
+Sacramento: Calif. Dept. Food Agric.
+Gill, R. J. 1997.
+The Scale Insects of California Part 3: The Armored Scales
+.
+(PDF)
+Sacramento: Calif. Dept. Food Agric.
+Grafton-Cardwell, E. E. 2012.
+Pest Notes: Cottony Cushion Scale
+. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 7410.
+Rust, M. K., and D. -H. Choe. 2012.
+Pest Notes: Ants
+. Oakland: Univ. Calif. Div. Agric. Nat. Res. Publ. 7411.
+Dreistadt, S. H. 2010.
+Pest Notes: Sycamore Scale
+. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 7409.
+Revised from a previous edition by J. G. Morse, Entomology, UC Riverside; P. A. Phillips, UC IPM Program, emeritus, Ventura Co.; and R. E. Rice, Entomology, emeritus, Kearney Agricultural Center, Parlier.
+Resources
+About Pest Notes
+Glossary
+Compare Risks from Pesticides Mentioned
+WARNING ON THE USE OF PESTICIDES
+List of other Pest Notes
+Publication Information
+Pest Notes
+: Scales
+UC ANR Publication 7408
+Author(s)
+J.N. Kabashima
+(emeritus), UC Cooperative Extension, Orange and Los Angeles Counties
+S.H. Dreistadt
+, UC Statewide IPM Program

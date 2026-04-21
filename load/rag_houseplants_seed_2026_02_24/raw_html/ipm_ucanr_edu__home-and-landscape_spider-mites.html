@@ -1,0 +1,750 @@
+<!-- INF10\startRequest.cfm -->
+
+<!-- page-view-home-and-landscape\index.cfm -->
+
+<!-- ck:4550 --><!-- rp:/home-and-landscape/spider-mites --> 
+
+<!-- // Debug: ~infVer:10.0.0~/home-and-landscape/spider-mites~ck:4550~sk:9~v:0~pk:HLS~pv:01~tn:pn-qt-2x8~tv:2025~tk:1~ -->
+
+<!-- INF10\header-v5.cfm -->
+
+
+
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	
+	
+	
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700&amp;subset=latin,latin-ext" type="text/css" />
+	
+	
+	
+	<link rel="stylesheet" href="/assets_v7/styles/bootstrap-1.css" type="text/css" />
+	<link rel="icon" type="image/png" href="/assets_v7/images/favicon.ico" />
+			
+	
+	
+	
+	
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+	
+		<script src="https://unpkg.com/htmx.org@1.6.1"></script>
+	
+		<link href="/assets_v7/fontawesome7_1_0/css/fontawesome.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/brands.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/solid.min.css" rel="stylesheet">
+	
+		<!-- Google Tag Manager -->
+		<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NPR7B4');</script>
+		<!-- End Google Tag Manager -->
+	
+	
+	
+
+	<script async src="https://cse.google.com/cse.js?cx=005318318591192111806:oa2cd9kjx8k"></script>
+
+	<style>	
+		.icon-bar {
+		position: fixed;
+		z-index: 500;
+		top: calc(100vh - (100vh - 40%));
+		right: 0;
+		left: calc(100vw - 105px);
+		width: 140px;
+		-webkit-transform: translateY(-50%);
+		-ms-transform: translateY(-50%);
+		transform: translateY(-50%);
+		transform: rotate(-90deg);
+		}
+
+		.icon-bar a {
+		display: block;
+		text-align: center;
+		padding: 14px;
+		transition: all 0.3s ease;
+		color: white !important;
+		font-size: 14px;
+		border-bottom: none;
+		}
+		
+		.icon-bar a:hover {
+		background-color: #000;
+		}
+		
+		.pdf {
+		background: #bb0000;
+		color: white;
+		}
+
+		.print {
+		background: #008EAA;
+		color: white;
+		}
+		
+		.feedback {
+		background: #008EAA;
+		color: white;
+		}
+
+		@media print { 
+			.icon-bar {
+				display: none !important;
+			}
+		}
+	</style>
+	
+	
+		
+	<title>Spider Mites / Home and Landscape / UC Statewide IPM Program (UC IPM)</title>
+</head>
+
+<body>
+	
+		<!-- Google Tag Manager (noscript) -->
+		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NPR7B4" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+		<!-- End Google Tag Manager (noscript) -->
+	<!-- WWW03\Templates\WWW_headerNav_3_2023.cfm -->
+
+<div class="modal fade" id="notificationsModal" tabindex="-1" aria-labelledby="notificationsModal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" >
+            <div class="modal-header flex-wrap">
+                <div class="modal-title" id="notificationsModalLabel">Notifications</div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="notificationsModalContent">
+                Loading...
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<nav class="navbar navbar-expand-lg navbar-light shadow megamenu-nav" id="nav"  >
+    <div class="container-fluid">
+        
+            <a class="navbar-brand" href="/" onclick="_sz.push(['event', 'Mega Menu', 'Logo', 'UC IPM']);"><img src="/assets_v7/images/logo/header-logo-ipm.png" width="150px" alt="UC IPM logo"></a>
+            
+        <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-content" aria-label="mobile menu" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', 'Collapsed']);">
+            <div class="hamburger-toggle">
+                <div class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-content">
+            <ul class="navbar-nav mr-auto mb-2 mb-lg-0">
+                <li class="nav-item dropdown dropdown-mega position-static">
+                    <a class="nav-link dropdown-toggle toggle-animation" href="#" data-bs-toggle="dropdown" data-bs-auto-close="outside" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/spider-mites/']);">Manage
+                        Pests<i class="fas fa-chevron-down ms-1"></i></a>
+                    <div class="nav-dropdown dropdown-menu">
+                        <div class="mega-content">
+                            <div class="container-fluid">
+                                <div class="row">
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-1" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Home &amp; Landscape<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-1">
+
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/" class="dropdown-item">Home, Garden, Turf and Landscape Pests</a>
+                                            <a href="https://ucanr.edu/blogs/UCIPMurbanpests/" class="dropdown-item">Blog</a>
+                                            <a href="https://ucanr.edu/site/urban-community-ipm-webinars" class="dropdown-item">Webinars</a>
+                                            <a href="https://ipm.ucanr.edu/IPMPROJECT/videolibrary.html" class="dropdown-item">Video</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/" class="dropdown-item">Pesticide Active Ingredient Database</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/plant-problem-diagnostic-tool/" class="dropdown-item">Plant Problem Diagnostic Tool</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Seasonal Landscape IPM Checklist</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/wildlife-pest-identification/" class="dropdown-item">Wildlife Identification Tool</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                            <h6 class="dropdown-header mt-4">Resources</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Landscape Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-multi-unit-housing-managers/" class="dropdown-item">Multi-unit Housing Managers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/retail-nursery-and-garden-center-ipm-news/" class="dropdown-item">Retail Nurseries and Garden Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-schools-and-child-care-centers/" class="dropdown-item">Schools and Child Care Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-structural-pest-management-professionals/" class="dropdown-item">Structural Pest Management Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/master-gardeners/" class="dropdown-item">UC Master Gardeners</a>
+                                            
+                                            
+                                            
+                                            
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-2" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Agriculture<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-2">
+
+                                            <a href="https://ipm.ucanr.edu/agriculture/" class="dropdown-item">Pest Management Guidelines</a>
+
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <a href="https://ipm.ucanr.edu/GENERAL/pesticides.html" class="dropdown-item">Pesticide
+                                                Information</a>
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            <a href="https://ipm.ucanr.edu/bee-precaution-pesticide-ratings/" class="dropdown-item">Bee
+                                                Precaution Pesticide Ratings</a>
+                                            <a href="https://ipm.ucanr.edu/agriculture/decision-support-tool/" class="dropdown-item">Decision
+                                                Support</a>
+                                            <a href="https://ipm.ucanr.edu/WEATHER/" class="dropdown-item">Weather, Models and Degree
+                                                Days</a>
+                                            <span class="border-top"></span>
+                                            <h6 class="dropdown-header mt-4 mb-2">Resources</h6>
+                                            <a href="https://ipm.ucanr.edu/PMG/glossary.html" class="dropdown-item">Glossary</a>
+                                            <a href="https://ipm.ucanr.edu/mitigation/" class="dropdown-item">Mitigating Pesticides</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies
+                                                Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/GENERAL/links.html" class="dropdown-item">Pest Management
+                                                Sites</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-3" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Natural Areas<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-3">
+                                            <a href="https://ipm.ucanr.edu/natural-area-pests/" class="dropdown-item">Natural Area Pests</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/events/" onclick="_sz.push(['event', 'Mega Menu', 'Events and Trainings', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/spider-mites/']);">Events
+                        and Trainings</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/about/" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'About', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/spider-mites/']);">About</a>
+                </li>
+            </ul>
+            <ul class="navbar-nav d-flex ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#searchModal" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'Search', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/spider-mites/']);"><i class="fa-solid fa-magnifying-glass me-2"></i>Search</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/make-a-gift/" onclick="_sz.push(['event', 'Mega Menu', 'Donate', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/spider-mites/']);">Donate</a>
+                </li>
+                
+                
+                
+                
+                
+            </ul>
+        </div>
+    </div>
+</nav>
+<!-- Account Settings Modal -->
+<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content" >
+            <div class="modal-header" >
+                <div class="modal-title" id="accountSettingsModalLabel">Account Settings</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="accountSettingsModalBody">
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal" aria-label="Close">Close</button>
+                <button type="button" class="btn btn-primary float-end" hx-trigger="click" hx-post="htmx-INF-10-htmx-accountSettingsModalContent.cfm?submit=submit" hx-target="#accountSettingsModalBody" name="submit" value="submit" hx-include="[name='firstName'],[name='lastName']">
+                    Save
+                </button>
+            </div>
+		</div>
+	</div>
+</div>
+
+<script>
+    document.addEventListener('click', function (e) {
+        // Hamburger menu
+        if (e.target.classList.contains('hamburger-toggle')) {
+            e.target.children[0].classList.toggle('active');
+        }
+    })
+    var dropDownToggle = document.querySelectorAll('.toggle-animation');
+    dropDownToggle.forEach((dropdown) => {
+        dropdown.addEventListener('click', function () {
+            var icon = this.querySelector('.fas');
+            icon.classList.toggle('fa-chevron-down');
+            icon.classList.toggle('fa-chevron-up');
+        });
+    });
+    //change for medium and below
+    var adjustIconFloat = () => {
+        var breakpoint = 992;
+        var icons = document.querySelectorAll('.fa-chevron-down');
+        if (window.innerWidth <= breakpoint) {
+            icons.forEach(icon => {
+                icon.style.float = 'right';
+            });
+        } else {
+            icons.forEach(icon => {
+                icon.style.float = '';
+            });
+        }
+    }
+    window.addEventListener('resize', adjustIconFloat);
+    adjustIconFloat();
+</script>
+
+	
+
+	
+
+	<!-- Search Modal -->
+	<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-xl modal-dialog-scrollable">
+			<div class="modal-content">
+				<div class="modal-header">
+					<p class="h1 modal-title fs-5" id="searchModalLabel">Search</p>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="_sz.push(['event', 'Search Modal', 'Button', 'X']);"></button>
+				</div>
+				<div class="modal-body">
+					<form class="row g-3" onsubmit="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; return false;">
+						<div class="col">
+							<label for="searchInput" class="visually-hidden">search</label>
+							<input type="search" class="form-control" id="searchInput" placeholder="What's your pest problem?">
+						</div>
+						<div class="col-auto">
+							<button type="button" class="btn btn-primary" onclick="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; _sz.push(['event', 'Search Modal', 'Button', 'Search']);">Search</button>
+						</div>
+					</form>
+					<div class="gcse-searchresults-only"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	
+
+<!-- HLS01\Templates\HLS_pn-qt-2x8_1_2025.cfm -->
+
+<!-- INF10\inf_contents-v10.cfm -->
+
+
+
+ 
+<main>
+    <div class="content-header-wrap urban">
+       <!-- INF10\inf_breadcrumb-v10.cfm -->
+
+
+
+<div class="breadcrumb-wrapper">
+	<div class="container">
+		<div class="row justify-content-center">
+			<div class="col-md-10 col-sm-12">
+				<nav aria-label="breadcrumb">
+					<ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="/">UC IPM</a></li><li class="breadcrumb-item"><a href="/home-and-landscape">Home and Landscape</a></li>
+					</ol>
+				</nav>
+			</div>
+		</div>
+	</div>
+</div>
+
+       
+        <header>
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-10 col-sm-12">
+                        <p class="eyebrow">Home and Landscape</p>
+                        <h1>Spider Mites</h1>
+                        <div class="info">
+                            
+                            
+                            
+                            <!--<div>Published on January 25, 2022</div>-->
+                            <div>Updated: 12/2011</div>
+                        </div>
+                        <div class="icons">
+                            <a href="https://ipm.ucanr.edu/PDF/PESTNOTES/pnspidermites.pdf"><i class="fa-solid fa-file-pdf" aria-label="PDF file"></i></a> 
+            <a href="https://www.linkedin.com/shareArticle/?mini=true&url=https://ipm.ucanr.edu/home-and-landscape/spider-mites/" target="_blank"><i class="fab fa-linkedin" aria-label="LinkedIn"></i></a>
+        
+            <a href="https://bsky.app/intent/compose?text=Learn%20about%20Spider%20Mites%20at%20UC%20IPM%2E%20https%3A%2F%2Fipm%2Eucanr%2Eedu%2Fhome%2Dand%2Dlandscape%2Fspider%2Dmites%2F" target="_blank"><i class="fa-brands fa-square-bluesky" aria-label="Bluesky"></i></a>
+        
+            <a href="https://www.facebook.com/sharer/sharer.php?u=https://ipm.ucanr.edu/home-and-landscape/spider-mites/" target="_blank"><i class="fab fa-facebook-square" aria-label="FaceBook"></i></a>
+        
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+            <div class="banner mb-5">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-md-10 col-sm-12">
+                            <img class="img-fluid" src='/PMG/IMAGES/T/I-AC-TSPP-CO.013banner.jpg' width="100%" height="100%" border="0" alt='Eggs and adult males and females on leaf Credit: Jack Kelly Clark, UC IPM' title='Colony of webspinning spider mites Credit: Jack Kelly Clark, UC IPM'>
+                            
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-2 col-md-2 d-none d-md-block">
+                <div class="position-sticky sticky-top side-nav-wrap-scroll" style="top:30px; z-index:0;">
+                    <nav id="navbar-example3" class="side-nav">
+                        <div class="h3 mb-3">On this page</div>
+                            
+                                <a class="nav-link" href="#QUICK_233_1">Quick Tips</a>
+                                <a class="nav-link" href="#INTRODUCTION_65_1">Pest Notes: Introduction</a>
+                            
+                                <a class="nav-link" href="#IDENTIFICATION_247_1">Identification</a>
+                            
+                                <a class="nav-link" href="#LIFE_241_1">Life Cycle</a>
+                            
+                                <a class="nav-link" href="#DAMAGE_51_1">Damage</a>
+                            
+                                <a class="nav-link" href="#MANAGEMENT_52_2">Management</a>
+                            
+                                <a class="nav-link" href="#REFERENCES_266_1">References</a>
+                            
+                            <a class="nav-link" href="#RESOURCES">Resources</a>
+                            <a class="nav-link" href="#PUBLICATIONINFORMATION">Publication Information</a>
+                    </nav>
+                </div>
+            </div>
+            <div class="col-md-8 col-lg-8 col-sm-12 content-body">
+                <span class="in-nav-mobile d-block d-md-none">
+                    <a class="heading" data-bs-toggle="collapse" href="#HeaderSection" aria-expanded="false" aria-controls="HeaderSection">On this page<i class="fas fa-chevron-down float-end"></i>
+                    </a>
+                    <ul class="collapse" id="HeaderSection">
+                        
+                            <li class="nav-item"><a href="#QUICK_233_1">Quick Tips</a></li>
+                            <li class="nav-item"><a href="#INTRODUCTION_65_1">Pest Notes: Introduction</a></li>
+                        
+                            <li class="nav-item"><a href="#IDENTIFICATION_247_1">Identification</a></li>
+                        
+                            <li class="nav-item"><a href="#LIFE_241_1">Life Cycle</a></li>
+                        
+                            <li class="nav-item"><a href="#DAMAGE_51_1">Damage</a></li>
+                        
+                            <li class="nav-item"><a href="#MANAGEMENT_52_2">Management</a></li>
+                        
+                            <li class="nav-item"><a href="#REFERENCES_266_1">References</a></li>
+                        
+                        <li class="nav-item"><a href="#RESOURCES">Resources</a></li>
+                        <li class="nav-item"><a href="#PUBLICATIONINFORMATION">Publication Information</a></li>
+                    </ul>
+                </span>
+                
+                <div data-bs-spy="scroll" data-bs-target="#navbar-example3" data-bs-offset="0" tabindex="0">
+                     
+                        <div class="callout" id="item-0">
+                            <div class="callout-title">
+                                <span id="QUICK_233_1"></span>
+                                <p class="h3">Quick Tips</p>
+                            </div>
+                            <div class="callout-body" id="calloutBody">
+                                <p><strong>Spider mites are common pests of fruit trees, vegetables, berries, vines, houseplants, and ornamental plants. </strong>Mites are tiny and difficult to see.Although related to insects, mites are arachnids just like spiders and ticks. If leaves are stippled with white dots or have webbing, check the undersides to see if spider mites are present. Sprays of water, insecticidal oils, or insecticidal soaps can be used for management. Spider mites have many natural predators that often limit their numbers.</p>
+<p class="h3">What to look for:</p>
+<ul>
+  <li>To the naked eye, spider mites look like tiny,      moving dots. Use a magnifying lens to see them.</li>
+  <li>Adults are less than 1/20 inch long and have eight      legs, an oval body, and two colored eyespots near the end of the head.</li>
+  <li>Spider mites live in colonies, mostly on the      underside of leaves; a single colony can contain hundreds of mites.</li>
+  <li>When numbers are high, dense webbing can cover      leaves, twigs, and fruit.</li>
+</ul>
+<p class="h3">What damage do spider mites cause?</p>
+<ul>
+  <li>Spider mites cause damage by sucking cell contents      from leaves.</li>
+  <li>A small number of mites isn&rsquo;t usually a problem, but      very high populations can be damaging, especially to annual plants.</li>
+  <li>Often, damage first appears as a stippling of light      dots on the leaves; sometimes leaves turn a bronze color. Heavily infested      leaves can turn yellow and drop off.</li>
+  <li>Damage is usually most severe in hot, dusty      conditions and on water-stressed plants.</li>
+</ul>
+<p class="h3">Protect predators of spider mites.</p>
+<ul>
+  <li>Spider mites have many predators or &ldquo;natural      enemies&rdquo;, which help to control their populations and prevent them from      causing plant damage.</li>
+  <li>Key natural enemies include predatory thrips,      lacewings, and minute pirate bugs. </li>
+  <li>Predatory mites, which are about the same size as      plant-feeding mites but have longer legs and are more active, are also      effective in reducing spider mite numbers.</li>
+</ul>
+<p class="h3">How do I control spider mites?</p>
+<ul>
+  <li>Water plants enough so they are not drought      stressed, which increases mites and mite damage.</li>
+  <li>Keep dust down. Plant ground covers, use mulches,      and irrigate regularly.</li>
+  <li>Most woody plants can tolerate low to moderate mite      populations, and natural enemies are often abundant.</li>
+  <li>If plants are infested, apply a water spray or mist      to the undersides of leaves at least once a day.</li>
+</ul>
+<p class="h3">What about pesticides?</p>
+<ul>
+  <li>If an insecticide is needed, use an insecticidal oil      or insecticidal soap (or a combination of the two). Completely cover the      undersides of leaves. Be sure mites are present before treating. Don&rsquo;t      spray when plants are water-stressed or if it is very hot. </li>
+  <li>Spider mites frequently become a problem after      applying certain insecticides such as some organophosphates or      pyrethroids. These insecticides are not very effective against mites,      often kill mite predators and can result in spikes of spider mite populations.</li>
+</ul> <p>Download a <a href="https://ipm.ucanr.edu/PDF/QT/qtspidermites.pdf">PDF of this Quick Tips</a>. Descargue un <a href="https://ipm.ucanr.edu/PDF/QTSP/qtspspidermites.pdf">PDF de estos Notas Breves</a>.</p>
+                            </div>
+                            <div class="p-3 text-center">
+                                <a href="#" data-bs-toggle="collapse" data-bs-target="#collapseExample" aria-expanded="false" aria-controls="collapseExample" class="gradient-vertical" id="expandContent"  onclick="expandQuickTips(event, 'calloutBody', 'expandContent', 'gradient-vertical')">
+                                    Read more Quick Tips for this pest
+                                </a>
+                            </div>
+                        </div>
+                    
+                                        <h2 id="INTRODUCTION_65_1">Pest Notes: Introduction</h2>
+                                    
+                                <!-- cot:1/cse:65/muc:1-->
+                                <p>Mites are common pests in landscapes and gardens that feed on many fruit trees, vines, berries, vegetables, and ornamental plants. Although related to insects, mites aren&rsquo;t insects but members of the arachnid class along with spiders and ticks. Spider mites (Figure 1), also called webspinning mites, are the most common mite pests and among the most ubiquitous of all pests in the garden and on the farm.</p>
+      
+      <p>  Webspinning spider mites include the <a href="/PMG/T/I-AC-TSPP-AD.032.html">Pacific spider mite</a>, <a href="/PMG/T/I-AC-TSPP-AD.022.html">twospotted spider mite</a>, <a href="/PMG/T/I-AC-TTUR-AD.011.html">strawberry spider mite</a>, and several other species. Most common ones are closely related species in the <i>Tetranychus</i> genus and can&rsquo;t be reliably distinguished in the field. However, there is little need to do so, since their damage, biology, and management are virtually the same.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/T/I-AC-TTUR-AD.011.jpg' alt='Adults and egg sitting on leaf, 15X; . Credit: Jack Kelly Clark, UC IPM' title='Spider mites. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Spider mites. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="IDENTIFICATION_247_1">Identification</h2>
+                                    
+                                <!-- cot:1/cse:247/muc:1-->
+                                <p>To the naked eye, spider mites look like tiny, moving dots; however, you can see them easily with a 10X hand lens. Adult females, the largest forms, are less than 1/20 inch long. Spider mites live in colonies, mostly on the <a href="/PMG/T/I-AC-TSPP-CO.004.html">undersurfaces of leaves</a>; a single colony may contain hundreds of individuals. The names “spider mite” and “webspinning mite” come from the silk webbing most species produce on infested leaves. The presence of <a href="/PMG/T/I-AC-TSPP-CD.060.html">webbing</a> is an easy way to distinguish them from all other types of mites and small insects such as aphids and thrips, which can also infest leaf undersides.</p>
+      
+      <p>  Adult mites have eight legs and an oval body with two red eyespots near the head end. Females usually have a large, dark blotch on each side of the body and numerous bristles covering the legs and body. <a href="/PMG/T/I-AC-TSPP-NM.005.html">Immatures</a> resemble adults (except they are much smaller), and the newly hatched larvae have only six legs. The other immature stages have eight legs. Eggs are spherical and translucent, like tiny droplets, becoming cream colored before hatching (Figure 4).</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/T/I-AC-TSPP-EG.005.jpg' alt='Eggs sitting on leaf, 15X; . Credit: Jack Kelly Clark, UC IPM' title='Twospotted spider mite eggs. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Twospotted spider mite eggs. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="LIFE_241_1">Life Cycle</h2>
+                                    
+                                <!-- cot:1/cse:241/muc:1-->
+                                <p>In some parts of California, spider mites may feed and reproduce all year on plants that retain their green leaves throughout the winter. In colder areas and on deciduous trees that drop their leaves, webspinning mites overwinter as <a href="/PMG/T/I-AC-TSPP-AD.001.html">red or orange mated females</a> under rough bark scales and in ground litter and trash. They begin feeding and laying eggs when warm weather returns in spring.</p>
+      
+      <p>  Spider mites reproduce rapidly in hot weather and commonly become numerous in June through September. If the temperature and food supplies are favorable, a generation can be completed in less than a week (Figure 5). Spider mites prefer hot, dusty conditions and usually are first found on trees or plants adjacent to dusty roadways or at margins of gardens. Plants under water stress also are highly susceptible. As foliage quality declines on heavily infested plants, female mites catch wind currents and disperse to other plants. High mite populations may undergo a rapid decline in late summer when predators overtake them, host plant conditions become unfavorable, and the weather turns cooler as well as following rain.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/T/I-AC-TSPP-LC.003.jpg' alt='Line art illustration of the five life stages of a spider mite. Credit: D. Kidd.' title='Spider mite life cycle, development of a typical plant-feeding spider mite egg, larva, two nymphal stages, and adult. Credit: D. Kidd.'>
+                <figcaption >Spider mite life cycle, development of a typical plant-feeding spider mite egg, larva, two nymphal stages, and adult. Credit: D. Kidd.</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="DAMAGE_51_1">Damage</h2>
+                                    
+                                <!-- cot:1/cse:51/muc:1-->
+                                <p>Mites cause damage by sucking cell contents from leaves. A small number of mites usually isn&rsquo;t reason for concern, but very high populations&mdash;levels high enough to show visible damage to leaves&mdash;can damage plants, especially herbaceous ones. At first, the damage shows up as a <a href="/PMG/T/I-AC-TSPP-CD.113.html">stippling</a> of light dots on the leaves; sometimes the leaves take on a bronze color. As feeding continues, the leaves turn yellowish or reddish and drop off. Often, large amounts of webbing cover leaves, twigs, and fruit. Damage is usually worse when compounded by water stress.</p>
+   
+        <p>Loss of leaves won&rsquo;t cause yield losses in fruit trees during the year of infestation unless it occurs in spring or very early summer, but it may impact next year&rsquo;s crop. On annual vegetable crops&mdash;such as squash, melons, and watermelons&mdash;loss of leaves can have a significant impact on yield and lead to sunburning. On crops such as sugar peas and beans, where pods are attacked, spider mites can cause direct damage. On ornamentals, mites are primarily an aesthetic concern, but they can kill plants if populations become very high on annual plants. Spider mites are also important pests of field-grown roses.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/T/I-AC-TSPP-CD.125.jpg' alt='Yellow stippling on leaflet Credit: Jack Kelly Clark, UC IPM' title='Feeding by webspinning mites first appears as leaf stippling. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Feeding by webspinning mites first appears as leaf stippling. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="MANAGEMENT_52_2">Management</h2>
+                                    
+                                <!-- cot:1/cse:52/muc:2-->
+                                <p>Spider mites have many natural enemies that often limit populations. Adequate irrigation is important, because water-stressed plants are most likely to be damaged. Broad-spectrum insecticide treatments for other pests frequently cause mite outbreaks, so avoid these pesticides when possible. Sprays of water, insecticidal oils, or soaps can be used for management. Always monitor mite levels before treatment.</p>
+      
+        <h3>Monitoring</h3>
+        <p>Mites are tiny and difficult to detect. You’ll usually notice plant damage such as stippled or yellow leaves before you spot the mites themselves (Figure 6). <a href="/PMG/C/S-NC-CULT-MO.005.html">Check the undersides</a> of leaves for mites, their eggs, and webbing; you’ll need a hand lens to identify them. To observe mites more closely, shake a few off the leaf surface onto a white sheet of paper. Once disturbed, they will move around rapidly. Be sure mites are present before you treat. Sometimes the mites will be gone by the time you notice the damage; plants will often recover after mites have left.</p>
+        
+       <h3>Biological Control</h3>
+      <p>Spider mites have many natural enemies, which limit their numbers in many landscapes and gardens, especially when undisturbed by pesticide sprays. Some of the most important are the predatory mites, including the <a href="/natural-enemies/western-predatory-mite/">western predatory mite</a>, <em>Galendromus</em> (formerly <em>Metaseiulus</em>) <em>occidentalis,</em> and <a href="/natural-enemies/phytoseiulus-predatory-mites/"><em>Phytoseiulus</em></a> mite species. Predatory mites are about the same size as plant-feeding mites but have longer legs and are more active; they also are more teardrop-shaped than spider mites.</p>
+<p>Various other insects are also important predators—<a href="/natural-enemies/sixspotted-thrips/">sixspotted thrips</a> (<em>Scolothrips sexmaculatus</em>), the larvae and adults of the <a href="/natural-enemies/spider-mite-destroyer/">spider mite destroyer lady beetle</a> (<em>Stethorus picipes</em>), the larvae of certain flies including the <a href="/PMG/F/I-DP-FELT-LV.004.html">cecidomyid</a> <em>Feltiella acarivora</em>, and various general predators such as <a href="/natural-enemies/minute-pirate-bugs/">minute pirate bugs</a>, <a href="/natural-enemies/bigeyed-bugs/">bigeyed bugs</a>, and <a href="/natural-enemies/green-lacewings/">lacewing larvae</a>. <a href="/PMG/F/I-TS-FOCC-AD.015.html">Western flower thrips</a>, <em>Frankliniella occidentalis</em>, can be an important predator on spider mite eggs and larvae, but this species will also inflict severe damage to plants if mites aren’t present on which to feed.</p>
+       
+       <p> The purchase and release of predatory mites can be useful in establishing populations in large plantings or orchards, but the best results are obtained by creating favorable conditions for naturally occurring predators, such as avoiding dusty conditions and insecticide sprays. The major predator mites commercially available for release are the western predatory mite and <em>Phytoseiulus</em>. The western predatory mite is more effective under hot, dry conditions. These predators don’t feed on foliage or become pests; thus if pest mites aren’t available when predatory mites are released, the predators starve or migrate elsewhere.</p>
+       
+       <p> If you wish to establish predators in a heavily infested orchard or garden that has few predators, use a soap spray or selective miticide to bring pest mites to a lower level and then release predatory mites. A good guideline is that one predator is needed for every 10 spider mites to provide control. More than one application of predatory mites may be required if you want to reduce pest populations rapidly. Concentrate releases in hot spots where spider mite numbers are highest. Once established on perennials, predatory mites may reproduce and provide biological control indefinitely without further augmentation unless nonselective insecticides are applied that kill the predators.</p>
+       
+       <h3>Cultural Control</h3>
+        <p>Cultural practices can have a significant impact on spider mites. <a href="/PMG/C/S-GR-CULT-SA.001.html">Dusty conditions</a> often lead to mite outbreaks. Apply water to pathways and other dusty areas at regular intervals. Water-stressed trees and plants are less tolerant of spider mite damage. Be sure to provide adequate irrigation. Mid­season washing of trees and vines with water to remove dust may help prevent serious late-season mite infestations.</p>
+        
+        <p>In gardens and on small fruit trees, regular, forceful spraying of plants with water often will reduce spider mite numbers adequately. Be sure to get good coverage, especially on the undersides of leaves. If more control is required, use an insecticidal soap or oil in your spray, but test the product on one or two plants to be sure it isn’t damaging to them. (See Chemical Control below.)</p>
+        
+        <h3>Chemical Control</h3>
+      <p>Spider mites frequently become a problem after applying insecticides. Such outbreaks are commonly a result of the insecticide killing off the mites’ natural enemies but also occur when certain insecticides stimulate mite reproduction. For example, spider mites exposed to <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=111">carbaryl</a>* (formerly in the product Sevin) in the laboratory have been shown to reproduce faster than untreated populations. Carbaryl, some organophosphates, and some pyrethroids apparently also favor spider mites by increasing the level of nitrogen in leaves. Insecticides applied during hot weather usually appear to have the greatest effect, causing dramatic spider mite outbreaks within a few days.</p>
+<p>If a treatment for mites is necessary, use selective materials, preferably <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soap</a> or insecticidal oil. Both petroleum-based <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142">horticultural oils</a> and plant-based oils such as <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=38">neem</a>, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=108">canola</a>, or cottonseed oils are acceptable. There are also a number of plant extracts formulated as acaricides (a pesticide that kills mites) that exert an effect on spider mites. These include garlic extract, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=121">clove oil</a>, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=46">mint oils</a>, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=55">rosemary oil</a>, cinnamon oil and others. Don’t use soaps or oils on water-stressed plants or when temperatures exceed 90°F. These materials may injure some plants, so check labels and/or test them out on a portion of the foliage several days before applying a full treatment. Oils and soaps must contact mites to kill them, so excellent coverage, especially on the undersides of leaves, is essential, and repeat applications may be required.</p>
+<p><a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=70">Sulfur</a> sprays can be used on some vegetables, fruit trees, and ornamentals. This product will burn cucurbits and other plants in some cases. Don’t use sulfur unless it has been shown to be safe for that plant in your locality. Use liquid products such as sulfur and potash soap combinations (e.g., Safer Brand 3-in-1 Garden Spray) rather than sulfur dusts, which drift easily and can be breathed in. Don’t use sulfur if temperatures exceed 90°F, and don’t apply sulfur within 30 days of an oil spray. Sulfur is a skin irritant and eye and respiratory hazard, so always wear appropriate protective clothing.</p>
+
+<p>*As of August 1, 2020, pesticides containing the active ingredient carbaryl are restricted use materials in California. A valid pesticide applicator’s license is required for their possession and use. For more information see the <a href="https://www.cdpr.ca.gov/docs/county/cacltrs/penfltrs/penf2020/202010.htm">California Department of Pesticide Regulation website</a>.</p> 
+                                            <div class="alert alert-warning mt-3">The pesticide information on this page may become out of date as products and active ingredients change or become unavailable. Some of the pesticides listed are only available for use by licensed pesticide applicators. No endorsements of named products are intended, nor is criticism implied of products not mentioned.</div>
+                                        
+                                        <h2 id="REFERENCES_266_1">References</h2>
+                                    
+                                <!-- cot:1/cse:266/muc:1-->
+                                <p>Dreistadt SH, JK Clark, TA Martin, ML Flint. 2016. <a href="/IPMPROJECT/ADS/manual_landscape.html" target="_blank"><em>Pests of Landscape Trees and Shrubs: An Integrated Pest Management Guide</em></a><a href="/IPMPROJECT/ADS/manual_landscape.html" target="_blank">.</a> 3rd ed. UC ANR Publication 3359. Oakland, CA.</p>
+<p>Flint ML. 2018. <a href="/IPMPROJECT/ADS/manual_gardenfarms.html" target="_blank"><em>Pests of the Garden and Small Farm: A Grower's Guide to Using Less Pesticide</em></a>, 3rd ed. UC ANR Publication 3332. Oakland, CA. </p> 
+
+                    <h2 id="RESOURCES">Resources</h2>
+                    <ul>
+                        <li><a href="/IPMPROJECT/about_urban.html">About Pest Notes</a></li>
+                        <li><a href="/PMG/glossary.html">Glossary</a></li>
+                        <li><a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/compare-active-ingredients/?conKey=4550">Compare Risks from Pesticides Mentioned</a></li>
+                        <li><a href="/PMG/PESTNOTES/warning.html">WARNING ON THE USE OF PESTICIDES</a></li>
+                        <li><a href="/PMG/PESTNOTES/index.html">List of other Pest Notes</a></li>
+                    </ul>
+
+					
+
+                    <h2 id="PUBLICATIONINFORMATION">Publication Information</h2>
+                    <div class="authors bg-color-light-blue">
+                        <img src="https://ipm.ucanr.edu/assets_v7/images/uc-peer-reviewed.png" title="UC Peer Reviewed Logo" alt="UC Peer Reviewed Logo">
+                        <p><strong>Pest Notes</strong>: Spider Mites</p>
+                        <p><strong>UC ANR Publication 7405</strong></p>
+                        
+                            <p><strong>Author(s)</strong></p>
+                            
+                                    <p>L.D. Godfrey, Entomology, UC Davis</p>
+                                
+                    </div>
+                </div>
+            </div>
+        </div>
+</main>
+
+<meta property="og:url"                content="https://ipm.ucanr.edu/home-and-landscape/spider-mites/" />
+<meta property="og:type"               content="website" />
+<meta property="og:title"              content="Spider Mites / Home and Landscape / UC Statewide IPM Program (UC IPM)" />
+<meta property="og:description"        content="Mites are common pests in landscapes and gardens that feed on many fruit trees, vines, berries, vegetables, and ornamental plants. Although related to insects, mites aren&rsquo;t insects but members of the arachnid class along with spiders and ticks. Spider mites (Figure 1), also called webspinning mites, are the most common mite pests and among the most ubiquitous of all pests in the garden and on the farm.
+      
+        Webspinning spider mites include the Pacific spider mite, twospotted spider mite, strawberry spider mite, and several other species. Most common ones are closely related species in the Tetranychus genus and can&rsquo;t be reliably distinguished in the field. However, there is little need to do so, since their damage, biology, and management are virtually the same." />
+<meta property="og:image"              content="https://ipm.ucanr.edu/PMG/IMAGES/T/I-AC-TTUR-AD.011 .jpg" />
+
+<script>
+    //$(document).ready(function () {
+       // /*
+       // $("#collapseExample").on("hide.bs.collapse", function(){
+       //   $("#multiCollapseExampleText").html('<span class="glyphicon glyphicon-collapse-down"></span> Open');
+       // });
+       // */
+        //$("#collapseExample").on("show.bs.collapse", function () {
+            //$("#multiCollapseExampleText").html('');
+        //});
+    //}); 
+
+    const expandQuickTips = (e, contentId, expandLinkId, gradientClass) => {
+    e.preventDefault();
+    const content = document.getElementById(contentId); //content div to expand/collapse
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+
+    content.classList.remove(gradientClass); // css for gradient
+    content.style.maxHeight = 'none';
+    expandLink.style.display = 'none';
+};
+
+// intially hide content
+const setInitQuickTipsHeight = (contentId,expandLinkId) => {
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+    const content = document.getElementById(contentId); 
+    const totalHeight = content.scrollHeight; 
+    const initialHeight = totalHeight * 0.25; 
+    const threshold = 200;
+    if (totalHeight > threshold) {
+        content.style.maxHeight = initialHeight + 'px';
+        content.style.overflow = 'hidden';
+    } else {
+        content.style.maxHeight = totalHeight + 'px'; 
+        expandLink.style.display = 'none';
+    }
+};
+setInitQuickTipsHeight('calloutBody','expandContent');
+</script><!-- INF10\footer-v5.cfm -->
+
+<!-- # WWW03\Templates\WWW_footerNav_3_2023.cfm -->
+
+
+
+
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Managing Pests</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/agriculture/">Agriculture</a></li>
+          <li><a href="/home-and-landscape/">Home and Landscape</a></li>
+          <li><a href="/natural-area-pests/">Natural Area Pests</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Safety</a></li>
+          <li><a href="/invasive-and-exotic-pests/">Invasive and Exotic Pests</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">About</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/about/">About UC IPM</a></li>
+          <li><a href="/highlights/">Annual Reports</a></li>
+          <li><a href="/strategic-plan/">UC IPM Strategic Plan</a></li>
+          <li><a href="/IPMPROJECT/programs.html">UC IPM Programs</a></li>
+          <li><a href="/what-is-ipm/">What is IPM?</a></li>
+          <li><a href="/whats-new/">What's New</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Resources</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/PMG/glossary.html">Glossary</a></li>
+          <li><a href="/GENERAL/links.html">Links</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Information</a></li>
+          <li><a href="/IPMPROJECT/pubsmenu.html">Publications and Newsletter</a></li>
+          <li><a href="/IPMPROJECT/recursos-espanol.html"><span lang="es">Recursos en espa&ntilde;ol</span></a></li>
+          <li><a href="/IPMPROJECT/workshops.html">Trainings and Events</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Get In Touch</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=RE: Spider Mites">Contact Us</a></li>
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=Feedback: Spider Mites">Feedback</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</footer>
+<div class="footer-secondary">
+  <div class="container">
+    <div class="row">
+      <div class="col-12 footer-secondary-content-wrap">
+        <img src="/assets_v7/images/logo/anr.png" alt="UC IPM logo with an outline of the state of california in the back drop and the UC ANR logo below." width="500px" class="mt-3 mb-3">
+        <div>
+          <div class="footer-icons">
+            
+            <a href="https://www.linkedin.com/showcase/uc-integrated-pest-management/" aria-label="Follow UC IPM on Linkedin"><i class="fab fa-linkedin"></i></a>
+            <a href="https://www.youtube.com/user/UCIPM" aria-label="Follow UC IPM on Youtube"><i class="fab fa-youtube"></i></a>
+            <a href="https://www.instagram.com/ucipm/" aria-label="Follow UC IPM on Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="https://www.facebook.com/UCIPM/" aria-label="Follow UC IPM on Facebook"><i class="fab fa-facebook-square"></i></a>
+          </div>
+        </div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="UC IPM Home and Landscape specific social media options">
+          <span class="footer-secondary-bolded-text">Home and Landscape: </span><a href="https://www.instagram.com/ucipmurban/">Instagram</a> | <a href="https://www.facebook.com/ucipmurban/">Facebook</a></div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="Copyright, usage notices and other links.">
+          <a href="/GENERAL/copyright.html">Use Permissions and Citations</a>
+          |
+          <a href="/nondiscrimination-statements/">Nondiscrimination Statement</a>
+          |
+          <a href="/GENERAL/acknowledgments.html">Acknowledgements</a>
+          |
+          <a href="/accessibility/">Accessibility</a>
+          |
+          <a href="https://ucanr.edu/?privacyStatement">Privacy Statement</a>
+          |
+          <a href="/ADMIN/">Staff-Only Page</a>
+          
+          <p class="small fc-uc-dark-blue mt-5">&copy;1996&mdash;2026 Statewide IPM Program, Agriculture and Natural Resources, University of California Regents of the University of California unless otherwise noted.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+" crossorigin="anonymous"></script>
+
+
+<script async src="https://siteimproveanalytics.com/js/siteanalyze_8343.js"></script>
+
+
+
+</body>
+</html>

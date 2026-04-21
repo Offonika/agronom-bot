@@ -1,0 +1,748 @@
+<!-- INF10\startRequest.cfm -->
+
+<!-- page-view-home-and-landscape\index.cfm -->
+
+<!-- ck:4474 --><!-- rp:/home-and-landscape/fungus-gnats --> 
+
+<!-- // Debug: ~infVer:10.0.0~/home-and-landscape/fungus-gnats~ck:4474~sk:9~v:0~pk:HLS~pv:01~tn:pn-qt-2x8~tv:2025~tk:1~ -->
+
+<!-- INF10\header-v5.cfm -->
+
+
+
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	
+	
+	
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700&amp;subset=latin,latin-ext" type="text/css" />
+	
+	
+	
+	<link rel="stylesheet" href="/assets_v7/styles/bootstrap-1.css" type="text/css" />
+	<link rel="icon" type="image/png" href="/assets_v7/images/favicon.ico" />
+			
+	
+	
+	
+	
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+	
+		<script src="https://unpkg.com/htmx.org@1.6.1"></script>
+	
+		<link href="/assets_v7/fontawesome7_1_0/css/fontawesome.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/brands.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/solid.min.css" rel="stylesheet">
+	
+		<!-- Google Tag Manager -->
+		<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NPR7B4');</script>
+		<!-- End Google Tag Manager -->
+	
+	
+	
+
+	<script async src="https://cse.google.com/cse.js?cx=005318318591192111806:oa2cd9kjx8k"></script>
+
+	<style>	
+		.icon-bar {
+		position: fixed;
+		z-index: 500;
+		top: calc(100vh - (100vh - 40%));
+		right: 0;
+		left: calc(100vw - 105px);
+		width: 140px;
+		-webkit-transform: translateY(-50%);
+		-ms-transform: translateY(-50%);
+		transform: translateY(-50%);
+		transform: rotate(-90deg);
+		}
+
+		.icon-bar a {
+		display: block;
+		text-align: center;
+		padding: 14px;
+		transition: all 0.3s ease;
+		color: white !important;
+		font-size: 14px;
+		border-bottom: none;
+		}
+		
+		.icon-bar a:hover {
+		background-color: #000;
+		}
+		
+		.pdf {
+		background: #bb0000;
+		color: white;
+		}
+
+		.print {
+		background: #008EAA;
+		color: white;
+		}
+		
+		.feedback {
+		background: #008EAA;
+		color: white;
+		}
+
+		@media print { 
+			.icon-bar {
+				display: none !important;
+			}
+		}
+	</style>
+	
+	
+		
+	<title>Fungus Gnats / Home and Landscape / UC Statewide IPM Program (UC IPM)</title>
+</head>
+
+<body>
+	
+		<!-- Google Tag Manager (noscript) -->
+		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NPR7B4" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+		<!-- End Google Tag Manager (noscript) -->
+	<!-- WWW03\Templates\WWW_headerNav_3_2023.cfm -->
+
+<div class="modal fade" id="notificationsModal" tabindex="-1" aria-labelledby="notificationsModal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" >
+            <div class="modal-header flex-wrap">
+                <div class="modal-title" id="notificationsModalLabel">Notifications</div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="notificationsModalContent">
+                Loading...
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<nav class="navbar navbar-expand-lg navbar-light shadow megamenu-nav" id="nav"  >
+    <div class="container-fluid">
+        
+            <a class="navbar-brand" href="/" onclick="_sz.push(['event', 'Mega Menu', 'Logo', 'UC IPM']);"><img src="/assets_v7/images/logo/header-logo-ipm.png" width="150px" alt="UC IPM logo"></a>
+            
+        <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-content" aria-label="mobile menu" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', 'Collapsed']);">
+            <div class="hamburger-toggle">
+                <div class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-content">
+            <ul class="navbar-nav mr-auto mb-2 mb-lg-0">
+                <li class="nav-item dropdown dropdown-mega position-static">
+                    <a class="nav-link dropdown-toggle toggle-animation" href="#" data-bs-toggle="dropdown" data-bs-auto-close="outside" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/fungus-gnats/']);">Manage
+                        Pests<i class="fas fa-chevron-down ms-1"></i></a>
+                    <div class="nav-dropdown dropdown-menu">
+                        <div class="mega-content">
+                            <div class="container-fluid">
+                                <div class="row">
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-1" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Home &amp; Landscape<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-1">
+
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/" class="dropdown-item">Home, Garden, Turf and Landscape Pests</a>
+                                            <a href="https://ucanr.edu/blogs/UCIPMurbanpests/" class="dropdown-item">Blog</a>
+                                            <a href="https://ucanr.edu/site/urban-community-ipm-webinars" class="dropdown-item">Webinars</a>
+                                            <a href="https://ipm.ucanr.edu/IPMPROJECT/videolibrary.html" class="dropdown-item">Video</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/" class="dropdown-item">Pesticide Active Ingredient Database</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/plant-problem-diagnostic-tool/" class="dropdown-item">Plant Problem Diagnostic Tool</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Seasonal Landscape IPM Checklist</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/wildlife-pest-identification/" class="dropdown-item">Wildlife Identification Tool</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                            <h6 class="dropdown-header mt-4">Resources</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Landscape Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-multi-unit-housing-managers/" class="dropdown-item">Multi-unit Housing Managers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/retail-nursery-and-garden-center-ipm-news/" class="dropdown-item">Retail Nurseries and Garden Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-schools-and-child-care-centers/" class="dropdown-item">Schools and Child Care Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-structural-pest-management-professionals/" class="dropdown-item">Structural Pest Management Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/master-gardeners/" class="dropdown-item">UC Master Gardeners</a>
+                                            
+                                            
+                                            
+                                            
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-2" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Agriculture<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-2">
+
+                                            <a href="https://ipm.ucanr.edu/agriculture/" class="dropdown-item">Pest Management Guidelines</a>
+
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <a href="https://ipm.ucanr.edu/GENERAL/pesticides.html" class="dropdown-item">Pesticide
+                                                Information</a>
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            <a href="https://ipm.ucanr.edu/bee-precaution-pesticide-ratings/" class="dropdown-item">Bee
+                                                Precaution Pesticide Ratings</a>
+                                            <a href="https://ipm.ucanr.edu/agriculture/decision-support-tool/" class="dropdown-item">Decision
+                                                Support</a>
+                                            <a href="https://ipm.ucanr.edu/WEATHER/" class="dropdown-item">Weather, Models and Degree
+                                                Days</a>
+                                            <span class="border-top"></span>
+                                            <h6 class="dropdown-header mt-4 mb-2">Resources</h6>
+                                            <a href="https://ipm.ucanr.edu/PMG/glossary.html" class="dropdown-item">Glossary</a>
+                                            <a href="https://ipm.ucanr.edu/mitigation/" class="dropdown-item">Mitigating Pesticides</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies
+                                                Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/GENERAL/links.html" class="dropdown-item">Pest Management
+                                                Sites</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-3" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Natural Areas<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-3">
+                                            <a href="https://ipm.ucanr.edu/natural-area-pests/" class="dropdown-item">Natural Area Pests</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/events/" onclick="_sz.push(['event', 'Mega Menu', 'Events and Trainings', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/fungus-gnats/']);">Events
+                        and Trainings</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/about/" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'About', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/fungus-gnats/']);">About</a>
+                </li>
+            </ul>
+            <ul class="navbar-nav d-flex ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#searchModal" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'Search', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/fungus-gnats/']);"><i class="fa-solid fa-magnifying-glass me-2"></i>Search</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/make-a-gift/" onclick="_sz.push(['event', 'Mega Menu', 'Donate', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/fungus-gnats/']);">Donate</a>
+                </li>
+                
+                
+                
+                
+                
+            </ul>
+        </div>
+    </div>
+</nav>
+<!-- Account Settings Modal -->
+<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content" >
+            <div class="modal-header" >
+                <div class="modal-title" id="accountSettingsModalLabel">Account Settings</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="accountSettingsModalBody">
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal" aria-label="Close">Close</button>
+                <button type="button" class="btn btn-primary float-end" hx-trigger="click" hx-post="htmx-INF-10-htmx-accountSettingsModalContent.cfm?submit=submit" hx-target="#accountSettingsModalBody" name="submit" value="submit" hx-include="[name='firstName'],[name='lastName']">
+                    Save
+                </button>
+            </div>
+		</div>
+	</div>
+</div>
+
+<script>
+    document.addEventListener('click', function (e) {
+        // Hamburger menu
+        if (e.target.classList.contains('hamburger-toggle')) {
+            e.target.children[0].classList.toggle('active');
+        }
+    })
+    var dropDownToggle = document.querySelectorAll('.toggle-animation');
+    dropDownToggle.forEach((dropdown) => {
+        dropdown.addEventListener('click', function () {
+            var icon = this.querySelector('.fas');
+            icon.classList.toggle('fa-chevron-down');
+            icon.classList.toggle('fa-chevron-up');
+        });
+    });
+    //change for medium and below
+    var adjustIconFloat = () => {
+        var breakpoint = 992;
+        var icons = document.querySelectorAll('.fa-chevron-down');
+        if (window.innerWidth <= breakpoint) {
+            icons.forEach(icon => {
+                icon.style.float = 'right';
+            });
+        } else {
+            icons.forEach(icon => {
+                icon.style.float = '';
+            });
+        }
+    }
+    window.addEventListener('resize', adjustIconFloat);
+    adjustIconFloat();
+</script>
+
+	
+
+	
+
+	<!-- Search Modal -->
+	<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-xl modal-dialog-scrollable">
+			<div class="modal-content">
+				<div class="modal-header">
+					<p class="h1 modal-title fs-5" id="searchModalLabel">Search</p>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="_sz.push(['event', 'Search Modal', 'Button', 'X']);"></button>
+				</div>
+				<div class="modal-body">
+					<form class="row g-3" onsubmit="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; return false;">
+						<div class="col">
+							<label for="searchInput" class="visually-hidden">search</label>
+							<input type="search" class="form-control" id="searchInput" placeholder="What's your pest problem?">
+						</div>
+						<div class="col-auto">
+							<button type="button" class="btn btn-primary" onclick="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; _sz.push(['event', 'Search Modal', 'Button', 'Search']);">Search</button>
+						</div>
+					</form>
+					<div class="gcse-searchresults-only"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	
+
+<!-- HLS01\Templates\HLS_pn-qt-2x8_1_2025.cfm -->
+
+<!-- INF10\inf_contents-v10.cfm -->
+
+
+
+ 
+<main>
+    <div class="content-header-wrap urban">
+       <!-- INF10\inf_breadcrumb-v10.cfm -->
+
+
+
+<div class="breadcrumb-wrapper">
+	<div class="container">
+		<div class="row justify-content-center">
+			<div class="col-md-10 col-sm-12">
+				<nav aria-label="breadcrumb">
+					<ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="/">UC IPM</a></li><li class="breadcrumb-item"><a href="/home-and-landscape">Home and Landscape</a></li>
+					</ol>
+				</nav>
+			</div>
+		</div>
+	</div>
+</div>
+
+       
+        <header>
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-10 col-sm-12">
+                        <p class="eyebrow">Home and Landscape</p>
+                        <h1>Fungus Gnats</h1>
+                        <div class="info">
+                            
+                            
+                            
+                            <!--<div>Published on January 25, 2022</div>-->
+                            <div>Updated: 08/2013</div>
+                        </div>
+                        <div class="icons">
+                            <a href="https://ipm.ucanr.edu/PDF/PESTNOTES/pnfungusgnats.pdf"><i class="fa-solid fa-file-pdf" aria-label="PDF file"></i></a> 
+            <a href="https://www.linkedin.com/shareArticle/?mini=true&url=https://ipm.ucanr.edu/home-and-landscape/fungus-gnats/" target="_blank"><i class="fab fa-linkedin" aria-label="LinkedIn"></i></a>
+        
+            <a href="https://bsky.app/intent/compose?text=Learn%20about%20Fungus%20Gnats%20at%20UC%20IPM%2E%20https%3A%2F%2Fipm%2Eucanr%2Eedu%2Fhome%2Dand%2Dlandscape%2Ffungus%2Dgnats%2F" target="_blank"><i class="fa-brands fa-square-bluesky" aria-label="Bluesky"></i></a>
+        
+            <a href="https://www.facebook.com/sharer/sharer.php?u=https://ipm.ucanr.edu/home-and-landscape/fungus-gnats/" target="_blank"><i class="fab fa-facebook-square" aria-label="FaceBook"></i></a>
+        
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+            <div class="banner mb-5">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-md-10 col-sm-12">
+                            <img class="img-fluid" src='/PMG/IMAGES/B/I-DP-BRAD-AD.001banner.jpg' width="100%" height="100%" border="0" alt='Tiny gnat on leaf Credit: Jack Kelly Clark, UC IPM' title='Fungus gnat Credit: Jack Kelly Clark, UC IPM'>
+                            
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-2 col-md-2 d-none d-md-block">
+                <div class="position-sticky sticky-top side-nav-wrap-scroll" style="top:30px; z-index:0;">
+                    <nav id="navbar-example3" class="side-nav">
+                        <div class="h3 mb-3">On this page</div>
+                            
+                                    <a class="nav-link" href="#INBRIEF_414_1">In Brief</a>
+                                    <a class="nav-link" href="#INTRODUCTION_65_1">Pest Notes: Introduction</a>
+                                
+                                <a class="nav-link" href="#IDENTIFICATION_247_1">Identification</a>
+                            
+                                <a class="nav-link" href="#DAMAGE_51_1">Damage</a>
+                            
+                                <a class="nav-link" href="#LIFE_241_1">Life Cycle</a>
+                            
+                                <a class="nav-link" href="#MANAGEMENT_52_1">Management</a>
+                            
+                                <a class="nav-link" href="#REFERENCES_266_1">References</a>
+                            
+                            <a class="nav-link" href="#RESOURCES">Resources</a>
+                            <a class="nav-link" href="#PUBLICATIONINFORMATION">Publication Information</a>
+                    </nav>
+                </div>
+            </div>
+            <div class="col-md-8 col-lg-8 col-sm-12 content-body">
+                <span class="in-nav-mobile d-block d-md-none">
+                    <a class="heading" data-bs-toggle="collapse" href="#HeaderSection" aria-expanded="false" aria-controls="HeaderSection">On this page<i class="fas fa-chevron-down float-end"></i>
+                    </a>
+                    <ul class="collapse" id="HeaderSection">
+                        
+                                <li class="nav-item"><a href="#INBRIEF_414_1">In Brief</a></li>
+                                <li class="nav-item"><a href="#INTRODUCTION_65_1">Pest Notes: Introduction</a></li>
+                            
+                            <li class="nav-item"><a href="#IDENTIFICATION_247_1">Identification</a></li>
+                        
+                            <li class="nav-item"><a href="#DAMAGE_51_1">Damage</a></li>
+                        
+                            <li class="nav-item"><a href="#LIFE_241_1">Life Cycle</a></li>
+                        
+                            <li class="nav-item"><a href="#MANAGEMENT_52_1">Management</a></li>
+                        
+                            <li class="nav-item"><a href="#REFERENCES_266_1">References</a></li>
+                        
+                        <li class="nav-item"><a href="#RESOURCES">Resources</a></li>
+                        <li class="nav-item"><a href="#PUBLICATIONINFORMATION">Publication Information</a></li>
+                    </ul>
+                </span>
+                
+                <div data-bs-spy="scroll" data-bs-target="#navbar-example3" data-bs-offset="0" tabindex="0">
+                    
+            <div class="callout">
+                <div class="callout-title">
+                    <span id="INBRIEF_414_1"></span>
+                    <p class="h3">In Brief</p>
+                </div>
+                <div class="callout-body">
+                    <ul>
+  <li>Fungus gnats are small nuisance flies that commonly infest potted plants.</li>
+  <li>Their larvae primarily feed on fungi and organic matter in soil, but also chew roots.</li>
+  <li>You will see adults resting on plants, soil, windows, or walls, or you might see them in flight.&nbsp;</li>
+  <li>Because fungus gnats thrive in moist conditions, avoid overwatering houseplants and provide good drainage.</li>
+</ul>
+                </div>
+            </div>
+        
+                                        <h2 id="INTRODUCTION_65_1">Pest Notes: Introduction</h2>
+                                    
+                                <!-- cot:1/cse:65/muc:1-->
+                                <p>Fungus gnats are small flies that infest soil, potting mix, other container media, and other sources of organic decomposition. Their larvae primarily feed on fungi and organic matter in soil, but also chew roots and can be a problem in greenhouses, nurseries, potted plants and interior plantscapes. Adult fungus gnats may emerge from houseplants indoors and become a nuisance.</p> 
+                                        <h2 id="IDENTIFICATION_247_1">Identification</h2>
+                                    
+                                <!-- cot:1/cse:247/muc:1-->
+                                <p>Fungus gnats (<i>Orfelia</i> and <i>Bradysia</i> species), also called darkwinged fungus gnats (Sciaridae), are dark, delicate-looking flies similar in appearance to mosquitoes. Adult fungus gnats have slender legs with segmented antennae that are longer than their head. Their long antennae distinguish them from the more robust shore flies, which are also found in greenhouses, associated with algae and decomposing organic matter, but have short bristle-like antennae. Although a few species are up to 1&frasl;2 inch long, fungus gnat adults commonly are about 1&frasl;16 to 1&frasl;8 inch long. Wings are light gray to clear, and the common <i>Bradysia</i> species have a <a href="pni7448-1a.html">Y-shaped wing vein</a>.</p>
+      
+      <p>Because adult fungus gnats are attracted to light, you first might notice these pests flying near windows indoors. However, in comparison with more active species such as the common housefly (<i>Musca domestica</i>), fungus gnats are relatively weak fliers and usually don&rsquo;t move around much indoors. Fungus gnats often remain near potted plants and run across (or rest on) growing media, foliage, compost, and wet mulch piles. </p>
+      
+      <p>Females lay tiny eggs in moist organic debris or potting soil. Larvae have a shiny black head and an elongated, whitish-to-clear, legless body. They eat organic mulch, leaf mold, grass clippings, compost, root hairs, and fungi. If conditions are especially moist and fungus gnats are abundant, larvae can leave slime trails on the surface of media that look like trails from small snails or slugs.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/B/I-DP-BRAD-CD.004.jpg' alt='Shiny trails on media surface of rose grown in containers in the greenhouse, San Mateo Co., infested by fungus gnat larvae Credit: Jack Kelly Clark, UC IPM' title='Shiny trails on the soil surface made by fungus gnat larvae. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Shiny trails on the soil surface made by fungus gnat larvae. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="DAMAGE_51_1">Damage</h2>
+                                    
+                                <!-- cot:1/cse:51/muc:1-->
+                                <p>Adult fungus gnats don&rsquo;t damage plants or bite people; their presence is primarily considered a nuisance. Larvae, however, when present in large numbers, can damage roots and stunt plant growth, particularly in seedlings and young plants. Significant root damage and even plant death have been observed in interior plantscapes and in houseplants when high populations were associated with moist, organically-rich soil. Thus, a houseplant that is wilting may not indicate a lack of water, but rather root damage by fungus gnat larvae or (more commonly) other causes of unhealthy roots. However, too much or too little water, root decay fungi, and improper soil conditions (e.g., poor drainage, or waterlogging) are much more common causes of wilted plants.</p>
+      
+      <p>Serious fungus gnat damage is more common in greenhouses, nurseries, and sod farms. Although larvae also feed on plant roots outdoors, they don&rsquo;t usually cause serious damage.</p> 
+                                        <h2 id="LIFE_241_1">Life Cycle</h2>
+                                    
+                                <!-- cot:1/cse:241/muc:1-->
+                                <p>Fungus gnats develop through <a href="/PMG/PESTNOTES/pni7448-2c.html">four stages</a>&mdash;egg, larva (with four larval stages or instars), pupa, and adult. The tiny eggs and oblong pupae occur in damp organic media where females lay eggs and larvae feed. At 75&ordm;F, eggs hatch in about 3 days, the larvae take approximately 10 days to develop into pupae, and about 4 days later the adults emerge. A generation of fungus gnats (from female to female) can be produced in about 17 days depending upon temperature. The warmer it is, the faster they will develop and the more generations will be produced in a year.</p>
+      
+      <p>Fungus gnats have many overlapping generations each year. Outdoors, they are most common during winter and spring in interior areas of California, when water is more available and cooler temperatures prevail. They can occur during any time of the year in moist coastal regions and indoors.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/B/I-DP-BRAD-LV.004.jpg' alt='Fungus gnat larvae on underside of fallen leaf on container plant media surface (3x) in UC Davis greenhouse Credit: Jack Kelly Clark, UC IPM' title='Fungus gnat larvae. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Fungus gnat larvae. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="MANAGEMENT_52_1">Management</h2>
+                                    
+                                <!-- cot:1/cse:52/muc:1-->
+                                <p>Most of the fungus gnat’s life is spent as a larva and pupa in organic matter or soil, so the most effective control methods target these immature stages rather than attempting to directly control the mobile, short-lived adults. Physical and cultural management tactics—primarily the reductions of excess moisture and organic debris—are key to reducing fungus gnat problems. Commercially-available and naturally-occurring biological control agents can also control this pest. Insecticides are considered an important control option in some commercial plant production but generally aren’t recommended for fungus gnat management in and around the home. </p>
+      
+      <h3>Monitoring</h3>
+      
+       <p> Visual inspection for adults usually is adequate for determining whether a problem exists. You will see adults resting on plants, soil, windows, or walls, or you might see them in flight. Besides looking for adults, check plant pots for excessively moist conditions and organic debris where larvae feed. <a href="/PMG/S/S-FL-SCEN-MO.030.html">Yellow sticky traps</a> can be used to trap adults. Chunks of raw potato placed in pots with the cut sides down (not the peels) are sometimes used to monitor for larvae.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/B/I-DP-BRAD-AD.013.jpg' alt='Adult fungus gnat caught in yellow sticky trap (7.5x), UC Davis Credit: Jack Kelly Clark, UC IPM' title='Fungus gnat adult caught in a yellow sticky trap. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Fungus gnat adult caught in a yellow sticky trap. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                <!-- cot:1/cse:52/muc:2-->
+                                <h3>Water and Soil Management</h3>
+      
+       <p> Because fungus gnats thrive in moist conditions, especially where there is an abundance of decaying vegetation and fungi, avoid overwatering and provide good drainage. Allow the surface of container soil to dry between waterings. Clean up standing water, and eliminate any plumbing or irrigation system leaks. Moist and decomposing grass clippings, compost, organic fertilizers, and mulches are also favorite breeding spots. Avoid using incompletely-composted organic matter in potting media unless it is pasteurized first, because it will often be infested with fungus gnats. Improve the drainage of the potting mix (e.g., increase the proportion of perlite or sand in the mix). Minimize organic debris around buildings and crops. Avoid fertilizing with excessive amounts of manure, blood meal, or similar organic materials. Screen and caulk leaky windows and doors to help prevent pests from coming indoors.</p>
+       
+      <p>If you have infested plants, don’t move them to new areas where flies can emerge to infest other pots. In some cases you may wish to toss out severely infested plants. </p>
+      
+      <p>Purchase and use only pasteurized container mix or potting mix. Commercial growers often treat potting soil with heat or steam before using it; this will kill flies and the algae and microorganisms they feed on. Home gardeners can solarize soil:</p>
+      
+     <ul>
+        <li>Moisten it.</li>
+        <li>Place it in a bag of transparent plastic or black plastic.</li>
+        <li>Make the pile no deeper than about 8 inches.</li>
+        <li>Place the bagged soil on a slightly elevated surface, such as a pallet in a sunny location, for about 4 to 6 weeks.</li>
+</ul>
+      
+      <p>See the <em>Pest Note: <a href="/PMG/PESTNOTES/pn74145.html">Soil Solarization</a></em> for details. Store pasteurized potting soil off the ground and in closed containers to prevent it from becoming infested before use.</p>
+      
+      <h3>Trapping</h3>
+      
+        <p>In home situations where fungus gnat adults are a nuisance, it may be possible to reduce the problem by using sticky traps available at retail nursery and garden centers. Yellow sticky traps can be cut into smaller squares, attached to wooden skewers or sticks and placed in pots to trap adults. Also, raw potato chunks placed in the soil are very attractive to fungus gnat larvae. These may be used not only to check pots for larvae but also to trap them away from plant roots. After a few days in a pot, remove infested chunks, dispose of them, and replace with fresh ones.</p>
+        
+  <h3>Biological Control</h3>
+  
+     <p>Three commercially available biological control agents can be purchased to control fungus gnats in pots or container media. These include <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=65"><em>Steinernema</em> nematodes</a>, <em>Hypoaspis</em> predatory mites, and the biological insecticide <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=94"><em>Bacillus thuringiensis</em> subspecies <em>israelensis</em></a> (Bti). Several Bti products (Mosquito Bits, Gnatrol) are readily available in retail nurseries and garden centers, so these products may be the most convenient for home gardeners to use. Bti does not reproduce or persist indoors, so infestations in potting media might require repeated applications at about five-day intervals to provide control. Nematodes and <em>Hypoaspis</em> mites must be mail-ordered and are live and perishable products, requiring immediate application. Nematodes can provide relatively long-term control of fungus gnat larvae, and they can be self-reproducing after several inoculative applications to establish their populations. <em>Steinernema feltiae</em> is more effective against fungus gnats than other commercially available nematode species. Mix Bti or nematodes with water, and apply as a soil drench, or spray onto media using a hand-pump spray bottle or other spray equipment, following label directions.</p>
+<p>Several natural enemies help to manage fungus gnat populations in outdoor systems, such as landscapes and gardens, and indoors in greenhouses and conservatories, including the predatory hunter flies, <em>Coenosia</em> spp. These flies catch and consume adult fungus gnats in mid-air, and prey on fungus gnat larvae in soil while developing as larvae themselves. Conserve these and other natural enemies by avoiding broad-spectrum insecticide applications. </p>
+     
+<h4>Commercially Available Biological Pesticides and Natural Enemies for Controlling Fungus Gnat Larvae.</h4>
+<p><em>Bacillus thuringiensis </em>subspecies<em> israelensis </em>(Bti) (Gnatrol) is a naturally occurring, spore-forming bacterium produced commercially by fermentation. Bti applied at labeled rates provides temporary control and is toxic only to fly larvae, such as mosquitoes, black flies, and fungus gnats. Repeat applications commonly are needed for long-term control. This Bt is a different subspecies from that applied to foliage to control caterpillars. Bt labeled for caterpillars is not effective against fly larvae.</p>
+<p><em>Hypoaspis (=Geolaelaps </em>or<em> Stratiolaelaps)</em> mite is a light-brownish predaceous mite adapted to feeding in the upper layers of moist soil. Preys on fungus gnat larvae and pupae, thrips pupae, springtails, and other tiny invertebrates. Commercial mites commonly are shipped in a shaker-type container used to apply them. Recommended rates in commercial nurseries are about 1/2 to several dozen mites per container or square foot of media. Make applications before pests become abundant. <em>Hypoaspis</em> probably won’t perform very well in individual houseplants and probably isn’t a good choice for use in homes.</p>
+<p><em>Steinernema feltiae </em>is a nematode that is effective when temperatures are between 60° to 90°F and conditions are moist. You can apply it as a soil drench and to media using conventional spray equipment. Nematodes reproduce and actively search for hosts, so under moist conditions they can provide season-long control after several initial applications to establish populations.</p>
+<p>These materials are essentially nontoxic to people and are compatible for application in combination. Bt is available from many well-stocked nurseries and garden supply stores. Predaceous mites, Bti, and nematodes, are commercially available through mail order from special suppliers.</p>
+      
+      <h3>Chemical Control</h3>
+      
+      <p>Insecticides are rarely warranted to control these flies in and around homes. However, if you do apply an insecticide for fungus gnats, consider using Bti or <em>Steinernema feltiae</em> nematodes to control the larvae; see the section Biological Control for more information.</p>
+<p>If Bti or nematodes aren’t available and high populations are intolerable, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=53">pyrethrins</a> or a pyrethroid insecticide may provide temporary, fast-acting control. Spray the surface of potting soil and plant parts where adults typically rest. Do not aerially fog indoors or attempt to spray adult gnats in flight. Be sure the product is labeled for your particular use (e.g., for "house plants") and read and follow the product's directions. </p>
+<p>Pyrethrins have low toxicity to people and pets and are the active ingredients in the botanical pyrethrum, which is derived from flowers of certain chrysanthemums. Many products include a petroleum-derived synergist (piperonyl butoxide, or PBO) to increase pyrethrum effectiveness. Pyrethroids (e.g., <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=101">bifenthrin</a>, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=47">permethrin</a>) are synthesized from petroleum to be chemically similar to pyrethrins; they often are more effective and persistent but are more toxic to beneficial insects. When using these products on houseplants or interiorscape containers, if possible move plants outdoors for treatment as a precaution, and wait about a day after applying the chemical before bringing them back inside.</p>
+<p>For information on managing fungus gnats in commercial flower, nursery or greenhouse operations, see the <em>UC IPM Pest Management Guidelines: </em><a href="/PMG/selectnewpest.floriculture.html"><em>Floriculture and Ornamental Nurseries</em></a> and the book <a href="/IPMPROJECT/ADS/manual_floriculture.html"><em>Integrated Pest Management for Floriculture and Nurseries</em></a>.</p> 
+                                            <div class="alert alert-warning mt-3">The pesticide information on this page may become out of date as products and active ingredients change or become unavailable. Some of the pesticides listed are only available for use by licensed pesticide applicators. No endorsements of named products are intended, nor is criticism implied of products not mentioned.</div>
+                                        
+                                        <h2 id="REFERENCES_266_1">References</h2>
+                                    
+                                <!-- cot:1/cse:266/muc:1-->
+                                <p>Cloyd, R. A. 2010. <a href="http://www.ksre.ksu.edu/bookstore/pubs/MF2937.pdf">Fungus gnat management in greenhouses and nurseries</a> <span class="footertext">(PDF)</span>. Kansas State University Agricultural Experiment Station and Cooperative Extension Service. Publication MF-2937:</p>
+      
+      <p>Dreistadt, S. H. rev. 1986. <em>Fungus Gnats and March Flies</em>. Oakland: Univ. Calif. Div. Agric. Nat. Res. Publ. 7051.</p>
+        
+        <p>Dreistadt, S. H., J. K. Clark, and M. L. Flint. 2001. <em><a href="/IPMPROJECT/ADS/manual_floriculture.html">Integrated Pest Management for Floriculture and Nurseries</a></em>. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3402.</p>
+        
+      <p>Harris, M. A., R. D. Oetting, and W. A. Gardner. 1995. Use of entomopathogenic nematodes and a new monitoring technique for control of fungus gnats, <em>Bradysia coprophila</em> (Dipt.: Sciaridae), in floriculture. <em>Biological Control</em> 5:412-418.</p>
+      
+      <p><em>UC IPM Pest Management Guidelines: <a href="/PMG/selectnewpest.floriculture.html">Floriculture and Ornamental Nurseries</a></em>. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 3392. </p>
+      
+      <p>Nielsen, G. R. 1997. <a href="http://pss.uvm.edu/ppp/pubs/el50.htm">Fungus Gnats</a>. Department of Plant and Soil Science, University of Vermont Extension. Publication EL 50: </p>
+      
+      <p>Stapleton, J.J.; C.A. Wilen, and R.H. Molinar. Pest Notes: <a href="http://anrcatalog.ucdavis.edu/Items/74145.aspx">Soil Solarization</a>. Oakland: Univ. Calif. Agric. Nat. Res. Publ. 7441. </p>
+      
+      <p>Wright, E. M., and R. J. Chambers. 1994. The biology of the predatory mite <em>Hypoaspis miles</em> (Acari: Laelapidae), a potential biological control agent of <em>Bradysia paupera</em> (Dipt.: Sciaridae). <em>Entomophaga</em> 39:225-235.</p>
+
+ <p>Adapted from: Dreistadt, S. H. 2001 Pest Note: <em><a href="http://anrcatalog.ucdavis.edu/InsectMiteMolluscPests/7448.aspx">Fungus Gnats, Shore Flies, Moth Flies and March Flies</a></em>. Oakland: Univ. Calif. Div. Agric. Nat. Res. Publ. 7448.</p> 
+
+                    <h2 id="RESOURCES">Resources</h2>
+                    <ul>
+                        <li><a href="/IPMPROJECT/about_urban.html">About Pest Notes</a></li>
+                        <li><a href="/PMG/glossary.html">Glossary</a></li>
+                        <li><a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/compare-active-ingredients/?conKey=4474">Compare Risks from Pesticides Mentioned</a></li>
+                        <li><a href="/PMG/PESTNOTES/warning.html">WARNING ON THE USE OF PESTICIDES</a></li>
+                        <li><a href="/PMG/PESTNOTES/index.html">List of other Pest Notes</a></li>
+                    </ul>
+
+					
+
+                    <h2 id="PUBLICATIONINFORMATION">Publication Information</h2>
+                    <div class="authors bg-color-light-blue">
+                        <img src="https://ipm.ucanr.edu/assets_v7/images/uc-peer-reviewed.png" title="UC Peer Reviewed Logo" alt="UC Peer Reviewed Logo">
+                        <p><strong>Pest Notes</strong>: Fungus Gnats</p>
+                        <p><strong>UC ANR Publication 7448</strong></p>
+                        
+                            <p><strong>Author(s)</strong></p>
+                            
+                                    <p><a href="https://ucanr.edu/people/james-bethke">J.A. Bethke</a> (emeritus), UC Cooperative Extension San Diego County</p>
+                                
+                                    <p><a href="https://ucanr.edu/people/steve-h-dreistadt">S.H. Dreistadt</a>, UC Statewide IPM Program</p>
+                                
+                    </div>
+                </div>
+            </div>
+        </div>
+</main>
+
+<meta property="og:url"                content="https://ipm.ucanr.edu/home-and-landscape/fungus-gnats/" />
+<meta property="og:type"               content="website" />
+<meta property="og:title"              content="Fungus Gnats / Home and Landscape / UC Statewide IPM Program (UC IPM)" />
+<meta property="og:description"        content="Fungus gnats are small flies that infest soil, potting mix, other container media, and other sources of organic decomposition. Their larvae primarily feed on fungi and organic matter in soil, but also chew roots and can be a problem in greenhouses, nurseries, potted plants and interior plantscapes. Adult fungus gnats may emerge from houseplants indoors and become a nuisance." />
+<meta property="og:image"              content="https://ipm.ucanr.edu/PMG/IMAGES/B/I-DP-BRAD-AD.001banner.jpg" />
+
+<script>
+    //$(document).ready(function () {
+       // /*
+       // $("#collapseExample").on("hide.bs.collapse", function(){
+       //   $("#multiCollapseExampleText").html('<span class="glyphicon glyphicon-collapse-down"></span> Open');
+       // });
+       // */
+        //$("#collapseExample").on("show.bs.collapse", function () {
+            //$("#multiCollapseExampleText").html('');
+        //});
+    //}); 
+
+    const expandQuickTips = (e, contentId, expandLinkId, gradientClass) => {
+    e.preventDefault();
+    const content = document.getElementById(contentId); //content div to expand/collapse
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+
+    content.classList.remove(gradientClass); // css for gradient
+    content.style.maxHeight = 'none';
+    expandLink.style.display = 'none';
+};
+
+// intially hide content
+const setInitQuickTipsHeight = (contentId,expandLinkId) => {
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+    const content = document.getElementById(contentId); 
+    const totalHeight = content.scrollHeight; 
+    const initialHeight = totalHeight * 0.25; 
+    const threshold = 200;
+    if (totalHeight > threshold) {
+        content.style.maxHeight = initialHeight + 'px';
+        content.style.overflow = 'hidden';
+    } else {
+        content.style.maxHeight = totalHeight + 'px'; 
+        expandLink.style.display = 'none';
+    }
+};
+setInitQuickTipsHeight('calloutBody','expandContent');
+</script><!-- INF10\footer-v5.cfm -->
+
+<!-- # WWW03\Templates\WWW_footerNav_3_2023.cfm -->
+
+
+
+
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Managing Pests</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/agriculture/">Agriculture</a></li>
+          <li><a href="/home-and-landscape/">Home and Landscape</a></li>
+          <li><a href="/natural-area-pests/">Natural Area Pests</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Safety</a></li>
+          <li><a href="/invasive-and-exotic-pests/">Invasive and Exotic Pests</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">About</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/about/">About UC IPM</a></li>
+          <li><a href="/highlights/">Annual Reports</a></li>
+          <li><a href="/strategic-plan/">UC IPM Strategic Plan</a></li>
+          <li><a href="/IPMPROJECT/programs.html">UC IPM Programs</a></li>
+          <li><a href="/what-is-ipm/">What is IPM?</a></li>
+          <li><a href="/whats-new/">What's New</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Resources</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/PMG/glossary.html">Glossary</a></li>
+          <li><a href="/GENERAL/links.html">Links</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Information</a></li>
+          <li><a href="/IPMPROJECT/pubsmenu.html">Publications and Newsletter</a></li>
+          <li><a href="/IPMPROJECT/recursos-espanol.html"><span lang="es">Recursos en espa&ntilde;ol</span></a></li>
+          <li><a href="/IPMPROJECT/workshops.html">Trainings and Events</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Get In Touch</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=RE: Fungus Gnats">Contact Us</a></li>
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=Feedback: Fungus Gnats">Feedback</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</footer>
+<div class="footer-secondary">
+  <div class="container">
+    <div class="row">
+      <div class="col-12 footer-secondary-content-wrap">
+        <img src="/assets_v7/images/logo/anr.png" alt="UC IPM logo with an outline of the state of california in the back drop and the UC ANR logo below." width="500px" class="mt-3 mb-3">
+        <div>
+          <div class="footer-icons">
+            
+            <a href="https://www.linkedin.com/showcase/uc-integrated-pest-management/" aria-label="Follow UC IPM on Linkedin"><i class="fab fa-linkedin"></i></a>
+            <a href="https://www.youtube.com/user/UCIPM" aria-label="Follow UC IPM on Youtube"><i class="fab fa-youtube"></i></a>
+            <a href="https://www.instagram.com/ucipm/" aria-label="Follow UC IPM on Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="https://www.facebook.com/UCIPM/" aria-label="Follow UC IPM on Facebook"><i class="fab fa-facebook-square"></i></a>
+          </div>
+        </div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="UC IPM Home and Landscape specific social media options">
+          <span class="footer-secondary-bolded-text">Home and Landscape: </span><a href="https://www.instagram.com/ucipmurban/">Instagram</a> | <a href="https://www.facebook.com/ucipmurban/">Facebook</a></div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="Copyright, usage notices and other links.">
+          <a href="/GENERAL/copyright.html">Use Permissions and Citations</a>
+          |
+          <a href="/nondiscrimination-statements/">Nondiscrimination Statement</a>
+          |
+          <a href="/GENERAL/acknowledgments.html">Acknowledgements</a>
+          |
+          <a href="/accessibility/">Accessibility</a>
+          |
+          <a href="https://ucanr.edu/?privacyStatement">Privacy Statement</a>
+          |
+          <a href="/ADMIN/">Staff-Only Page</a>
+          
+          <p class="small fc-uc-dark-blue mt-5">&copy;1996&mdash;2026 Statewide IPM Program, Agriculture and Natural Resources, University of California Regents of the University of California unless otherwise noted.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+" crossorigin="anonymous"></script>
+
+
+<script async src="https://siteimproveanalytics.com/js/siteanalyze_8343.js"></script>
+
+
+
+</body>
+</html>

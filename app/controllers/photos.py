@@ -55,12 +55,20 @@ settings = Settings()
 logger = logging.getLogger(__name__)
 
 OPTIONAL_FILE = File(None)
+OPTIONAL_FILES = File(None)
 FREE_MONTHLY_LIMIT = settings.free_monthly_limit
 FREE_WEEKLY_CASES = settings.free_weekly_cases
 PAYWALL_ENABLED = settings.paywall_enabled
+MAX_IMAGE_BYTES = 2 * 1024 * 1024
+MAX_ALBUM_IMAGES = 8
+MAX_ALBUM_TOTAL_BYTES = MAX_IMAGE_BYTES * MAX_ALBUM_IMAGES
 
 # Low confidence threshold (diagnoses below this don't consume a case)
 LOW_CONFIDENCE_THRESHOLD = 0.6
+try:
+    CROP_CLARIFY_THRESHOLD = max(0.0, min(1.0, float(settings.crop_clarify_threshold)))
+except (TypeError, ValueError):
+    CROP_CLARIFY_THRESHOLD = 0.75
 
 router = APIRouter()
 
@@ -149,26 +157,54 @@ class _ProcessImageError(Exception):
 
 
 async def _process_image(
-    contents: bytes,
+    contents: bytes | list[bytes],
     user_id: int,
     crop_hint: str | None = None,
     same_case_id: int | None = None,
 ) -> dict[str, Any]:
-    if len(contents) > 2 * 1024 * 1024:
-        err = ErrorResponse(
-            code=ErrorCode.BAD_REQUEST, message="image too large"
-        )
-        raise _ProcessImageError(
-            JSONResponse(status_code=413, content=err.model_dump())
-        )
+    if isinstance(contents, (bytes, bytearray)):
+        content_items = [bytes(contents)]
+    elif isinstance(contents, list):
+        content_items = [bytes(item) for item in contents if isinstance(item, (bytes, bytearray))]
+    else:
+        content_items = []
+
+    if not content_items:
+        err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="image is required")
+        raise _ProcessImageError(JSONResponse(status_code=400, content=err.model_dump()))
+    if len(content_items) > MAX_ALBUM_IMAGES:
+        err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="too many images")
+        raise _ProcessImageError(JSONResponse(status_code=400, content=err.model_dump()))
+
+    total_size = 0
+    for item in content_items:
+        if len(item) > MAX_IMAGE_BYTES:
+            err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="image too large")
+            raise _ProcessImageError(JSONResponse(status_code=413, content=err.model_dump()))
+        total_size += len(item)
+    if total_size > MAX_ALBUM_TOTAL_BYTES:
+        err = ErrorResponse(code=ErrorCode.BAD_REQUEST, message="images too large")
+        raise _ProcessImageError(JSONResponse(status_code=413, content=err.model_dump()))
 
     if resp := await _enforce_paywall(user_id, same_case_id=same_case_id):
         raise _ProcessImageError(resp)
 
-    key = await upload_photo(user_id, contents)
+    keys: list[str] = []
+    for item in content_items:
+        key = await upload_photo(user_id, item)
+        keys.append(key)
+    primary_key = keys[0]
+    primary_bytes = content_items[0]
+    extra_images = list(zip(keys[1:], content_items[1:]))
+    gpt_kwargs: dict[str, Any] = {"crop_hint": crop_hint}
+    if extra_images:
+        gpt_kwargs["extra_images"] = extra_images
     try:
         inference = await asyncio.to_thread(
-            call_gpt_vision, key, contents, crop_hint=crop_hint
+            call_gpt_vision,
+            primary_key,
+            primary_bytes,
+            **gpt_kwargs,
         )
         crop = inference.get("crop", "")
         disease = inference.get("disease", "")
@@ -205,9 +241,13 @@ async def _process_image(
     roi_calc_seconds.observe(time.perf_counter() - roi_start)
 
     return {
-        "file_id": key,
+        "file_id": primary_key,
+        "file_ids": keys,
+        "image_count": len(content_items),
         "crop": crop,
         "crop_ru": inference.get("crop_ru"),
+        "crop_confidence": inference.get("crop_confidence"),
+        "crop_candidates": inference.get("crop_candidates"),
         "disease": disease,
         "confidence": conf,
         "roi": roi,
@@ -302,6 +342,8 @@ class NextSteps(BaseModel):
 class DiagnoseResponse(BaseModel):
     crop: str
     crop_ru: str | None = None
+    crop_confidence: float | None = None
+    crop_candidates: list[str] | None = None
     object_id: int | None = None
     case_id: int | None = None
     variety: str | None = None
@@ -466,30 +508,58 @@ async def diagnose(
     request: Request,
     user_id: int = Depends(rate_limit),
     image: UploadFile | None = OPTIONAL_FILE,
+    images: list[UploadFile] | None = OPTIONAL_FILES,
     prompt_id: str | None = Form(None),
     crop_hint: str | None = Form(None),
     case_id: int | None = Form(None),
 ):
-    limit = 2 * 1024 * 1024
+    limit = MAX_IMAGE_BYTES
     hint_value: str | None = None
     case_id_value: int | None = None
-    if image:
+    contents_payload: bytes | list[bytes]
+    if image or images:
         if prompt_id not in (None, "v1"):
             err = ErrorResponse(
                 code=ErrorCode.BAD_REQUEST, message="prompt_id must be 'v1'"
             )
             return JSONResponse(status_code=400, content=err.model_dump())
-        if getattr(image, "size", None) and image.size > limit:
+        upload_items: list[UploadFile] = []
+        if images:
+            upload_items.extend(images)
+        if image:
+            upload_items.append(image)
+        if not upload_items:
             err = ErrorResponse(
-                code=ErrorCode.BAD_REQUEST, message="image too large"
+                code=ErrorCode.BAD_REQUEST, message="image is required"
             )
-            return JSONResponse(status_code=413, content=err.model_dump())
-        contents = await image.read(limit + 1)
-        if len(contents) > limit:
+            return JSONResponse(status_code=400, content=err.model_dump())
+        if len(upload_items) > MAX_ALBUM_IMAGES:
             err = ErrorResponse(
-                code=ErrorCode.BAD_REQUEST, message="image too large"
+                code=ErrorCode.BAD_REQUEST, message="too many images"
             )
-            return JSONResponse(status_code=413, content=err.model_dump())
+            return JSONResponse(status_code=400, content=err.model_dump())
+        contents_items: list[bytes] = []
+        total_size = 0
+        for upload in upload_items:
+            if getattr(upload, "size", None) and upload.size > limit:
+                err = ErrorResponse(
+                    code=ErrorCode.BAD_REQUEST, message="image too large"
+                )
+                return JSONResponse(status_code=413, content=err.model_dump())
+            item = await upload.read(limit + 1)
+            if len(item) > limit:
+                err = ErrorResponse(
+                    code=ErrorCode.BAD_REQUEST, message="image too large"
+                )
+                return JSONResponse(status_code=413, content=err.model_dump())
+            total_size += len(item)
+            if total_size > MAX_ALBUM_TOTAL_BYTES:
+                err = ErrorResponse(
+                    code=ErrorCode.BAD_REQUEST, message="images too large"
+                )
+                return JSONResponse(status_code=413, content=err.model_dump())
+            contents_items.append(item)
+        contents_payload = contents_items if len(contents_items) > 1 else contents_items[0]
         hint_value = (crop_hint or "").strip() or None
         if case_id and case_id > 0:
             case_id_value = case_id
@@ -530,6 +600,7 @@ async def diagnose(
         hint_value = (body.crop_hint or "").strip() or None
         if body.case_id and body.case_id > 0:
             case_id_value = body.case_id
+        contents_payload = contents
     if case_id_value:
         try:
             recent_case = await asyncio.to_thread(
@@ -539,12 +610,16 @@ async def diagnose(
             recent_case = None
         if not recent_case or recent_case.get("case_id") != case_id_value:
             case_id_value = None
+        elif not hint_value:
+            case_crop = str(recent_case.get("crop") or "").strip()
+            if case_crop:
+                hint_value = case_crop
 
     diag_requests_total.inc()
     start_time = time.perf_counter()
     try:
         result = await _process_image(
-            contents,
+            contents_payload,
             user_id,
             crop_hint=hint_value,
             same_case_id=case_id_value,
@@ -553,6 +628,14 @@ async def diagnose(
         crop = result.get("crop", "")
         disease = result.get("disease", "")
         conf = float(result.get("confidence", 0.0))
+        raw_crop_conf = result.get("crop_confidence")
+        try:
+            crop_conf = float(raw_crop_conf)
+            if crop_conf > 1.0 and crop_conf <= 100.0:
+                crop_conf /= 100.0
+            crop_conf = max(0.0, min(1.0, crop_conf))
+        except (TypeError, ValueError):
+            crop_conf = conf
         roi = float(result.get("roi", 0.0))
     except _ProcessImageError as err:
         diag_latency_seconds.observe(time.perf_counter() - start_time)
@@ -682,6 +765,23 @@ async def diagnose(
 
     disease_name_ru = str(result.get("disease_name_ru") or "").strip() or None
     crop_ru = str(result.get("crop_ru") or "").strip() or None
+    crop_candidates: list[str] | None = None
+    raw_candidates = result.get("crop_candidates")
+    if isinstance(raw_candidates, list):
+        dedup_candidates: list[str] = []
+        seen_candidates: set[str] = set()
+        for candidate in raw_candidates:
+            item = str(candidate or "").strip()
+            if not item:
+                continue
+            key = item.casefold()
+            if key in seen_candidates:
+                continue
+            seen_candidates.add(key)
+            dedup_candidates.append(item)
+            if len(dedup_candidates) >= 3:
+                break
+        crop_candidates = dedup_candidates or None
     raw_object_id = result.get("object_id")
     object_id: int | None = None
     try:
@@ -711,15 +811,32 @@ async def diagnose(
         assistant_followups = cleaned_followups or None
 
     need_clarify_crop = bool(result.get("need_clarify_crop"))
+    if status == "ok" and crop_conf < CROP_CLARIFY_THRESHOLD:
+        need_clarify_crop = True
     clarify_crop_variants: list[str] | None = None
     raw_variants = result.get("clarify_crop_variants")
     if isinstance(raw_variants, list):
         cleaned_variants = [str(item).strip() for item in raw_variants if str(item or "").strip()]
         clarify_crop_variants = cleaned_variants or None
+    if need_clarify_crop and not clarify_crop_variants:
+        fallback_variants: list[str] = []
+        preferred_variants: list[str] = [crop_ru] if crop_ru else [crop]
+        for variant in [*preferred_variants, *(crop_candidates or [])]:
+            item = str(variant or "").strip()
+            if not item:
+                continue
+            if any(existing.casefold() == item.casefold() for existing in fallback_variants):
+                continue
+            fallback_variants.append(item)
+            if len(fallback_variants) >= 3:
+                break
+        clarify_crop_variants = fallback_variants or None
 
     response_payload = DiagnoseResponse(
         crop=crop,
         crop_ru=crop_ru,
+        crop_confidence=crop_conf if status == "ok" else None,
+        crop_candidates=crop_candidates if status == "ok" else None,
         variety=variety,
         variety_ru=variety_ru,
         disease=disease,

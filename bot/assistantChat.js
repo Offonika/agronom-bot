@@ -12,10 +12,22 @@ const API_BASE = process.env.API_BASE_URL || 'http://localhost:8010';
 const SESSION_TTL_MS = Number(process.env.ASSISTANT_SESSION_TTL_MS || `${10 * 60 * 1000}`);
 const START_THROTTLE_MS = Number(process.env.ASSISTANT_START_THROTTLE_MS || '1500');
 const CONTEXT_TTL_MS = Number(process.env.ASSISTANT_CONTEXT_TTL_MS || `${24 * 60 * 60 * 1000}`);
+let CHAT_TIMEOUT_MS = Number(process.env.ASSISTANT_CHAT_TIMEOUT_MS || `${120 * 1000}`);
+if (!Number.isFinite(CHAT_TIMEOUT_MS) || CHAT_TIMEOUT_MS <= 0) {
+  CHAT_TIMEOUT_MS = 120 * 1000;
+}
+let TYPING_INTERVAL_MS = Number(process.env.ASSISTANT_TYPING_INTERVAL_MS || '4500');
+if (!Number.isFinite(TYPING_INTERVAL_MS) || TYPING_INTERVAL_MS <= 0) {
+  TYPING_INTERVAL_MS = 4500;
+}
 const MAX_FOLLOWUPS = 3;
 const BODY_LOG_LIMIT = 500;
 const CONFIRM_DEDUP_MS = Number(process.env.ASSISTANT_CONFIRM_DEDUP_MS || '120000');
 const SHORT_REPLY_WINDOW_MS = Number(process.env.ASSISTANT_SHORT_REPLY_WINDOW_MS || '120000');
+const HISTORY_MAX_ITEMS = Number(process.env.ASSISTANT_HISTORY_MAX_ITEMS || '8');
+const HISTORY_MAX_TEXT = Number(process.env.ASSISTANT_HISTORY_MAX_TEXT || '320');
+const SESSION_EXPIRED_GRACE_MS = Number(process.env.ASSISTANT_SESSION_EXPIRED_GRACE_MS || '300000');
+const REDIS_KEY_PREFIX = process.env.ASSISTANT_SESSION_REDIS_PREFIX || 'bot:assistant_session:';
 const QUESTION_PREFIX_RE =
   /^(как|что|почему|зачем|когда|где|сколько|какой|какая|какие|чем|чего|куда|отчего|можно|нужно|стоит|подскаж|посовет|помоги)\b/i;
 const SHORT_ACK_RE =
@@ -44,15 +56,72 @@ const TOPIC_LABELS = {
   indoor: 'комнатные растения',
 };
 
-function createAssistantChat({ db, pool } = {}) {
+function createAssistantChat({ db, pool, redis = null, sessionKeyPrefix = REDIS_KEY_PREFIX } = {}) {
   if (!db) {
     throw new Error('assistantChat requires db');
   }
   const sessions = new Map();
   const confirmCache = new Map();
+  const redisClient = redis || null;
+  const redisKeyPrefix =
+    typeof sessionKeyPrefix === 'string' && sessionKeyPrefix.trim()
+      ? sessionKeyPrefix.trim()
+      : REDIS_KEY_PREFIX;
+  const historyItemsLimit = Number.isFinite(HISTORY_MAX_ITEMS)
+    ? Math.min(Math.max(Math.round(HISTORY_MAX_ITEMS), 2), 24)
+    : 8;
+  const historyTextLimit = Number.isFinite(HISTORY_MAX_TEXT)
+    ? Math.min(Math.max(Math.round(HISTORY_MAX_TEXT), 64), 1000)
+    : 320;
 
   function now() {
     return Date.now();
+  }
+
+  function toSessionKey(tgUserId) {
+    const id = Number(tgUserId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    return String(id);
+  }
+
+  function __getSessions() {
+    return sessions;
+  }
+
+  function getRedisKey(tgUserId) {
+    const key = toSessionKey(tgUserId);
+    if (!key) return null;
+    return `${redisKeyPrefix}${key}`;
+  }
+
+  function startTypingLoop(ctx) {
+    const chatId = ctx?.chat?.id;
+    if (!chatId) return () => {};
+    const intervalMs = Math.max(2500, Number.isFinite(TYPING_INTERVAL_MS) ? TYPING_INTERVAL_MS : 4500);
+    let stopped = false;
+
+    async function sendOnce() {
+      if (stopped) return;
+      try {
+        if (typeof ctx.sendChatAction === 'function') {
+          await ctx.sendChatAction('typing');
+          return;
+        }
+        if (ctx.telegram?.sendChatAction) {
+          await ctx.telegram.sendChatAction(chatId, 'typing');
+        }
+      } catch {
+        // ignore chat action failures
+      }
+    }
+
+    // Fire once immediately to show "typing..." quickly, then keep-alive.
+    void sendOnce();
+    const timer = setInterval(() => void sendOnce(), intervalMs);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
   }
 
   function generateSessionId() {
@@ -68,18 +137,93 @@ function createAssistantChat({ db, pool } = {}) {
     return now() - anchor > SESSION_TTL_MS;
   }
 
-  function getSession(userId) {
-    const session = sessions.get(userId);
-    if (!session) return null;
-    if (isExpired(session)) {
-      sessions.delete(userId);
-      return null;
-    }
-    return session;
+  function restoreSession(raw, tgUserId = null) {
+    if (!raw || typeof raw !== 'object') return null;
+    const normalized = {
+      sessionId: raw.sessionId || generateSessionId(),
+      startedAt: Number(raw.startedAt) || now(),
+      lastActiveAt: Number(raw.lastActiveAt) || Number(raw.startedAt) || now(),
+      objectId: raw.objectId ? Number(raw.objectId) || null : null,
+      pendingProposalId: raw.pendingProposalId ? String(raw.pendingProposalId) : null,
+      pendingMessage: typeof raw.pendingMessage === 'string' ? raw.pendingMessage : null,
+      pendingTopic: typeof raw.pendingTopic === 'string' ? raw.pendingTopic : null,
+      history: normalizeHistory(raw.history),
+      recentDiagnosisId: raw.recentDiagnosisId ? Number(raw.recentDiagnosisId) || null : null,
+      lastStartAt: Number(raw.lastStartAt) || null,
+      lastAssistantReplyAt: Number(raw.lastAssistantReplyAt) || null,
+      tgUserId: toSessionKey(tgUserId),
+    };
+    return isExpired(normalized) ? null : normalized;
   }
 
-  function saveSession(userId, patch = {}) {
-    const current = sessions.get(userId) || {
+  async function persistSession(tgUserId, session) {
+    if (!redisClient) return;
+    const key = getRedisKey(tgUserId);
+    if (!key) return;
+    if (!session) {
+      try {
+        await redisClient.del(key);
+      } catch (err) {
+        console.error('assistant.session persist delete failed', err);
+      }
+      return;
+    }
+    const anchor = Number(session.lastActiveAt || session.startedAt || now());
+    const ttlMs = Math.max(1000, anchor + SESSION_TTL_MS - now() + SESSION_EXPIRED_GRACE_MS);
+    try {
+      await redisClient.set(key, JSON.stringify(session), 'PX', ttlMs);
+    } catch (err) {
+      console.error('assistant.session persist set failed', err);
+    }
+  }
+
+  async function hydrateSession(tgUserId) {
+    const key = toSessionKey(tgUserId);
+    if (!key) return null;
+    const session = sessions.get(key);
+    if (session && !isExpired(session)) return session;
+    if (isExpired(session)) {
+      sessions.delete(key);
+    }
+    if (!redisClient) return null;
+    const redisKey = getRedisKey(tgUserId);
+    if (!redisKey) return null;
+    try {
+      const raw = await redisClient.get(redisKey);
+      if (!raw) return null;
+      const restored = restoreSession(JSON.parse(raw), tgUserId);
+      if (!restored) {
+        await redisClient.del(redisKey);
+        return null;
+      }
+      sessions.set(key, restored);
+      return restored;
+    } catch (err) {
+      console.error('assistant.session hydrate failed', err);
+      return null;
+    }
+  }
+
+  async function getSession(tgUserId) {
+    return hydrateSession(tgUserId);
+  }
+
+  async function saveSession(tgUserId, patch = {}) {
+    const key = toSessionKey(tgUserId);
+    if (!key) {
+      return {
+        sessionId: generateSessionId(),
+        startedAt: now(),
+        lastActiveAt: now(),
+        objectId: null,
+        pendingProposalId: null,
+        pendingMessage: null,
+        pendingTopic: null,
+        history: [],
+        ...patch,
+      };
+    }
+    const current = (await hydrateSession(tgUserId)) || {
       sessionId: generateSessionId(),
       startedAt: now(),
       lastActiveAt: now(),
@@ -87,11 +231,55 @@ function createAssistantChat({ db, pool } = {}) {
       pendingProposalId: null,
       pendingMessage: null,
       pendingTopic: null,
+      history: [],
     };
     const next = { ...current, ...patch };
     next.lastActiveAt = now();
-    sessions.set(userId, next);
+    sessions.set(key, next);
+    await persistSession(tgUserId, next);
     return next;
+  }
+
+  function normalizeHistory(history) {
+    if (!Array.isArray(history) || !history.length) return [];
+    const cleaned = [];
+    for (const item of history) {
+      if (!item || typeof item !== 'object') continue;
+      const roleRaw = typeof item.role === 'string' ? item.role.trim().toLowerCase() : '';
+      const role = roleRaw === 'assistant' ? 'assistant' : roleRaw === 'user' ? 'user' : '';
+      if (!role) continue;
+      const textRaw = typeof item.text === 'string' ? item.text.trim() : '';
+      if (!textRaw) continue;
+      cleaned.push({
+        role,
+        text: textRaw.slice(0, historyTextLimit),
+      });
+      if (cleaned.length >= historyItemsLimit) break;
+    }
+    if (cleaned.length <= historyItemsLimit) return cleaned;
+    return cleaned.slice(-historyItemsLimit);
+  }
+
+  function appendHistory(history, role, text) {
+    const roleValue = role === 'assistant' ? 'assistant' : role === 'user' ? 'user' : '';
+    const textValue = typeof text === 'string' ? text.trim() : '';
+    if (!roleValue || !textValue) {
+      return normalizeHistory(history);
+    }
+    const base = normalizeHistory(history);
+    base.push({ role: roleValue, text: textValue.slice(0, historyTextLimit) });
+    if (base.length > historyItemsLimit) {
+      return base.slice(-historyItemsLimit);
+    }
+    return base;
+  }
+
+  async function deleteSession(tgUserId) {
+    const key = toSessionKey(tgUserId);
+    if (!key) return false;
+    const deleted = sessions.delete(key);
+    await persistSession(tgUserId, null);
+    return deleted;
   }
 
   function getConfirmKey(userId, proposalId, objectId) {
@@ -268,7 +456,7 @@ function createAssistantChat({ db, pool } = {}) {
   async function start(ctx) {
     const userId = ctx.from?.id;
     if (!userId) return;
-    const existing = getSession(userId);
+    const existing = await getSession(userId);
     if (existing?.lastStartAt && now() - existing.lastStartAt < START_THROTTLE_MS) {
       return;
     }
@@ -288,7 +476,7 @@ function createAssistantChat({ db, pool } = {}) {
     if (!objectId && user?.last_object_id) {
       objectId = Number(user.last_object_id) || null;
     }
-    const session = saveSession(userId, {
+    const session = await saveSession(userId, {
       startedAt: now(),
       sessionId: generateSessionId(),
       pendingProposalId: null,
@@ -304,7 +492,7 @@ function createAssistantChat({ db, pool } = {}) {
         object = await db.getObjectById(session.objectId);
         if (!object) {
           session.objectId = null;
-          saveSession(userId, { objectId: null });
+          await saveSession(userId, { objectId: null });
         }
       } catch (err) {
         console.error('assistant.object fetch failed', err);
@@ -342,13 +530,13 @@ function createAssistantChat({ db, pool } = {}) {
     const message = text.trim();
     if (!message) return false;
     const messageTopic = detectTopic(message);
-    let session = getSession(userId);
+    let session = await getSession(userId);
     if (isPunctuationOnly(message)) {
       await ctx.reply(msg('assistant.need_question') || 'Напишите вопрос текстом.');
       return true;
     }
     if (session && isShortAck(message) && !hasRecentAssistantReply(session)) {
-      sessions.delete(userId);
+      await deleteSession(userId);
       console.info('assistant.chat.short_ack_ignored', { userId });
       return true;
     }
@@ -364,9 +552,10 @@ function createAssistantChat({ db, pool } = {}) {
     if (session?.objectId && messageTopic) {
       const sessionTopic = await resolveSessionTopic(userId, session);
       if (sessionTopic && sessionTopic !== messageTopic) {
-        session.pendingMessage = message;
-        session.pendingTopic = messageTopic;
-        sessions.set(userId, session);
+        await saveSession(userId, {
+          pendingMessage: message,
+          pendingTopic: messageTopic,
+        });
         const prompt =
           msg('assistant.context_mismatch', { topic: topicLabel(messageTopic) }) ||
           `Похоже, вопрос про ${topicLabel(messageTopic)}. Выберите растение или продолжим без привязки.`;
@@ -394,7 +583,7 @@ function createAssistantChat({ db, pool } = {}) {
       if (!objectId && user?.last_object_id) {
         objectId = Number(user.last_object_id) || null;
       }
-      session = saveSession(userId, {
+      session = await saveSession(userId, {
         startedAt: now(),
         sessionId: generateSessionId(),
         pendingProposalId: null,
@@ -403,15 +592,20 @@ function createAssistantChat({ db, pool } = {}) {
         lastStartAt: now(),
       });
     } else {
-      saveSession(userId);
+      await saveSession(userId);
     }
     await sendChatRequest(ctx, user, session, message);
     return true;
   }
 
   async function sendChatRequest(ctx, user, session, message) {
+    const stopTyping = startTypingLoop(ctx);
     const userId = user.id;
     const metadata = {};
+    const sessionHistory = normalizeHistory(session?.history);
+    if (sessionHistory.length) {
+      metadata.history = sessionHistory;
+    }
     if (session?.recentDiagnosisId) {
       metadata.recent_diagnosis_id = session.recentDiagnosisId;
     }
@@ -454,16 +648,27 @@ function createAssistantChat({ db, pool } = {}) {
     };
     console.info('assistant.chat.request', logContext);
     let resp;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
     try {
       resp = await fetch(`${API_BASE}/v1/assistant/chat`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
     } catch (err) {
+      if (err?.name === 'AbortError') {
+        console.error('assistant.chat timeout', logContext);
+        await ctx.reply(msg('error_GPT_TIMEOUT') || msg('diagnose_error') || 'GPT не ответил');
+        return;
+      }
       console.error('assistant.chat network error', err, logContext);
-      await ctx.reply(msg('assistant.error'));
+      await ctx.reply(msg('diagnose_error') || 'Ошибка диагностики');
       return;
+    } finally {
+      clearTimeout(timeout);
+      stopTyping();
     }
     console.info('assistant.chat.response', { ...logContext, status: resp.status });
     if (!resp.ok) {
@@ -479,10 +684,10 @@ function createAssistantChat({ db, pool } = {}) {
       await ctx.reply(msg('assistant.error'));
       return;
     }
-    await sendAssistantReply(ctx, session, data);
+    await sendAssistantReply(ctx, session, data, message);
   }
 
-  async function sendAssistantReply(ctx, session, data) {
+  async function sendAssistantReply(ctx, session, data, userMessage) {
     const answer = typeof data?.assistant_message === 'string' ? data.assistant_message.trim() : '';
     const followups = Array.isArray(data?.followups) ? data.followups.slice(0, MAX_FOLLOWUPS) : [];
     const proposals = Array.isArray(data?.proposals) ? data.proposals : [];
@@ -498,7 +703,7 @@ function createAssistantChat({ db, pool } = {}) {
       lines.push(answer);
     }
     if (followups.length) {
-      const title = msg('assistant.followups_title') || 'Можно спросить:';
+      const title = msg('assistant.followups_title') || 'Чтобы уточнить, ответьте:';
       lines.push([title, ...followups.map((line) => `• ${line}`)].join('\n'));
     }
     const text = lines.filter(Boolean).join('\n\n') || msg('assistant.error');
@@ -512,7 +717,12 @@ function createAssistantChat({ db, pool } = {}) {
     try {
       await ctx.reply(text, opts);
       if (ctx.from?.id) {
-        saveSession(ctx.from.id, { lastAssistantReplyAt: now() });
+        const withUser = appendHistory(session?.history, 'user', userMessage);
+        const withAssistant = appendHistory(withUser, 'assistant', answer || text);
+        await saveSession(ctx.from.id, {
+          lastAssistantReplyAt: now(),
+          history: withAssistant,
+        });
       }
     } catch (err) {
       console.error('assistant.chat.reply_failed', err, replyContext);
@@ -539,9 +749,11 @@ function createAssistantChat({ db, pool } = {}) {
   }
 
   async function chooseObject(ctx) {
+    const tgUserId = ctx.from?.id;
+    if (!tgUserId) return;
     const user = await resolveUser(ctx);
     if (!user) return;
-    const session = saveSession(user.id);
+    const session = await saveSession(tgUserId);
     if (typeof db.listObjects !== 'function') {
       await ctx.reply(msg('assistant.no_objects') || msg('photo_prompt'));
       return;
@@ -577,9 +789,11 @@ function createAssistantChat({ db, pool } = {}) {
   }
 
   async function pickObject(ctx, objectId) {
+    const tgUserId = ctx.from?.id;
+    if (!tgUserId) return;
     const user = await resolveUser(ctx);
     if (!user) return;
-    const session = saveSession(user.id);
+    let session = await saveSession(tgUserId);
     const targetId = Number(objectId);
     if (!targetId) {
       await replyUserError(ctx, 'OBJECT_NOT_FOUND');
@@ -603,8 +817,7 @@ function createAssistantChat({ db, pool } = {}) {
       await replyUserError(ctx, 'OBJECT_NOT_OWNED');
       return;
     }
-    session.objectId = targetId;
-    sessions.set(user.id, session);
+    session = await saveSession(tgUserId, { objectId: targetId });
     if (typeof db.updateUserLastObject === 'function') {
       try {
         await db.updateUserLastObject(user.id, targetId);
@@ -616,27 +829,30 @@ function createAssistantChat({ db, pool } = {}) {
     await ctx.reply(msg('assistant.object_selected', { name }) || `Выбрано растение: ${name}.`);
     if (session.pendingProposalId) {
       const proposalId = session.pendingProposalId;
-      session.pendingProposalId = null;
-      sessions.set(user.id, session);
+      await saveSession(tgUserId, { pendingProposalId: null });
       await confirm(ctx, proposalId, targetId);
       return;
     }
     if (session.pendingMessage) {
       const pending = session.pendingMessage;
-      session.pendingMessage = null;
-      session.pendingTopic = null;
-      sessions.set(user.id, session);
+      await saveSession(tgUserId, {
+        pendingMessage: null,
+        pendingTopic: null,
+      });
+      session = (await getSession(tgUserId)) || session;
       await sendChatRequest(ctx, user, session, pending);
     }
   }
 
   async function confirm(ctx, proposalId, objectId) {
+    const tgUserId = ctx.from?.id;
+    if (!tgUserId) return;
     const user = await resolveUser(ctx);
     if (!user?.api_key) {
       await ctx.reply(msg('assistant.error') || msg('diagnose_error'));
       return;
     }
-    const session = saveSession(user.id);
+    const session = await saveSession(tgUserId);
     const userId = ctx.from?.id || user.id;
     if (typeof ctx.answerCbQuery === 'function') {
       try {
@@ -666,8 +882,7 @@ function createAssistantChat({ db, pool } = {}) {
       confirmCache.set(dedupKey, { ts: now() });
     }
     if (!targetId) {
-      session.pendingProposalId = proposalId;
-      sessions.set(user.id, session);
+      await saveSession(tgUserId, { pendingProposalId: proposalId });
       await chooseObject(ctx);
       return;
     }
@@ -764,11 +979,12 @@ function createAssistantChat({ db, pool } = {}) {
         // ignore toast errors
       }
     }
-    const session = saveSession(userId, { objectId: null });
+    const session = await saveSession(userId, { objectId: null });
     const pending = session.pendingMessage;
-    session.pendingMessage = null;
-    session.pendingTopic = null;
-    sessions.set(userId, session);
+    const nextSession = await saveSession(userId, {
+      pendingMessage: null,
+      pendingTopic: null,
+    });
     if (!pending) {
       await ctx.reply(msg('assistant.context_cleared') || 'Ок, отвечаю без привязки к растению.');
       return;
@@ -780,7 +996,7 @@ function createAssistantChat({ db, pool } = {}) {
     }
     const allowed = await ensureAccess(ctx, user);
     if (!allowed) return;
-    await sendChatRequest(ctx, user, session, pending);
+    await sendChatRequest(ctx, user, nextSession, pending);
   }
 
   async function handleAssistantError(ctx, resp, logPrefix, context = null) {
@@ -805,11 +1021,10 @@ function createAssistantChat({ db, pool } = {}) {
   async function continueChat(ctx) {
     const userId = ctx.from?.id;
     if (!userId) return;
-    const session = saveSession(userId);
+    await saveSession(userId);
     const text = msg('assistant.start') || '🤖 Живой ассистент готов помочь. Задайте вопрос.';
     await ctx.reply(text);
-    session.lastAssistantReplyAt = now();
-    sessions.set(userId, session);
+    await saveSession(userId, { lastAssistantReplyAt: now() });
   }
 
   return {
@@ -820,6 +1035,7 @@ function createAssistantChat({ db, pool } = {}) {
     confirm,
     clearContext,
     continueChat,
+    __getSessions,
   };
 }
 

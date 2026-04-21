@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Карманный агроном в ChatGPT — диагностика растений по фото</title>
+  <meta name="description" content="Диагностика болезней и вредителей растений по фото: диагноз → план лечения, PHI и подбор времени обработки по погоде («зелёные окна»). Открыть GPT или перейти в Telegram-бот.">
+  <link rel="canonical" href="https://agronom.offonika.ru/gpt/">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Карманный агроном в ChatGPT — диагностика растений по фото">
+  <meta property="og:description" content="Болезни и вредители по фото: план лечения, PHI и «зелёные окна» по погоде. Открыть GPT или Telegram-бот (fallback).">
+  <meta property="og:image" content="https://agronom.offonika.ru/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://agronom.offonika.ru/gpt/">
+  <meta property="og:site_name" content="Карманный агроном">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Карманный агроном в ChatGPT — диагностика растений по фото">
+  <meta name="twitter:description" content="Болезни и вредители по фото: план лечения, PHI и «зелёные окна» по погоде">
+
+  <!-- Favicon -->
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Outfit', 'system-ui', 'sans-serif'] },
+          colors: {
+            leaf: {
+              50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80',
+              500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d'
+            },
+            earth: {
+              50: '#faf8f5', 100: '#f5f0e8', 200: '#e8dcc8', 300: '#d4c4a8', 400: '#b8a07a',
+              500: '#9a8156', 600: '#7d6644', 700: '#5f4d35', 800: '#453929', 900: '#2d251c'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @keyframes fade-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fade-in 0.6s ease-out forwards; }
+    [data-animate]:nth-child(1) { animation-delay: 0.1s; }
+    [data-animate]:nth-child(2) { animation-delay: 0.2s; }
+    [data-animate]:nth-child(3) { animation-delay: 0.3s; }
+    [data-animate]:nth-child(4) { animation-delay: 0.4s; }
+
+    .hero-gradient { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #faf8f5 100%); }
+    .pattern-overlay {
+      background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2322c55e' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    .faq-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+    .faq-item.open .faq-content { max-height: 900px; }
+    .faq-item.open .faq-icon { transform: rotate(180deg); }
+    .faq-icon { transition: transform 0.3s ease; }
+  </style>
+
+  <!-- JSON-LD (SEO / AI visibility) -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://agronom.offonika.ru/#org",
+          "name": "Карманный агроном",
+          "legalName": "ООО «МАСТЕР-МОБАЙЛ»",
+          "url": "https://agronom.offonika.ru/",
+          "logo": "https://agronom.offonika.ru/og-image.png",
+          "email": "teleinvest-sk@mail.ru",
+          "telephone": "+7 938 915-33-33"
+        },
+        {
+          "@type": "Product",
+          "@id": "https://agronom.offonika.ru/#product",
+          "name": "Карманный агроном (Telegram-бот)",
+          "description": "Диагностика болезней растений по фото: диагноз → план действий, PHI, напоминания и подбор времени обработки по погоде («зелёные окна»).",
+          "brand": { "@id": "https://agronom.offonika.ru/#org" },
+          "url": "https://agronom.offonika.ru/",
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "RUB",
+            "price": "199",
+            "availability": "https://schema.org/InStock",
+            "url": "https://agronom.offonika.ru/"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://agronom.offonika.ru/#app",
+          "name": "Карманный агроном",
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "Telegram",
+          "url": "https://agronom.offonika.ru/",
+          "publisher": { "@id": "https://agronom.offonika.ru/#org" }
+        }
+      ]
+    }
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context":"https://schema.org",
+      "@type":"FAQPage",
+      "mainEntity":[
+        {
+          "@type":"Question",
+          "name":"Нужна ли подписка Plus?",
+          "acceptedAnswer":{"@type":"Answer","text":"Открытие GPT в ChatGPT может зависеть от условий вашей подписки и региона. Если доступ к GPT ограничен, используйте Telegram-бот: он даёт диагностику по фото и план лечения без установки приложений."}
+        },
+        {
+          "@type":"Question",
+          "name":"Можно ли прислать фото?",
+          "acceptedAnswer":{"@type":"Answer","text":"Да. Для точности лучше прислать 2–3 фото: общий вид растения, лист крупно (лицевая сторона) и тот же лист с изнанки. При необходимости добавьте плод/цветок/стебель."}
+        },
+        {
+          "@type":"Question",
+          "name":"Чем отличается GPT от Telegram-бота?",
+          "acceptedAnswer":{"@type":"Answer","text":"Оба варианта помогают с диагнозом и планом. Telegram-бот удобен как быстрый fallback: простая ссылка, UTM/start для трекинга, напоминания и флоу под Telegram."}
+        },
+        {
+          "@type":"Question",
+          "name":"Как считается PHI?",
+          "acceptedAnswer":{"@type":"Answer","text":"PHI (pre-harvest interval) — срок ожидания после обработки до сбора урожая. Его нужно соблюдать согласно инструкции к препарату; бот помогает не забыть и выбрать безопасный план."}
+        },
+        {
+          "@type":"Question",
+          "name":"Что такое зелёные окна?",
+          "acceptedAnswer":{"@type":"Answer","text":"«Зелёные окна» — подход к выбору времени обработки по погоде: без дождя после опрыскивания, при подходящем ветре и температуре. Это повышает эффективность и снижает риск смыва."}
+        }
+      ]
+    }
+  </script>
+</head>
+<body class="font-sans text-earth-800 antialiased">
+  <header class="bg-white/70 backdrop-blur-sm border-b border-earth-100">
+    <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/assets/favicon.svg" alt="Карманный агроном" class="w-8 h-8">
+        <span class="font-semibold text-earth-900">Карманный агроном</span>
+      </a>
+      <div class="flex items-center gap-4 text-sm">
+        <a href="/plant-disease-photo/" class="text-earth-600 hover:text-earth-900 transition-colors">Болезнь по фото</a>
+        <a href="/green-windows/" class="text-earth-600 hover:text-earth-900 transition-colors">Зелёные окна</a>
+        <a href="/phi/" class="text-earth-600 hover:text-earth-900 transition-colors">PHI</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero-gradient pattern-overlay py-16 md:py-24 relative overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-b from-transparent to-white/60 pointer-events-none"></div>
+      <div class="container mx-auto px-4 relative z-10">
+        <div class="max-w-4xl mx-auto text-center">
+          <div class="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 mb-8 shadow-sm" data-animate>
+            <span class="w-2 h-2 bg-leaf-500 rounded-full animate-pulse"></span>
+            <span class="text-sm font-medium text-leaf-700">GPT в ChatGPT + Telegram fallback</span>
+          </div>
+
+          <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-earth-900 mb-6 leading-tight" data-animate>
+            Карманный агроном в ChatGPT
+          </h1>
+
+          <p class="text-xl md:text-2xl text-earth-600 mb-10 max-w-3xl mx-auto" data-animate>
+            Диагностика по фото + план + PHI + «зелёные окна».
+          </p>
+
+          <div class="flex flex-col gap-3 justify-center items-center" data-animate>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <a href="https://chatgpt.com/g/g-6986574ef1808191a43d7145553e6b2e-karmannyi-agronom"
+               data-cta="gpt_open"
+               data-position="gpt_page"
+               class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 hover:shadow-xl hover:shadow-leaf-600/40 transition-all duration-300 hover:-translate-y-0.5">
+                Открыть GPT
+              </a>
+
+              <a href="https://t.me/AgronommAI_bot"
+                 data-cta="telegram"
+                 data-position="gpt_page_fallback"
+                 class="inline-flex items-center gap-3 bg-white hover:bg-leaf-50 text-leaf-700 font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg hover:shadow-xl border border-leaf-200 transition-all duration-300 hover:-translate-y-0.5">
+                Открыть Telegram-бота
+              </a>
+            </div>
+
+            <a href="https://t.me/AgronommAI_bot"
+               data-cta="telegram"
+               data-position="gpt_page_fallback_diagnosis"
+               class="inline-flex items-center gap-3 text-leaf-700 hover:text-leaf-800 font-semibold text-base">
+              Открыть Telegram-бота и начать диагностику
+            </a>
+          </div>
+
+          <p class="mt-4 text-earth-500 text-sm" data-animate>
+            Если GPT не открылся, ниже есть инструкция: как найти его в Explore GPTs.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How to -->
+    <section class="py-20 bg-white" id="how-to-open">
+      <div class="container mx-auto px-4">
+        <div class="max-w-4xl mx-auto">
+          <div class="text-center mb-12">
+            <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">Как открыть (3 шага)</h2>
+            <p class="text-earth-600 text-lg">Если кнопка “Открыть GPT” не сработала, откройте через Explore GPTs.</p>
+          </div>
+
+          <div class="grid md:grid-cols-3 gap-6">
+            <div class="bg-earth-50 rounded-2xl p-6 border border-earth-100 shadow-sm" data-animate>
+              <div class="flex items-center gap-3 mb-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-leaf-100 text-leaf-700 font-bold">1</span>
+                <h3 class="font-semibold text-earth-900">Открой ChatGPT</h3>
+              </div>
+              <p class="text-earth-700 text-sm">
+                Перейдите в Explore GPTs (или откройте каталог GPTs):
+                <a href="https://chatgpt.com/gpts" target="_blank" rel="noopener noreferrer" class="text-leaf-700 font-semibold hover:text-leaf-800">
+                  chatgpt.com/gpts
+                </a>.
+              </p>
+            </div>
+
+            <div class="bg-earth-50 rounded-2xl p-6 border border-earth-100 shadow-sm" data-animate>
+              <div class="flex items-center gap-3 mb-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-leaf-100 text-leaf-700 font-bold">2</span>
+                <h3 class="font-semibold text-earth-900">Найдите GPT</h3>
+              </div>
+              <p class="text-earth-700 text-sm">
+                В поиске введите: <span class="font-semibold">Карманный агроном</span>.
+              </p>
+            </div>
+
+            <div class="bg-earth-50 rounded-2xl p-6 border border-earth-100 shadow-sm" data-animate>
+              <div class="flex items-center gap-3 mb-3">
+                <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-leaf-100 text-leaf-700 font-bold">3</span>
+                <h3 class="font-semibold text-earth-900">Откройте и начните чат</h3>
+              </div>
+              <p class="text-earth-700 text-sm">
+                Отправьте фото растения и коротко опишите проблему. Для точности лучше 2–3 фото.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-10 text-center">
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <a href="https://t.me/AgronommAI_bot"
+                 data-cta="telegram"
+                 data-position="gpt_page_fallback"
+                 class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 transition-all duration-300 hover:-translate-y-0.5">
+                Открыть Telegram-бота (fallback)
+              </a>
+              <a href="https://t.me/AgronommAI_bot"
+                 data-cta="telegram"
+                 data-position="gpt_page_fallback_diagnosis"
+                 class="inline-flex items-center gap-3 bg-white hover:bg-leaf-50 text-leaf-700 font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg hover:shadow-xl border border-leaf-200 transition-all duration-300 hover:-translate-y-0.5">
+                Открыть Telegram-бота и начать диагностику
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="py-20 bg-earth-50">
+      <div class="container mx-auto px-4">
+        <div class="max-w-4xl mx-auto">
+          <div class="text-center mb-12">
+            <h2 class="text-3xl md:text-4xl font-bold text-earth-900 mb-4">FAQ</h2>
+            <p class="text-earth-600 text-lg">Коротко о том, что чаще всего спрашивают.</p>
+          </div>
+
+          <div class="space-y-4">
+            <div class="faq-item bg-white rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="gpt_plus" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Нужна ли подписка Plus?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  Доступ к GPT в ChatGPT может зависеть от условий вашей подписки и региона. Если GPT недоступен, используйте Telegram-бот: он работает по простой ссылке и подходит как fallback.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-white rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="gpt_photos" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Можно ли прислать фото?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  Да. Базовый набор для диагностики: общий вид растения + лист крупно (лицевая сторона) + тот же лист с изнанки. Плод/цветок/стебель можно добавить по ситуации.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-white rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="gpt_vs_tg" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Чем отличается GPT от Telegram-бота?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  GPT удобен внутри ChatGPT. Telegram-бот удобен как быстрый и стабильный канал: простая ссылка, трекинг через UTM/start, и привычный Telegram-флоу.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-white rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="gpt_phi" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Как считается PHI?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  PHI (pre-harvest interval) задаётся инструкцией к препарату. Бот помогает выбрать безопасный план и не забыть срок ожидания до сбора урожая.
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item bg-white rounded-2xl shadow-sm border border-earth-100" data-animate>
+              <button class="w-full p-6 text-left flex items-center justify-between" data-faq="gpt_green_windows" onclick="this.parentElement.classList.toggle('open')">
+                <span class="font-semibold text-earth-900 pr-4">Что такое зелёные окна?</span>
+                <svg class="faq-icon w-5 h-5 text-earth-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+              <div class="faq-content">
+                <div class="px-6 pb-6 text-earth-700 text-sm">
+                  «Зелёные окна» помогают выбрать время обработки так, чтобы после опрыскивания не было дождя, а ветер и температура были подходящими.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-10 text-center">
+            <a href="https://t.me/AgronommAI_bot" data-cta="telegram" data-position="gpt_page_fallback"
+               class="inline-flex items-center gap-3 bg-leaf-600 hover:bg-leaf-700 text-white font-semibold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-leaf-600/30 transition-all duration-300 hover:-translate-y-0.5">
+              Открыть Telegram-бота
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-earth-900 text-earth-300 py-12">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div class="flex items-center gap-3">
+          <img src="/assets/favicon.svg" alt="Карманный агроном" class="w-8 h-8">
+          <span class="font-semibold text-white">Карманный агроном</span>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-6 text-sm">
+          <a href="/" class="hover:text-white transition-colors">Главная</a>
+          <a href="/privacy/" class="hover:text-white transition-colors">Политика</a>
+          <a href="/offer/" class="hover:text-white transition-colors">Оферта</a>
+          <a href="/plant-disease-photo/" class="hover:text-white transition-colors">Болезнь по фото</a>
+          <a href="/green-windows/" class="hover:text-white transition-colors">Зелёные окна</a>
+          <a href="/phi/" class="hover:text-white transition-colors">PHI</a>
+          <a href="/best-plant-disease-apps/" class="hover:text-white transition-colors">Лучшие приложения</a>
+          <a href="https://t.me/AgronommAI_bot" class="hover:text-white transition-colors" data-cta="telegram" data-position="gpt_page_fallback">Поддержка</a>
+        </div>
+
+        <div class="text-sm text-earth-500">© 2025 ООО «МАСТЕР-МОБАЙЛ»</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    window.METRIKA_ID = '106112758';
+  </script>
+  <script src="/scripts/utm.js"></script>
+  <script src="/scripts/analytics.js"></script>
+  <noscript><div><img src="https://mc.yandex.ru/watch/106112758" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+</body>
+</html>

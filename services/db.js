@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const { Pool } = require('pg');
 
 const MS_IN_HOUR = 60 * 60 * 1000;
@@ -71,15 +72,22 @@ function createDb(poolInstance) {
     return new Date(Date.now() + ttlMs);
   }
 
+  function generateUserApiKey() {
+    return crypto.randomBytes(24).toString('hex');
+  }
+
   async function ensureUser(tgId) {
+    const apiKey = generateUserApiKey();
     const sql = `
-      INSERT INTO users (tg_id)
-      VALUES ($1)
+      INSERT INTO users (tg_id, api_key)
+      VALUES ($1, $2)
       ON CONFLICT (tg_id)
-      DO UPDATE SET tg_id = EXCLUDED.tg_id
+      DO UPDATE SET
+        tg_id = EXCLUDED.tg_id,
+        api_key = COALESCE(users.api_key, EXCLUDED.api_key)
       RETURNING *;
     `;
-    const { rows } = await exec(sql, [tgId]);
+    const { rows } = await exec(sql, [tgId, apiKey]);
     return rows[0];
   }
 
@@ -580,6 +588,19 @@ function createDb(poolInstance) {
     return rows[0] || null;
   }
 
+  async function getLatestRecentDiagnosisByObject(userId, objectId) {
+    if (!userId || !objectId) return null;
+    const sql = `
+      SELECT *
+      FROM recent_diagnoses
+      WHERE user_id = $1 AND object_id = $2
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const { rows } = await exec(sql, [userId, objectId]);
+    return rows[0] || null;
+  }
+
   async function getRecentDiagnosisById(userId, diagnosisId) {
     if (!userId || !diagnosisId) return null;
     const sql = `
@@ -589,6 +610,54 @@ function createDb(poolInstance) {
       LIMIT 1;
     `;
     const { rows } = await exec(sql, [userId, diagnosisId]);
+    return rows[0] || null;
+  }
+
+  async function registerDiagnosisMessageContext({
+    userId,
+    diagnosisId,
+    chatId,
+    messageId,
+  }) {
+    if (!userId || !diagnosisId || !chatId || !messageId) return null;
+    const sql = `
+      INSERT INTO diagnosis_message_contexts (user_id, diagnosis_id, chat_id, message_id)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (chat_id, message_id)
+      DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        diagnosis_id = EXCLUDED.diagnosis_id,
+        created_at = NOW()
+      RETURNING *;
+    `;
+    const params = [userId, diagnosisId, chatId, messageId];
+    const { rows } = await exec(sql, params);
+    return rows[0] || null;
+  }
+
+  async function getRecentDiagnosisByMessageContext(
+    userId,
+    chatId,
+    messageId,
+    maxAgeHours = 72,
+  ) {
+    if (!userId || !chatId || !messageId) return null;
+    const ttlHours =
+      Number.isFinite(Number(maxAgeHours)) && Number(maxAgeHours) > 0
+        ? Number(maxAgeHours)
+        : 72;
+    const sql = `
+      SELECT rd.*
+      FROM diagnosis_message_contexts dmc
+      JOIN recent_diagnoses rd ON rd.id = dmc.diagnosis_id
+      WHERE dmc.user_id = $1
+        AND dmc.chat_id = $2
+        AND dmc.message_id = $3
+        AND dmc.created_at >= NOW() - ($4 || ' hours')::INTERVAL
+      LIMIT 1;
+    `;
+    const params = [userId, chatId, messageId, String(ttlHours)];
+    const { rows } = await exec(sql, params);
     return rows[0] || null;
   }
 
@@ -1648,6 +1717,239 @@ function createDb(poolInstance) {
     return rows[0]?.trial_ends_at || null;
   }
 
+  async function updateUserBeta(
+    userId,
+    {
+      isBeta = undefined,
+      betaOnboardedAt = undefined,
+      betaSurveyCompletedAt = undefined,
+    } = {},
+  ) {
+    if (!userId) return null;
+    const set = [];
+    const params = [userId];
+    let idx = 2;
+    if (typeof isBeta === 'boolean') {
+      set.push(`is_beta = $${idx++}`);
+      params.push(isBeta);
+    }
+    if (betaOnboardedAt !== undefined) {
+      set.push(`beta_onboarded_at = $${idx++}`);
+      params.push(betaOnboardedAt ? new Date(betaOnboardedAt) : null);
+    }
+    if (betaSurveyCompletedAt !== undefined) {
+      set.push(`beta_survey_completed_at = $${idx++}`);
+      params.push(betaSurveyCompletedAt ? new Date(betaSurveyCompletedAt) : null);
+    }
+    if (!set.length) {
+      const { rows } = await exec('SELECT * FROM users WHERE id = $1', [userId]);
+      return rows[0] || null;
+    }
+    const sql = `
+      UPDATE users
+      SET ${set.join(', ')}
+      WHERE id = $1
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, params);
+    return rows[0] || null;
+  }
+
+  async function logBetaEvent({ userId, eventType, payload = {} } = {}) {
+    if (!userId || !eventType) return null;
+    const sql = `
+      INSERT INTO beta_events (user_id, event_type, payload)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, [userId, eventType, json(payload)]);
+    return rows[0] || null;
+  }
+
+  async function getBetaEvent(userId, eventType) {
+    if (!userId || !eventType) return null;
+    const sql = `
+      SELECT *
+      FROM beta_events
+      WHERE user_id = $1 AND event_type = $2
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const { rows } = await exec(sql, [userId, eventType]);
+    return rows[0] || null;
+  }
+
+  async function createDiagnosisFeedback({ userId, caseId, q1, q2 = null, q3 = null } = {}) {
+    if (!userId || !caseId || !Number.isFinite(Number(q1))) return null;
+    const sql = `
+      INSERT INTO diagnosis_feedback (user_id, case_id, q1_confidence_score, q2_clarity_score, q3_comment)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *;
+    `;
+    const params = [
+      userId,
+      caseId,
+      Number(q1),
+      q2 == null ? null : Number(q2),
+      q3 == null ? null : String(q3),
+    ];
+    const { rows } = await exec(sql, params);
+    return rows[0] || null;
+  }
+
+  async function updateDiagnosisFeedback(
+    feedbackId,
+    userId,
+    { q1 = undefined, q2 = undefined, q3 = undefined } = {},
+  ) {
+    if (!feedbackId || !userId) return null;
+    const set = [];
+    const params = [feedbackId, userId];
+    let idx = 3;
+    if (q1 !== undefined) {
+      set.push(`q1_confidence_score = $${idx++}`);
+      params.push(q1 == null ? null : Number(q1));
+    }
+    if (q2 !== undefined) {
+      set.push(`q2_clarity_score = $${idx++}`);
+      params.push(q2 == null ? null : Number(q2));
+    }
+    if (q3 !== undefined) {
+      set.push(`q3_comment = $${idx++}`);
+      params.push(q3 == null ? null : String(q3));
+    }
+    if (!set.length) return null;
+    set.push('updated_at = NOW()');
+    const sql = `
+      UPDATE diagnosis_feedback
+      SET ${set.join(', ')}
+      WHERE id = $1 AND user_id = $2
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, params);
+    return rows[0] || null;
+  }
+
+  async function getDiagnosisFeedbackByCase(caseId) {
+    if (!caseId) return null;
+    const sql = `
+      SELECT *
+      FROM diagnosis_feedback
+      WHERE case_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const { rows } = await exec(sql, [caseId]);
+    return rows[0] || null;
+  }
+
+  async function getDiagnosisFeedbackByUser(userId) {
+    if (!userId) return null;
+    const sql = `
+      SELECT *
+      FROM diagnosis_feedback
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const { rows } = await exec(sql, [userId]);
+    return rows[0] || null;
+  }
+
+  async function createFollowupFeedback({ userId, caseId, dueAt = null, retryAt = null } = {}) {
+    if (!userId || !caseId) return null;
+    const sql = `
+      INSERT INTO followup_feedback (user_id, case_id, due_at, retry_at)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *;
+    `;
+    const params = [
+      userId,
+      caseId,
+      dueAt ? new Date(dueAt) : null,
+      retryAt ? new Date(retryAt) : null,
+    ];
+    const { rows } = await exec(sql, params);
+    return rows[0] || null;
+  }
+
+  async function getFollowupByCase(userId, caseId) {
+    if (!userId || !caseId) return null;
+    const sql = `
+      SELECT *
+      FROM followup_feedback
+      WHERE user_id = $1 AND case_id = $2
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const { rows } = await exec(sql, [userId, caseId]);
+    return rows[0] || null;
+  }
+
+  async function updateFollowupFeedback(
+    followupId,
+    patch = {},
+    userId = null,
+  ) {
+    if (!followupId || !patch || typeof patch !== 'object') return null;
+    const map = {
+      dueAt: 'due_at',
+      retryAt: 'retry_at',
+      sentAt: 'sent_at',
+      answeredAt: 'answered_at',
+      attempts: 'attempts',
+      status: 'status',
+      actionChoice: 'action_choice',
+      resultChoice: 'result_choice',
+    };
+    const set = [];
+    const params = [followupId];
+    let idx = 2;
+    for (const [key, col] of Object.entries(map)) {
+      if (!Object.prototype.hasOwnProperty.call(patch, key)) continue;
+      let value = patch[key];
+      if (col.endsWith('_at') && value) value = new Date(value);
+      set.push(`${col} = $${idx++}`);
+      params.push(value === undefined ? null : value);
+    }
+    if (!set.length) return null;
+    set.push('updated_at = NOW()');
+    let where = 'WHERE id = $1';
+    if (userId) {
+      where += ` AND user_id = $${idx++}`;
+      params.push(userId);
+    }
+    const sql = `
+      UPDATE followup_feedback
+      SET ${set.join(', ')}
+      ${where}
+      RETURNING *;
+    `;
+    const { rows } = await exec(sql, params);
+    return rows[0] || null;
+  }
+
+  async function listDueFollowups(now = new Date()) {
+    const at = now ? new Date(now) : new Date();
+    const sql = `
+      SELECT
+        f.*,
+        u.tg_id AS user_tg_id
+      FROM followup_feedback f
+      JOIN users u ON u.id = f.user_id
+      WHERE f.status = 'pending'
+        AND (
+          (f.sent_at IS NULL AND f.due_at IS NOT NULL AND f.due_at <= $1)
+          OR
+          (f.sent_at IS NOT NULL AND f.answered_at IS NULL AND f.attempts < 2 AND f.retry_at IS NOT NULL AND f.retry_at <= $1)
+        )
+      ORDER BY COALESCE(f.due_at, f.retry_at) ASC NULLS LAST, f.id ASC
+      LIMIT 200;
+    `;
+    const { rows } = await exec(sql, [at]);
+    return rows || [];
+  }
+
   // Marketing plan v2.4: UTM tracking
   async function saveUtm(userId, { source = null, medium = null, campaign = null } = {}) {
     if (!userId) return;
@@ -1736,16 +2038,23 @@ function createDb(poolInstance) {
   }
 
   // Marketing: Get recent case for "same plant?" check
-  async function getRecentCaseForSamePlantCheck(userId, maxAgeDays = 10) {
+  async function getRecentCaseForSamePlantCheck(userId, maxAgeDays = 10, objectId = null) {
     if (!userId) return null;
+    const normalizedObjectId = Number.isFinite(Number(objectId)) && Number(objectId) > 0
+      ? Number(objectId)
+      : null;
+    const objectFilter = normalizedObjectId ? ' AND object_id = $3' : '';
+    const params = normalizedObjectId
+      ? [userId, maxAgeDays, normalizedObjectId]
+      : [userId, maxAgeDays];
     const sql = `
       SELECT id, object_id, crop, disease, confidence, created_at
       FROM cases
-      WHERE user_id = $1 AND created_at >= NOW() - ($2 || ' days')::INTERVAL
+      WHERE user_id = $1 AND created_at >= NOW() - ($2 || ' days')::INTERVAL${objectFilter}
       ORDER BY created_at DESC
       LIMIT 1;
     `;
-    const { rows } = await exec(sql, [userId, maxAgeDays]);
+    const { rows } = await exec(sql, params);
     if (!rows.length) return null;
     const row = rows[0];
     return {
@@ -1792,7 +2101,10 @@ function createDb(poolInstance) {
     updatePlanStatus,
     saveRecentDiagnosis,
     getLatestRecentDiagnosis,
+    getLatestRecentDiagnosisByObject,
     getRecentDiagnosisById,
+    registerDiagnosisMessageContext,
+    getRecentDiagnosisByMessageContext,
     linkRecentDiagnosisToPlan,
     createPlanSession,
     updatePlanSession,
@@ -1822,6 +2134,17 @@ function createDb(poolInstance) {
     getTopCrops,
     getTopDiseases,
     setTrialPeriod,
+    updateUserBeta,
+    logBetaEvent,
+    getBetaEvent,
+    createDiagnosisFeedback,
+    updateDiagnosisFeedback,
+    getDiagnosisFeedbackByCase,
+    getDiagnosisFeedbackByUser,
+    createFollowupFeedback,
+    getFollowupByCase,
+    updateFollowupFeedback,
+    listDueFollowups,
     saveUtm,
     getCaseUsage,
     incrementCaseUsage,

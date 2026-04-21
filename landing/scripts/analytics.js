@@ -9,6 +9,8 @@
   // Placeholder для ID Метрики — заменить на реальный
   const METRIKA_ID = window.METRIKA_ID || 'XXXXXXXX';
   const CTA_FALLBACK_DELAY_MS = 450;
+  const PATHNAME = (window.location && window.location.pathname) ? window.location.pathname : '';
+  const IS_GPT_PAGE = PATHNAME === '/gpt/' || PATHNAME === '/gpt';
   
   /**
    * Инициализация Яндекс.Метрики
@@ -88,9 +90,116 @@
   }
 
   /**
+   * Трекинг page view для /gpt/
+   */
+  function trackGPTPageView() {
+    if (!IS_GPT_PAGE) return;
+    sendEvent('gpt_page_view', { page: 'gpt' });
+  }
+
+  /**
+   * Трекинг кликов по CTA /gpt/ hub + open
+   */
+  function trackGPTClicks() {
+    // /gpt/ page: "Открыть в ChatGPT (инструкция)"
+    document.querySelectorAll('[data-cta="gpt_open"]').forEach(el => {
+      el.addEventListener('click', function(e) {
+        const position = this.dataset.position || 'unknown';
+        const isLink = this.tagName === 'A';
+        const targetUrl = isLink ? (this.getAttribute('href') || '') : '';
+
+        // Для якорей/кнопок просто фиксируем событие.
+        if (!isLink || !targetUrl || targetUrl.startsWith('#')) {
+          sendEvent('gpt_open_click', { position: position });
+          return;
+        }
+
+        // Для навигации используем fallback-редирект, чтобы событие успело отправиться.
+        const isModifiedClick = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+        const isBlankTarget = (this.getAttribute('target') || '').toLowerCase() === '_blank';
+        if (isModifiedClick || isBlankTarget) {
+          sendEvent('gpt_open_click', { position: position, href: targetUrl });
+          return;
+        }
+
+        e.preventDefault();
+        const eventParams = buildEventParams({ position: position, href: targetUrl });
+        logEvent('gpt_open_click', eventParams);
+
+        let hasRedirected = false;
+        const redirect = () => {
+          if (hasRedirected) return;
+          hasRedirected = true;
+          window.location.href = targetUrl;
+        };
+
+        const fallbackTimer = setTimeout(redirect, CTA_FALLBACK_DELAY_MS);
+        if (typeof ym === 'function' && METRIKA_ID !== 'XXXXXXXX') {
+          ym(METRIKA_ID, 'reachGoal', 'gpt_open_click', eventParams, () => {
+            clearTimeout(fallbackTimer);
+            redirect();
+          });
+        } else {
+          clearTimeout(fallbackTimer);
+          redirect();
+        }
+      });
+    });
+
+    // Главная: CTA "Открыть в ChatGPT" -> /gpt/
+    document.querySelectorAll('[data-cta="gpt_hub"]').forEach(el => {
+      el.addEventListener('click', function(e) {
+        const position = this.dataset.position || 'unknown';
+        const isLink = this.tagName === 'A';
+        const targetUrl = isLink ? (this.getAttribute('href') || '') : '';
+
+        if (!isLink || !targetUrl || targetUrl.startsWith('#')) {
+          sendEvent('gpt_hub_click', { position: position });
+          return;
+        }
+
+        const isModifiedClick = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+        const isBlankTarget = (this.getAttribute('target') || '').toLowerCase() === '_blank';
+        if (isModifiedClick || isBlankTarget) {
+          sendEvent('gpt_hub_click', { position: position, href: targetUrl });
+          return;
+        }
+
+        e.preventDefault();
+        const eventParams = buildEventParams({ position: position, href: targetUrl });
+        logEvent('gpt_hub_click', eventParams);
+
+        let hasRedirected = false;
+        const redirect = () => {
+          if (hasRedirected) return;
+          hasRedirected = true;
+          window.location.href = targetUrl;
+        };
+
+        const fallbackTimer = setTimeout(redirect, CTA_FALLBACK_DELAY_MS);
+        if (typeof ym === 'function' && METRIKA_ID !== 'XXXXXXXX') {
+          ym(METRIKA_ID, 'reachGoal', 'gpt_hub_click', eventParams, () => {
+            clearTimeout(fallbackTimer);
+            redirect();
+          });
+        } else {
+          clearTimeout(fallbackTimer);
+          redirect();
+        }
+      });
+    });
+  }
+
+  /**
    * Трекинг кликов по CTA
    */
   function trackCTAClicks() {
+    function getGPTTelegramGoalName(position) {
+      if (position === 'gpt_page_fallback') return 'gpt_to_telegram_click_main';
+      if (position === 'gpt_page_fallback_diagnosis') return 'gpt_to_telegram_click_diagnosis';
+      return 'gpt_to_telegram_click';
+    }
+
     document.querySelectorAll('[data-cta="telegram"]').forEach(link => {
       link.addEventListener('click', function(e) {
         const targetUrl = this.href;
@@ -104,11 +213,15 @@
         if (isModifiedClick || isBlankTarget) {
           const position = this.dataset.position || 'unknown';
           sendEvent('cta_click', { position: position });
+          if (IS_GPT_PAGE) {
+            sendEvent(getGPTTelegramGoalName(position), { position: position });
+          }
           return;
         }
 
         e.preventDefault();
         const position = this.dataset.position || 'unknown';
+        const gptTelegramGoalName = IS_GPT_PAGE ? getGPTTelegramGoalName(position) : '';
         const eventParams = buildEventParams({ position: position });
         logEvent('cta_click', eventParams);
 
@@ -122,10 +235,20 @@
         const fallbackTimer = setTimeout(redirect, CTA_FALLBACK_DELAY_MS);
 
         if (typeof ym === 'function' && METRIKA_ID !== 'XXXXXXXX') {
-          ym(METRIKA_ID, 'reachGoal', 'cta_click', eventParams, () => {
-            clearTimeout(fallbackTimer);
-            redirect();
-          });
+          // Для /gpt/ ждём отправки и gpt_to_telegram_click_*, и cta_click.
+          if (IS_GPT_PAGE) {
+            ym(METRIKA_ID, 'reachGoal', gptTelegramGoalName, eventParams, () => {
+              ym(METRIKA_ID, 'reachGoal', 'cta_click', eventParams, () => {
+                clearTimeout(fallbackTimer);
+                redirect();
+              });
+            });
+          } else {
+            ym(METRIKA_ID, 'reachGoal', 'cta_click', eventParams, () => {
+              clearTimeout(fallbackTimer);
+              redirect();
+            });
+          }
         } else {
           clearTimeout(fallbackTimer);
           redirect();
@@ -279,7 +402,9 @@
    */
   function init() {
     initMetrika();
+    trackGPTPageView();
     trackCTAClicks();
+    trackGPTClicks();
     trackCustomClickEvents();
     trackCustomViewEvents();
     trackPricingView();
@@ -300,8 +425,6 @@
     getUTMParams
   };
 })();
-
-
 
 
 

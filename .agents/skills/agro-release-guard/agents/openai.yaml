@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agro Release Guard"
+  short_description: "Pre-PR и pre-release проверки для agronom-bot"
+  default_prompt: "Проведи pre-PR/pre-release проверки в agronom-bot и собери отчёт о рисках."

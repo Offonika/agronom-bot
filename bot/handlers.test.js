@@ -16,7 +16,10 @@ const {
   messageHandler,
   retryHandler,
   getProductName,
+  replyFaq,
   rememberDiagnosis,
+  rememberDiagnosisReplyContext,
+  extractDiagnosisIdFromReplyMessage,
   getCropHint,
   handleClarifySelection,
   buildProtocolRow,
@@ -39,33 +42,60 @@ const { getDocVersion } = require('./privacyNotice');
 const { historyHandler } = require('./history');
 const { reminderHandler, reminders } = require('./reminder');
 const { createPlanCommands } = require('./planCommands');
+const { createObjectChips } = require('./objectChips');
 const { createReminderScheduler } = require('./reminders');
 const { createPlanFlow } = require('./planFlow');
 const { createGeocoder } = require('../services/geocoder');
 const { createAssistantChat } = require('./assistantChat');
+const support = require('./support');
+const betaSurvey = require('./betaSurvey');
 const {
+  configurePersistence: configureRegionPromptPersistence,
+  __getPrompts: getRegionPrompts,
+} = require('./regionPromptState');
+const {
+  configurePersistence: configureLocationSessionPersistence,
   rememberLocationRequest: rememberLocationSession,
+  rememberLocationRequestAsync,
   clearLocationRequest: clearLocationSession,
+  clearLocationRequestAsync,
   peekLocationRequest,
+  peekLocationRequestAsync,
+  __getStore: getLocationSessionStore,
 } = require('./locationSession');
+const { createObjectDetailsHandler } = require('./objectDetailsHandler');
+const {
+  configurePersistence: configureObjectDetailsPersistence,
+  setSessionAsync: setObjectDetailsSessionAsync,
+  clearSessionAsync: clearObjectDetailsSessionAsync,
+  __getSessions: getObjectDetailsSessions,
+} = require('./objectDetailsSession');
 const {
   buildAssistantText,
+  buildAssistantDetailsText,
   buildKeyboardLayout,
   resolveFollowupReply,
 } = require('./messageFormatters/diagnosisMessage');
+const { createDiagDetailsHandler } = require('./callbacks/diag_details');
 const strings = require('../locales/ru.json');
 const { msg } = require('./utils');
 const {
+  configurePersistence: configurePhotoCollectorPersistence,
   addPhoto: addPhotoToAlbum,
+  addPhotoAsync: addPhotoToAlbumAsync,
   getState: getPhotoAlbumState,
+  getStateAsync: getPhotoAlbumStateAsync,
   pickPrimary: pickPrimaryPhoto,
   clearSession: clearPhotoAlbum,
+  clearSessionAsync: clearPhotoAlbumAsync,
   skipOptional: skipOptionalPhotos,
+  startFollowupSession,
   MIN_PHOTOS,
   MAX_PHOTOS,
 } = require('./photoCollector');
 const photoTips = require('./photoTips');
 const locationThrottler = require('./locationThrottler');
+const { createQaIntake, parseQaCaseText } = require('./qaIntake');
 function tr(key, vars = {}) {
   let text = strings[key];
   for (const [k, v] of Object.entries(vars)) {
@@ -167,7 +197,7 @@ async function withMockFetch(responses, fn, calls) {
     return clone;
   };
   try {
-    await fn();
+    return await fn();
   } finally {
     global.fetch = origFetch;
     for (const b of open) {
@@ -178,6 +208,33 @@ async function withMockFetch(responses, fn, calls) {
       }
     }
   }
+}
+
+function createRedisStub() {
+  const store = new Map();
+  return {
+    store,
+    async get(key) {
+      const entry = store.get(key);
+      if (!entry) return null;
+      if (entry.expiresAt && entry.expiresAt <= Date.now()) {
+        store.delete(key);
+        return null;
+      }
+      return entry.value;
+    },
+    async set(key, value, mode, ttlMs) {
+      const expiresAt =
+        mode === 'PX' && Number.isFinite(Number(ttlMs))
+          ? Date.now() + Number(ttlMs)
+          : null;
+      store.set(key, { value, expiresAt });
+      return 'OK';
+    },
+    async del(key) {
+      return store.delete(key) ? 1 : 0;
+    },
+  };
 }
 
 /**
@@ -207,6 +264,11 @@ function createMinimalDeps(overrides = {}) {
     getConsentStatus: async () => null,
     ...overrides.db,
   };
+  // Some handlers log analytics events via pool, which needs a tg_id -> internal user.id resolution.
+  // In prod pool is a real pg.Pool; in tests we provide a minimal compatible stub.
+  if (typeof mockPool.ensureUser !== 'function') {
+    mockPool.ensureUser = async (tgId) => mockDb.ensureUser(tgId);
+  }
   return {
     pool: mockPool,
     db: mockDb,
@@ -263,7 +325,7 @@ async function withSilencedConsoleErrors(fn) {
   const origError = console.error;
   console.error = () => {};
   try {
-    await fn();
+    return await fn();
   } finally {
     console.error = origError;
   }
@@ -316,6 +378,271 @@ function createCallbackCtx(data, telegramId = 123) {
     __answers: answers,
   };
 }
+
+test('parseQaCaseText parses pipe format', () => {
+  const parsed = parseQaCaseText(
+    'Алоэ | followup_photo | S2 | context_lost | Уточнить грунт | Потерял контекст | Нить диалога оборвалась',
+  );
+  assert.equal(parsed.plant, 'Алоэ');
+  assert.equal(parsed.scenario, 'followup_photo');
+  assert.equal(parsed.severity, 'S2');
+  assert.equal(parsed.errorType, 'context_lost');
+  assert.equal(parsed.expected, 'Уточнить грунт');
+  assert.equal(parsed.actual, 'Потерял контекст');
+  assert.equal(parsed.notes, 'Нить диалога оборвалась');
+});
+
+test('parseQaCaseText parses key-value confidence without percent sign', () => {
+  const parsed = parseQaCaseText('сценарий: new_diagnosis; критичность: S2; ошибка: other; уверенность: 62');
+  assert.equal(parsed.confidence, '62%');
+});
+
+test('qaIntake /qa command saves case to beta_events payload', async () => {
+  const prevChat = process.env.QA_INTAKE_CHAT_ID;
+  const prevTesters = process.env.QA_INTAKE_TESTER_IDS;
+  try {
+    process.env.QA_INTAKE_CHAT_ID = '-100777888999';
+    process.env.QA_INTAKE_TESTER_IDS = '';
+    const saved = [];
+    const qa = createQaIntake({
+      db: {
+        ensureUser: async () => ({ id: 12 }),
+        logBetaEvent: async (payload) => {
+          saved.push(payload);
+          return { id: 1 };
+        },
+      },
+    });
+    const replies = [];
+    const ctx = {
+      chat: { id: -100777888999, type: 'supergroup' },
+      from: { id: 1001, first_name: 'Тоня', username: 'tonya' },
+      message: {
+        text: '/qa Алоэ | new_diagnosis | S2 | wrong_class | Запросить свет и полив | Увел в гниль',
+        message_id: 321,
+      },
+      reply: async (text) => replies.push(text),
+    };
+    await qa.handleCommand(ctx);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].eventType, 'qa_case_logged');
+    assert.equal(saved[0].payload.plant, 'Алоэ');
+    assert.equal(saved[0].payload.scenario, 'new_diagnosis');
+    assert.equal(saved[0].payload.severity, 'S2');
+    assert.equal(saved[0].payload.error_type, 'wrong_class');
+    assert.ok(String(saved[0].payload.case_id || '').startsWith('QA-'));
+    assert.ok(replies[0].includes('QA кейс сохранён'));
+  } finally {
+    if (prevChat === undefined) delete process.env.QA_INTAKE_CHAT_ID;
+    else process.env.QA_INTAKE_CHAT_ID = prevChat;
+    if (prevTesters === undefined) delete process.env.QA_INTAKE_TESTER_IDS;
+    else process.env.QA_INTAKE_TESTER_IDS = prevTesters;
+  }
+});
+
+test('qaIntake wizard saves minimal case and links to latest diagnosis', async () => {
+  const prevChat = process.env.QA_INTAKE_CHAT_ID;
+  const prevTesters = process.env.QA_INTAKE_TESTER_IDS;
+  try {
+    process.env.QA_INTAKE_CHAT_ID = '-100555666777';
+    process.env.QA_INTAKE_TESTER_IDS = '';
+    const saved = [];
+    const qa = createQaIntake({
+      db: {
+        ensureUser: async () => ({ id: 33 }),
+        getLatestRecentDiagnosis: async () => ({
+          id: 912,
+          created_at: new Date().toISOString(),
+          diagnosis_payload: { confidence: 0.83 },
+        }),
+        logBetaEvent: async (payload) => {
+          saved.push(payload);
+          return { id: 1 };
+        },
+      },
+    });
+
+    const commandReplies = [];
+    await qa.handleCommand({
+      chat: { id: -100555666777, type: 'supergroup' },
+      from: { id: 9001, first_name: 'Тоня' },
+      message: { text: '/qa', message_id: 1001 },
+      reply: async (text, opts) => {
+        commandReplies.push({ text, opts });
+        return { message_id: 2001, from: { is_bot: true } };
+      },
+    });
+    assert.equal(commandReplies.length, 1);
+
+    const edits = [];
+    const callbackReplies = [];
+    const callbackCtx = (data) => ({
+      chat: { id: -100555666777, type: 'supergroup' },
+      from: { id: 9001, first_name: 'Тоня' },
+      callbackQuery: { data, message: { message_id: 2001 } },
+      answerCbQuery: async () => {},
+      editMessageText: async (text, opts) => {
+        edits.push({ text, opts });
+      },
+      reply: async (text, opts) => {
+        callbackReplies.push({ text, opts });
+      },
+    });
+
+    await qa.handleCallback(callbackCtx('qa_scn:new_diagnosis'));
+    await qa.handleCallback(callbackCtx('qa_err:wrong_class'));
+    await qa.handleCallback(callbackCtx('qa_sev:S2'));
+    await qa.handleCallback(callbackCtx('qa_save'));
+
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].eventType, 'qa_case_logged');
+    assert.equal(saved[0].payload.scenario, 'new_diagnosis');
+    assert.equal(saved[0].payload.error_type, 'wrong_class');
+    assert.equal(saved[0].payload.severity, 'S2');
+    assert.equal(saved[0].payload.diagnosis_id, 912);
+    assert.equal(saved[0].payload.diagnosis_link_mode, 'latest_recent');
+    assert.equal(saved[0].payload.diagnosis_link_confidence, 'medium');
+    assert.equal(saved[0].payload.confidence, '83%');
+    assert.ok(edits.length >= 3);
+    assert.ok(callbackReplies.some((entry) => entry.text.includes('QA кейс сохранён')));
+  } finally {
+    if (prevChat === undefined) delete process.env.QA_INTAKE_CHAT_ID;
+    else process.env.QA_INTAKE_CHAT_ID = prevChat;
+    if (prevTesters === undefined) delete process.env.QA_INTAKE_TESTER_IDS;
+    else process.env.QA_INTAKE_TESTER_IDS = prevTesters;
+  }
+});
+
+test('qaIntake /qa command supports explicit diagnosis_id linking', async () => {
+  const prevChat = process.env.QA_INTAKE_CHAT_ID;
+  const prevTesters = process.env.QA_INTAKE_TESTER_IDS;
+  try {
+    process.env.QA_INTAKE_CHAT_ID = '-100555666777';
+    process.env.QA_INTAKE_TESTER_IDS = '';
+    const saved = [];
+    const qa = createQaIntake({
+      db: {
+        ensureUser: async () => ({ id: 77 }),
+        getRecentDiagnosisById: async (_userId, diagnosisId) => ({ id: diagnosisId }),
+        getLatestRecentDiagnosis: async () => ({ id: 999, created_at: new Date().toISOString() }),
+        logBetaEvent: async (payload) => {
+          saved.push(payload);
+          return { id: 1 };
+        },
+      },
+    });
+    await qa.handleCommand({
+      chat: { id: -100555666777, type: 'supergroup' },
+      from: { id: 1001, first_name: 'Тоня', username: 'tonya' },
+      message: {
+        text:
+          '/qa растение: Алоэ; сценарий: new_diagnosis; критичность: S2; ошибка: wrong_class; diagnosis_id: 1234; комментарий: тест',
+        message_id: 350,
+      },
+      reply: async () => {},
+    });
+
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].payload.diagnosis_id, 1234);
+    assert.equal(saved[0].payload.diagnosis_link_mode, 'explicit');
+    assert.equal(saved[0].payload.diagnosis_link_confidence, 'high');
+  } finally {
+    if (prevChat === undefined) delete process.env.QA_INTAKE_CHAT_ID;
+    else process.env.QA_INTAKE_CHAT_ID = prevChat;
+    if (prevTesters === undefined) delete process.env.QA_INTAKE_TESTER_IDS;
+    else process.env.QA_INTAKE_TESTER_IDS = prevTesters;
+  }
+});
+
+test('qaIntake wizard accepts field only as reply to exact prompt message id', async () => {
+  const prevChat = process.env.QA_INTAKE_CHAT_ID;
+  const prevTesters = process.env.QA_INTAKE_TESTER_IDS;
+  try {
+    process.env.QA_INTAKE_CHAT_ID = '-100111222333';
+    process.env.QA_INTAKE_TESTER_IDS = '';
+    const funnelEvents = [];
+    const qa = createQaIntake({
+      db: {
+        ensureUser: async () => ({ id: 77 }),
+        logFunnelEvent: async (payload) => {
+          funnelEvents.push(payload);
+          return { id: 1 };
+        },
+      },
+    });
+
+    await qa.handleCommand({
+      chat: { id: -100111222333, type: 'supergroup' },
+      from: { id: 5001, first_name: 'Тоня' },
+      message: { text: '/qa', message_id: 1001 },
+      reply: async () => ({ message_id: 2001, from: { is_bot: true } }),
+    });
+
+    const callbackReplies = [];
+    await qa.handleCallback({
+      chat: { id: -100111222333, type: 'supergroup' },
+      from: { id: 5001, first_name: 'Тоня' },
+      callbackQuery: { data: 'qa_add:plant', message: { message_id: 2001 } },
+      answerCbQuery: async () => {},
+      editMessageText: async () => {},
+      reply: async (text, opts) => {
+        callbackReplies.push({ text, opts });
+        return { message_id: 3005, from: { is_bot: true } };
+      },
+    });
+
+    const textReplies = [];
+    await qa.handleText({
+      chat: { id: -100111222333, type: 'supergroup' },
+      from: { id: 5001, first_name: 'Тоня' },
+      message: {
+        text: 'Фикус лирата',
+        reply_to_message: { message_id: 2001, from: { is_bot: true } },
+      },
+      reply: async (text, opts) => textReplies.push({ text, opts }),
+    });
+    assert.equal(textReplies[0].text, msg('qa_intake_reply_required'));
+    assert.equal(funnelEvents[0].event, 'qa_intake_reply_mismatch');
+
+    await qa.handleText({
+      chat: { id: -100111222333, type: 'supergroup' },
+      from: { id: 5001, first_name: 'Тоня' },
+      message: {
+        text: 'Фикус лирата',
+        reply_to_message: { message_id: 3005, from: { is_bot: true } },
+      },
+      reply: async (text, opts) => textReplies.push({ text, opts }),
+    });
+    assert.ok(String(textReplies[1].text || '').includes('Фикус лирата'));
+
+    const blockedReplies = [];
+    await qa.handleCallback({
+      chat: { id: -100111222333, type: 'supergroup' },
+      from: { id: 5001, first_name: 'Тоня' },
+      callbackQuery: { data: 'qa_add:expected', message: { message_id: 2001 } },
+      answerCbQuery: async () => {},
+      editMessageText: async () => {},
+      reply: async (text) => {
+        blockedReplies.push(text);
+        return { message_id: 3010, from: { is_bot: true } };
+      },
+    });
+    await qa.handleCallback({
+      chat: { id: -100111222333, type: 'supergroup' },
+      from: { id: 5001, first_name: 'Тоня' },
+      callbackQuery: { data: 'qa_menu:scn', message: { message_id: 2001 } },
+      answerCbQuery: async () => {},
+      editMessageText: async () => {},
+      reply: async (text) => blockedReplies.push(text),
+    });
+    assert.equal(blockedReplies[1], msg('qa_intake_reply_required'));
+  } finally {
+    if (prevChat === undefined) delete process.env.QA_INTAKE_CHAT_ID;
+    else process.env.QA_INTAKE_CHAT_ID = prevChat;
+    if (prevTesters === undefined) delete process.env.QA_INTAKE_TESTER_IDS;
+    else process.env.QA_INTAKE_TESTER_IDS = prevTesters;
+  }
+});
 
 test('photoHandler stores info and replies', { concurrency: false }, async () => {
   const calls = [];
@@ -377,14 +704,14 @@ test('photoHandler stores info and replies', { concurrency: false }, async () =>
   }, async () => {
     await photoHandler(deps, ctx);
   });
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 0);
   assert.equal(planFlowCalls.length, 0);
   assert.equal(replies[0].msg, tr('photo_processing'));
   const diagnosisReply = replies[1];
   assert.ok(diagnosisReply.msg.includes('📸 Диагноз'));
   assert.ok(diagnosisReply.msg.includes('⏰ Что дальше'));
   const callbacks = diagnosisReply.opts.reply_markup.inline_keyboard.flat().map((btn) => btn.callback_data);
-  assert.ok(callbacks.includes('plan_treatment'));
+  assert.ok(callbacks.some((cb) => String(cb).startsWith('plan_treatment')));
   // Marketing: Share button should be present for high confidence diagnoses
   const shareBtn = callbacks.find((cb) => cb && cb.startsWith('share_diag:'));
   assert.ok(shareBtn, 'Share button should be present');
@@ -596,6 +923,41 @@ test('planFlow start prompts for object selection', async () => {
   const nav = prompt.opts.reply_markup.inline_keyboard.flat();
   const objectBtn = nav.find((btn) => btn.text === 'Авто объект');
   assert.ok(objectBtn, 'should have object buttons');
+});
+
+test('planFlow with explicit missing object shows mismatch chooser instead of implicit fallback', async () => {
+  const replies = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 99, last_object_id: 2 }),
+      listObjects: async () => [
+        { id: 2, name: 'Фикус', user_id: 99, type: 'indoor' },
+        { id: 3, name: 'Монстера', user_id: 99, type: 'indoor' },
+      ],
+      getObjectById: async () => null,
+      updateUserLastObject: async () => {},
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 99 },
+      chat: { id: 123 },
+      reply: async (text, opts) => replies.push({ text, opts }),
+    },
+    { crop: 'ficus', confidence: 0.92, object_id: 9999, recent_diagnosis_id: 551 },
+  );
+  const mismatch = replies.find((entry) => String(entry.text || '').includes(msg('plan_object_mismatch_prompt')));
+  assert.ok(mismatch);
+  const buttons = mismatch.opts?.reply_markup?.inline_keyboard?.flat() || [];
+  assert.ok(buttons.some((btn) => btn.text === 'Фикус'));
+  assert.ok(buttons.some((btn) => btn.text === 'Монстера'));
 });
 
 test('planFlow auto-detects coordinates with geocoder', async () => {
@@ -1285,6 +1647,64 @@ test('planFlow uses machine plan when provided', async () => {
   assert.equal(wizardCalls[0].options.userId, 15);
 });
 
+test('planFlow filters rain triggers for indoor object and keeps safe fallback stage', async () => {
+  const createdDefs = [];
+  const sessionStubs = createSessionDbStubs();
+  const planFlow = createPlanFlow({
+    db: {
+      ...sessionStubs,
+      ensureUser: async () => ({ id: 415, last_object_id: null }),
+      listObjects: async () => [{ id: 14, name: 'Фикус', user_id: 415, type: 'indoor', meta: {} }],
+      updateUserLastObject: async () => {},
+      getObjectById: async () => ({ id: 14, name: 'Фикус', user_id: 415, type: 'indoor', meta: {} }),
+      createCase: async () => ({ id: 915 }),
+      createPlan: async () => ({ id: 916 }),
+      createStagesWithOptions: async (_planId, defs) => createdDefs.push(...defs),
+      findPlanByHash: async () => null,
+      findLatestPlanByObject: async () => null,
+      linkRecentDiagnosisToPlan: async () => {},
+    },
+    catalog: {
+      suggestStages: async () => [],
+      suggestOptions: async () => [],
+    },
+    planWizard: { showPlanTable: async () => {} },
+  });
+  await planFlow.start(
+    {
+      from: { id: 415 },
+      chat: { id: 4150 },
+      reply: async () => {},
+    },
+    {
+      crop: 'ficus',
+      disease: 'stress',
+      confidence: 0.91,
+      plan_machine: {
+        stages: [
+          {
+            name: 'После осадков >10 мм',
+            trigger: 'rain_mm>10',
+            kind: 'trigger',
+            options: [{ product_name: 'Фунгицид', needs_review: false }],
+          },
+        ],
+      },
+      treatment_plan: {
+        product: 'Базовый уход',
+        substance: 'без химии',
+        method: 'Контроль влажности и света',
+        phi_days: 0,
+      },
+    },
+  );
+  assert.equal(createdDefs.length, 1);
+  const serialized = JSON.stringify(createdDefs[0]).toLowerCase();
+  assert.ok(!serialized.includes('rain'));
+  assert.ok(!serialized.includes('осад'));
+  assert.equal(createdDefs[0].meta?.source, 'indoor_policy_fallback');
+});
+
 test('planFlow ignores QNA responses', async () => {
   let prompted = false;
   const planFlow = createPlanFlow({
@@ -1734,10 +2154,39 @@ test('planCommands handleObjects shows variety and note', async () => {
   });
   await planCommands.handleObjects({
     from: { id: 50 },
-    reply: async (msg) => replies.push(msg),
+    reply: async (text, opts) => replies.push({ text, opts }),
   });
-  assert.ok(replies[0].includes('Антоновка'));
-  assert.ok(replies[0].includes('Ряд 3'));
+  assert.ok(replies[0].text.includes('Антоновка'));
+  assert.ok(replies[0].text.includes('Ряд 3'));
+  assert.equal(
+    replies[0].opts?.reply_markup?.inline_keyboard?.[0]?.[0]?.callback_data,
+    'diag_followup_active',
+  );
+});
+
+test('objectChips send adds active followup button', async () => {
+  const sent = [];
+  const objectChips = createObjectChips({
+    bot: {
+      telegram: {
+        sendMessage: async (_chatId, _text, opts) => sent.push(opts),
+      },
+    },
+    db: {
+      ensureUser: async () => ({ id: 50, last_object_id: 9 }),
+      listObjects: async () => [
+        { id: 9, name: 'огурец', meta: {} },
+        { id: 10, name: 'антуриум', meta: {} },
+      ],
+    },
+  });
+  await objectChips.send({
+    from: { id: 12345 },
+    chat: { id: 54321 },
+  });
+  const keyboard = sent[0]?.reply_markup?.inline_keyboard || [];
+  const callbacks = keyboard.flat().map((btn) => btn.callback_data);
+  assert.ok(callbacks.includes('diag_followup_active'));
 });
 
 test('planCommands handleMerge merges objects', async () => {
@@ -1780,6 +2229,125 @@ test('db mergeObjects updates references inside transaction', async () => {
   await db.mergeObjects(7, 1, 2);
   assert.ok(queries.some((q) => String(q.text).includes('BEGIN')));
   assert.ok(queries.some((q) => String(q.text).includes('DELETE FROM objects')));
+  await pool.end();
+});
+
+test('db ensureUser generates api_key and uses COALESCE upsert', async () => {
+  const queries = [];
+  const pool = new Pool({ connectionString: 'postgres://test:test@localhost:5432/test' });
+  pool.query = async (text, params) => {
+    queries.push({ text, params });
+    return {
+      rows: [{ id: 1, tg_id: params[0], api_key: params[1] }],
+    };
+  };
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
+  pool.end = async () => {};
+  const db = createDb(pool);
+  const user = await db.ensureUser(555001);
+  assert.equal(user.tg_id, 555001);
+  assert.match(user.api_key, /^[0-9a-f]{48}$/);
+  assert.ok(String(queries[0].text).includes('COALESCE(users.api_key, EXCLUDED.api_key)'));
+  assert.equal(queries[0].params[0], 555001);
+  assert.match(queries[0].params[1], /^[0-9a-f]{48}$/);
+  await pool.end();
+});
+
+test('db ensureUser keeps existing api_key from DB row', async () => {
+  const pool = new Pool({ connectionString: 'postgres://test:test@localhost:5432/test' });
+  pool.query = async () => ({
+    rows: [{ id: 2, tg_id: 555002, api_key: 'existing-api-key' }],
+  });
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
+  pool.end = async () => {};
+  const db = createDb(pool);
+  const user = await db.ensureUser(555002);
+  assert.equal(user.api_key, 'existing-api-key');
+  await pool.end();
+});
+
+test('db getRecentCaseForSamePlantCheck applies object filter when active object is set', async () => {
+  const queries = [];
+  const pool = new Pool({ connectionString: 'postgres://test:test@localhost:5432/test' });
+  pool.query = async (text, params) => {
+    queries.push({ text, params });
+    return {
+      rows: [{
+        id: 77,
+        object_id: 202,
+        crop: 'огурец',
+        disease: 'mildew',
+        confidence: 0.81,
+        created_at: new Date().toISOString(),
+      }],
+    };
+  };
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
+  pool.end = async () => {};
+  const db = createDb(pool);
+  const recent = await db.getRecentCaseForSamePlantCheck(9, 10, 202);
+  assert.equal(recent.objectId, 202);
+  assert.ok(String(queries[0].text).includes('AND object_id = $3'));
+  assert.deepEqual(queries[0].params, [9, 10, 202]);
+  await pool.end();
+});
+
+test('db getRecentCaseForSamePlantCheck keeps broad search without active object', async () => {
+  const queries = [];
+  const pool = new Pool({ connectionString: 'postgres://test:test@localhost:5432/test' });
+  pool.query = async (text, params) => {
+    queries.push({ text, params });
+    return { rows: [] };
+  };
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
+  pool.end = async () => {};
+  const db = createDb(pool);
+  const recent = await db.getRecentCaseForSamePlantCheck(9, 10);
+  assert.equal(recent, null);
+  assert.ok(!String(queries[0].text).includes('AND object_id = $3'));
+  assert.deepEqual(queries[0].params, [9, 10]);
+  await pool.end();
+});
+
+test('db registerDiagnosisMessageContext upserts by chat/message pair', async () => {
+  const queries = [];
+  const pool = new Pool({ connectionString: 'postgres://test:test@localhost:5432/test' });
+  pool.query = async (text, params) => {
+    queries.push({ text, params });
+    return { rows: [{ id: 11, user_id: 7, diagnosis_id: 55, chat_id: -100123, message_id: 9001 }] };
+  };
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
+  pool.end = async () => {};
+  const db = createDb(pool);
+  const row = await db.registerDiagnosisMessageContext({
+    userId: 7,
+    diagnosisId: 55,
+    chatId: -100123,
+    messageId: 9001,
+  });
+  assert.equal(row.diagnosis_id, 55);
+  assert.ok(String(queries[0].text).includes('diagnosis_message_contexts'));
+  assert.ok(String(queries[0].text).includes('ON CONFLICT (chat_id, message_id)'));
+  assert.deepEqual(queries[0].params, [7, 55, -100123, 9001]);
+  await pool.end();
+});
+
+test('db getRecentDiagnosisByMessageContext fetches joined diagnosis with ttl', async () => {
+  const queries = [];
+  const pool = new Pool({ connectionString: 'postgres://test:test@localhost:5432/test' });
+  pool.query = async (text, params) => {
+    queries.push({ text, params });
+    return {
+      rows: [{ id: 1234, user_id: 7, object_id: 99, case_id: 77, diagnosis_payload: { disease: 'mildew' } }],
+    };
+  };
+  pool.connect = async () => ({ query: pool.query, release: () => {} });
+  pool.end = async () => {};
+  const db = createDb(pool);
+  const record = await db.getRecentDiagnosisByMessageContext(7, -100123, 9001, 72);
+  assert.equal(record.id, 1234);
+  assert.ok(String(queries[0].text).includes('JOIN recent_diagnoses rd'));
+  assert.deepEqual(queries[0].params, [7, -100123, 9001, '72']);
   await pool.end();
 });
 
@@ -1844,35 +2412,37 @@ test('planCommands handleLocationShare stores location after prompt', async () =
   await planCommands.handleLocation({
     from: { id: 12 },
     message: { text: '/location' },
-    reply: async (text) => replies.push(text),
+    reply: async (text, opts) => replies.push({ text, opts }),
   });
-  assert.ok(replies.includes(msg('location_pending')));
+  assert.ok(replies.some((entry) => entry.text === msg('location_pending')));
+  const geoPrompt = replies.find((entry) => entry.text === msg('location_geo_instructions'));
+  assert.ok(geoPrompt);
+  assert.equal(
+    geoPrompt.opts?.reply_markup?.keyboard?.[0]?.[0]?.request_location,
+    true,
+  );
   rememberLocationSession(12, 3, 'geo');
   await planCommands.handleLocationShare({
     from: { id: 12 },
     message: { location: { latitude: 55.71, longitude: 37.55 } },
-    reply: async (text) => replies.push(text),
+    reply: async (text, opts) => replies.push({ text, opts }),
   });
   assert.equal(latestPatch.objectId, 3);
   assert.equal(latestPatch.patch.lat, 55.71);
   assert.equal(latestPatch.patch.lon, 37.55);
-  assert.ok(replies.some((text) => typeof text === 'string' && text.includes('Сохранил координаты')));
+  const updated = replies.find((entry) => String(entry.text || '').includes('Сохранил координаты'));
+  assert.ok(updated);
+  assert.equal(updated.opts?.reply_markup?.remove_keyboard, true);
 });
 
-test('planCommands handleLocationShare applies to last object without prompt', async () => {
+test('planCommands handleLocationShare rejects location without active request', async () => {
   const replies = [];
-  let latestPatch = null;
   const db = {
     ensureUser: async () => ({ id: 20, last_object_id: 7 }),
-    listObjects: async () => [
-      { id: 7, name: 'Яблоня', user_id: 20, meta: {} },
-      { id: 8, name: 'Груша', user_id: 20, meta: {} },
-    ],
     getObjectById: async (id) => ({ id, name: id === 7 ? 'Яблоня' : 'Груша', user_id: 20, meta: {} }),
     updateUserLastObject: async () => {},
-    updateObjectMeta: async (objectId, patch) => {
-      latestPatch = { objectId, patch };
-      return { id: objectId, meta: patch };
+    updateObjectMeta: async () => {
+      throw new Error('location should not be saved without request');
     },
   };
   const planCommands = createPlanCommands({
@@ -1882,12 +2452,14 @@ test('planCommands handleLocationShare applies to last object without prompt', a
   await planCommands.handleLocationShare({
     from: { id: 20 },
     message: { location: { latitude: 55.12345, longitude: 37.54321 } },
-    reply: async (text) => replies.push(text),
+    reply: async (text, opts) => replies.push({ text, opts }),
   });
-  assert.equal(latestPatch.objectId, 7);
-  assert.equal(latestPatch.patch.lat, 55.12345);
-  assert.equal(latestPatch.patch.lon, 37.54321);
-  assert.ok(replies.some((text) => typeof text === 'string' && text.includes('координаты')));
+  assert.deepEqual(replies, [
+    {
+      text: msg('location_no_request'),
+      opts: { reply_markup: { remove_keyboard: true } },
+    },
+  ]);
 });
 
 test('planCommands handleLocationText geocodes address', async () => {
@@ -1991,13 +2563,18 @@ test('planLocationHandler requestGeo remembers session', async () => {
     from: { id: 5 },
     callbackQuery: { data: 'plan_location_geo|9' },
     answerCbQuery: async () => {},
-    reply: async (text) => replies.push(text),
+    reply: async (text, opts) => replies.push({ text, opts }),
   });
   const { entry } = peekLocationRequest(5);
   assert.equal(entry.objectId, 9);
   assert.equal(entry.mode, 'geo');
-  assert.ok(replies.includes(msg('location_geo_instructions')));
-  assert.ok(replies.includes(msg('location_pending')));
+  const instructions = replies.find((entry) => entry.text === msg('location_geo_instructions'));
+  assert.ok(instructions);
+  assert.equal(
+    instructions.opts?.reply_markup?.keyboard?.[0]?.[0]?.request_location,
+    true,
+  );
+  assert.ok(replies.some((entry) => entry.text === msg('location_pending')));
   clearLocationSession(5);
 });
 
@@ -2286,6 +2863,39 @@ test('photoHandler handles non-ok API status', { concurrency: false }, async () 
   assert.equal(replies[1], msg('diagnose_error'));
 });
 
+test('analyzePhoto returns structured failure when api_key is missing', { concurrency: false }, async () => {
+  const replies = [];
+  const analytics = [];
+  const deps = createMinimalDeps({
+    user: {
+      id: 501,
+      api_key: null,
+      is_beta: true,
+      utm_source: 'rastenia_msk',
+      utm_medium: 'post',
+      utm_campaign: 'post',
+    },
+    db: {
+      logAnalyticsEvent: async (payload) => analytics.push(payload),
+    },
+  });
+  const ctx = {
+    from: { id: 501001 },
+    reply: async (msg) => replies.push(msg),
+  };
+  const result = await withSilencedConsoleErrors(async () => analyzePhoto(
+    deps,
+    ctx,
+    { file_id: 'id-miss-key', file_unique_id: 'u', width: 1, height: 1, file_size: 1 },
+    { source: 'photo_album_done' },
+  ));
+  assert.equal(result.ok, false);
+  assert.equal(result.terminal, true);
+  assert.equal(result.reason, 'api_key_missing');
+  assert.equal(replies[0], msg('diagnose_error'));
+  assert.equal(analytics[0].event, 'diagnose_blocked_missing_api_key');
+});
+
 test('photoHandler responds with error_code message', { concurrency: false }, async () => {
   const deps = createMinimalDeps();
   const replies = [];
@@ -2406,6 +3016,128 @@ test('messageHandler answers follow-up from history', { concurrency: false }, as
   assert.equal(replies[0], 'Курс лечения: повтор через 10 дней.');
 });
 
+test('messageHandler interprets short "Нет" as direct answer to bot follow-up question', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 2011;
+  rememberDiagnosis(userId, {
+    assistant_ru: 'Проверьте полив и состав грунта.',
+    _water_soil_memory: { status: 'moist', substrate: true },
+  });
+  await messageHandler({
+    from: { id: userId },
+    message: {
+      text: 'Нет',
+      reply_to_message: { text: 'Есть ли кислый/затхлый запах от грунта?' },
+    },
+    reply: async (msg) => replies.push(msg),
+  });
+  assert.ok(String(replies[0] || '').includes(msg('diagnosis.water_soil_memory_ack_no_smell')));
+  assert.ok(String(replies[0] || '').includes(msg('diagnosis.water_soil_memory_ready')));
+  assert.ok(!String(replies[0] || '').includes(msg('followup_default')));
+});
+
+test('messageHandler interprets natural no-smell phrase as direct answer to bot follow-up question', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 20115;
+  rememberDiagnosis(userId, {
+    assistant_ru: 'Проверьте полив и состав грунта.',
+    _water_soil_memory: { status: 'moist', substrate: true },
+  });
+  await messageHandler({
+    from: { id: userId },
+    message: {
+      text: 'Нет запаха.',
+      reply_to_message: { text: 'Есть ли кислый/затхлый запах от грунта?' },
+    },
+    reply: async (msg) => replies.push(msg),
+  });
+  assert.ok(String(replies[0] || '').includes(msg('diagnosis.water_soil_memory_ack_no_smell')));
+  assert.ok(String(replies[0] || '').includes(msg('diagnosis.water_soil_memory_ready')));
+});
+
+test('messageHandler accepts colloquial substrate description without repeating same question', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 20116;
+  rememberDiagnosis(userId, {
+    assistant_ru: 'Проверьте полив и состав грунта.',
+    _water_soil_memory: { status: 'wet' },
+  });
+  await messageHandler({
+    from: { id: userId },
+    message: {
+      text: 'Обычная садовая земля с песком.',
+      reply_to_message: { text: 'Коротко напишите состав грунта (торф/минеральный/перлит/кора).' },
+    },
+    reply: async (msg) => replies.push(msg),
+  });
+  assert.ok(String(replies[0] || '').includes(msg('diagnosis.water_soil_memory_ack_substrate')));
+  assert.ok(String(replies[0] || '').includes(msg('diagnosis.water_soil_memory_need_smell')));
+  assert.ok(!String(replies[0] || '').includes(msg('diagnosis.water_soil_memory_need_substrate')));
+});
+
+test('messageHandler avoids repeating same long follow-up block on repeated clarification', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 2012;
+  rememberDiagnosis(userId, {
+    assistant_followups_ru: [
+      'Курс лечения: первые 3 дня держите стабильный полив, затем оцените динамику и повторите обработку через 10 дней при сохранении симптомов.',
+    ],
+  });
+  const ctx = {
+    from: { id: userId },
+    message: { text: 'Курс лечения какой?' },
+    reply: async (msg) => replies.push(msg),
+  };
+  await messageHandler(ctx);
+  await messageHandler(ctx);
+  assert.ok(String(replies[0] || '').includes('Курс лечения'));
+  assert.equal(replies[1], msg('diagnosis.followup_repeat_ack'));
+});
+
+test('messageHandler normalizes informal follow-up wording to formal style', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 2013;
+  rememberDiagnosis(userId, {
+    assistant_followups_ru: [
+      'Дай препарату сутки и напиши, как тебе лучше поливать твой цветок.',
+    ],
+  });
+  await messageHandler({
+    from: { id: userId },
+    message: { text: 'Курс лечения какой?' },
+    reply: async (msg) => replies.push(msg),
+  });
+  const lower = String(replies[0] || '').toLowerCase();
+  assert.ok(lower.includes('дайте'));
+  assert.ok(lower.includes('напишите'));
+  assert.ok(!/\bты\b|\bтебе\b|\bтвой\b/u.test(lower));
+});
+
+test('messageHandler prefers reply diagnosis context over overwritten last diagnosis', { concurrency: false }, async () => {
+  const replies = [];
+  const userId = 20260220;
+  const chatId = -5135393395;
+  const diagnosisMessageId = 4401;
+  const oldDiagnosis = { assistant_followups_ru: ['Старый контекст: повтор через 7 дней.'] };
+  const newDiagnosis = { assistant_followups_ru: ['Новый контекст: повтор через 14 дней.'] };
+
+  rememberDiagnosisReplyContext(chatId, diagnosisMessageId, userId, oldDiagnosis);
+  rememberDiagnosis(userId, newDiagnosis);
+
+  const ctx = {
+    from: { id: userId },
+    chat: { id: chatId },
+    message: {
+      text: 'Курс лечения какой?',
+      reply_to_message: { message_id: diagnosisMessageId },
+    },
+    reply: async (msg) => replies.push(msg),
+  };
+
+  await messageHandler(ctx);
+  assert.equal(replies[0], 'Старый контекст: повтор через 7 дней.');
+});
+
 test('messageHandler asks for new photo when no context', { concurrency: false }, async () => {
   const replies = [];
   const ctx = {
@@ -2415,6 +3147,171 @@ test('messageHandler asks for new photo when no context', { concurrency: false }
   };
   await messageHandler(ctx);
   assert.equal(replies[0], msg('faq.no_context'));
+});
+
+test('messageHandler treats region reply as regional_products intent', { concurrency: false }, async () => {
+  const replies = [];
+  const ctx = {
+    from: { id: 91 },
+    message: {
+      text: 'Москва',
+      reply_to_message: { text: 'Подберу разрешённые действующие вещества, когда назовёшь регион.' },
+    },
+    reply: async (text) => replies.push(text),
+  };
+  rememberDiagnosis(91, {
+    crop: 'томат',
+    disease: 'powdery_mildew',
+    treatment_plan: {
+      substance: 'медь',
+      method: 'опрыскивание',
+      dosage: '2 мл/л',
+      phi_days: 20,
+      safety_note: 'работай в перчатках',
+    },
+  });
+  await messageHandler(ctx);
+  assert.ok(replies[0]?.includes(msg('faq.regional_products.answer')));
+});
+
+test('betaSurvey comment does not intercept regional flow requests', { concurrency: false }, async () => {
+  const updates = [];
+  const db = {
+    ensureUser: async () => ({ id: 42 }),
+    updateDiagnosisFeedback: async (feedbackId, userId, patch) => {
+      updates.push({ feedbackId, userId, patch });
+      return { id: feedbackId };
+    },
+  };
+  const userId = 700;
+  rememberDiagnosis(userId, {
+    crop: 'томат',
+    disease: 'powdery_mildew',
+    treatment_plan: { dosage: '2 мл/л' },
+  });
+  await replyFaq(
+    {
+      from: { id: userId },
+      reply: async () => {},
+    },
+    'regional_products',
+  );
+  await betaSurvey.handleQ2(
+    { from: { id: userId }, reply: async () => {} },
+    db,
+    9001,
+    4,
+  );
+  const handled = await betaSurvey.handleComment(
+    {
+      from: { id: userId },
+      message: {
+        text: 'Москва',
+      },
+      reply: async () => {},
+    },
+    db,
+  );
+  assert.equal(handled, false);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].patch.q2, 4);
+});
+
+test('messageHandler restores awaited region prompt after in-memory reset', { concurrency: false }, async () => {
+  const userId = 704;
+  const replies = [];
+  const redis = createRedisStub();
+  configureRegionPromptPersistence({ redis, keyPrefix: 'test:region:' });
+  getRegionPrompts().clear();
+  rememberDiagnosis(userId, {
+    crop: 'томат',
+    disease: 'powdery_mildew',
+    treatment_plan: { dosage: '2 мл/л' },
+  });
+  await replyFaq(
+    {
+      from: { id: userId },
+      reply: async () => {},
+    },
+    'regional_products',
+  );
+  getRegionPrompts().clear();
+  await messageHandler({
+    from: { id: userId },
+    message: { text: 'Москва' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  });
+  assert.ok(replies[0].text.includes(msg('faq.regional_products.region_saved', { region: 'Москва' })));
+  configureRegionPromptPersistence({ redis: null });
+  getRegionPrompts().clear();
+});
+
+test('betaSurvey restores pending comment after in-memory reset', { concurrency: false }, async () => {
+  const updates = [];
+  const replies = [];
+  const redis = createRedisStub();
+  const userId = 705;
+  betaSurvey.configurePersistence({ redis, commentKeyPrefix: 'test:beta-comment:' });
+  betaSurvey.__getPendingComments().clear();
+  const db = {
+    ensureUser: async () => ({ id: 52 }),
+    updateDiagnosisFeedback: async (feedbackId, userIdArg, patch) => {
+      updates.push({ feedbackId, userId: userIdArg, patch });
+      return { id: feedbackId };
+    },
+    updateUserBeta: async () => {},
+  };
+  await betaSurvey.handleQ2(
+    { from: { id: userId }, reply: async () => {} },
+    db,
+    9002,
+    4,
+  );
+  betaSurvey.__getPendingComments().clear();
+  const handled = await betaSurvey.handleComment(
+    {
+      from: { id: userId },
+      message: { text: 'Очень помогло' },
+      reply: async (text) => replies.push(text),
+    },
+    db,
+  );
+  assert.equal(handled, true);
+  assert.equal(updates.at(-1).feedbackId, 9002);
+  assert.equal(updates.at(-1).patch.q3, 'Очень помогло');
+  assert.deepEqual(replies, [msg('beta.survey.thanks')]);
+  betaSurvey.configurePersistence({ redis: null });
+  betaSurvey.__getPendingComments().clear();
+});
+
+test('messageHandler consumes awaited region and suggests assistant', { concurrency: false }, async () => {
+  const userId = 902;
+  const replies = [];
+  rememberDiagnosis(userId, {
+    crop: 'томат',
+    disease: 'powdery_mildew',
+    treatment_plan: { dosage: '2 мл/л' },
+  });
+  await replyFaq(
+    {
+      from: { id: userId },
+      reply: async () => {},
+    },
+    'regional_products',
+  );
+  await messageHandler({
+    from: { id: userId },
+    message: { text: 'Москва' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  });
+  assert.ok(replies[0].text.includes(msg('faq.regional_products.region_saved', { region: 'Москва' })));
+  assert.ok(
+    replies[0].text.includes(
+      msg('faq.regional_products.answer_with_region', { region: 'Москва' }),
+    ),
+  );
+  const button = replies[0].opts?.reply_markup?.inline_keyboard?.[0]?.[0];
+  assert.equal(button?.callback_data, 'assistant_entry');
 });
 
 test('handleClarifySelection stores hint and confirms', { concurrency: false }, async () => {
@@ -2526,7 +3423,7 @@ test('getProductName caches hashed products', () => {
   assert.equal(getProductName(firstHash), 'p0');
 });
 
-test('photoHandler adds planning buttons', { concurrency: false }, async () => {
+test('photoHandler low-confidence shows recheck buttons without hard actions', { concurrency: false }, async () => {
   const deps = createMinimalDeps();
   const replies = [];
   const ctx = {
@@ -2544,8 +3441,8 @@ test('photoHandler adds planning buttons', { concurrency: false }, async () => {
   assert.equal(replies[0].msg, tr('photo_processing'));
   const buttons = replies[1].opts.reply_markup.inline_keyboard.flat();
   const cbs = buttons.map((btn) => btn.callback_data);
-  assert.ok(cbs.includes('plan_treatment'));
-  assert.ok(cbs.includes('ask_products'));
+  assert.ok(!cbs.includes('plan_treatment'));
+  assert.ok(!cbs.includes('ask_products'));
   assert.ok(cbs.includes('reshoot_photo'));
   assert.ok(replies[1].msg.includes('⚠️ Пересъёмка'));
 });
@@ -2638,7 +3535,7 @@ test('analyzePhoto sends case_id when linked', { concurrency: false }, async () 
       editMessageText: async () => {},
     },
   };
-  await withMockFetch(
+  const result = await withMockFetch(
     {
       'http://file': { body: Readable.from(Buffer.from('x')) },
       [`${API_BASE}/v1/ai/diagnose`]: {
@@ -2646,13 +3543,167 @@ test('analyzePhoto sends case_id when linked', { concurrency: false }, async () 
       },
     },
     async () => {
-      await analyzePhoto(deps, ctx, ctx.message.photo[0], { linkedCaseId: 123 });
+      return analyzePhoto(deps, ctx, ctx.message.photo[0], { linkedCaseId: 123 });
     },
     calls,
   );
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'diagnosis_shown');
   const apiCall = calls.find((call) => call.url.endsWith('/v1/ai/diagnose'));
   assert.ok(apiCall);
   assert.equal(apiCall.opts.body.get('case_id'), '123');
+});
+
+test('analyzePhoto starts mandatory low-confidence recheck session', { concurrency: false }, async () => {
+  const deps = createMinimalDeps({
+    db: {
+      saveRecentDiagnosis: async () => ({ id: 912, object_id: 9, case_id: 123 }),
+    },
+  });
+  const replies = [];
+  const tgUserId = 101234;
+  clearPhotoAlbum(tgUserId);
+  const ctx = {
+    message: { photo: [{ file_id: 'id-recheck', file_unique_id: 'u4', width: 1, height: 1, file_size: 1 }] },
+    from: { id: tgUserId },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: {
+      getFileLink: async () => ({ href: 'http://file-recheck' }),
+      editMessageText: async () => {},
+    },
+  };
+  const result = await withMockFetch(
+    {
+      'http://file-recheck': { body: Readable.from(Buffer.from('x')) },
+      [`${API_BASE}/v1/ai/diagnose`]: {
+        json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.62, need_reshoot: true }),
+      },
+    },
+    async () =>
+      analyzePhoto(deps, ctx, ctx.message.photo[0], {
+        linkedCaseId: 123,
+        linkedObjectId: 9,
+        source: 'photo_album_done',
+      }),
+  );
+  assert.equal(result.ok, true);
+  const state = getPhotoAlbumState(tgUserId);
+  assert.equal(state.followupMode, true);
+  assert.equal(state.minPhotos, 2);
+  assert.equal(state.ready, false);
+  assert.equal(state.linkedCaseId, 123);
+  assert.equal(state.linkedObjectId, 9);
+  const hasRecheckMsg = replies.some((entry) => String(entry.msg || '').includes('Пока это предварительный вывод'));
+  assert.equal(hasRecheckMsg, true);
+  clearPhotoAlbum(tgUserId);
+});
+
+test('analyzePhoto low-confidence recheck does not reuse stale last_object_id', { concurrency: false }, async () => {
+  const deps = createMinimalDeps({
+    user: {
+      id: 81,
+      last_object_id: 777,
+    },
+    db: {
+      listObjects: async () => [{ id: 777, name: 'Орхидея фаленопсис', type: 'phalaenopsis', user_id: 81 }],
+      saveRecentDiagnosis: async () => ({ id: 913, object_id: null, case_id: 124 }),
+    },
+  });
+  const replies = [];
+  const tgUserId = 101235;
+  clearPhotoAlbum(tgUserId);
+  const ctx = {
+    message: { photo: [{ file_id: 'id-recheck-2', file_unique_id: 'u5', width: 1, height: 1, file_size: 1 }] },
+    from: { id: tgUserId },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: {
+      getFileLink: async () => ({ href: 'http://file-recheck-2' }),
+      editMessageText: async () => {},
+    },
+  };
+  const result = await withMockFetch(
+    {
+      'http://file-recheck-2': { body: Readable.from(Buffer.from('x')) },
+      [`${API_BASE}/v1/ai/diagnose`]: {
+        json: async () => ({ crop: 'croton', crop_ru: 'кодиеум', disease: 'spider_mite', confidence: 0.62, need_reshoot: true }),
+      },
+    },
+    async () =>
+      analyzePhoto(deps, ctx, ctx.message.photo[0], {
+        linkedCaseId: 124,
+        source: 'photo_album_done',
+      }),
+  );
+  assert.equal(result.ok, true);
+  const state = getPhotoAlbumState(tgUserId);
+  assert.equal(state.followupMode, true);
+  assert.equal(state.linkedCaseId, 124);
+  assert.equal(state.linkedObjectId, null);
+  assert.equal(state.sourceDiagnosisId, 913);
+  assert.ok(replies.some((entry) => String(entry.msg || '').includes('Пока это предварительный вывод')));
+  clearPhotoAlbum(tgUserId);
+});
+
+test('analyzePhoto sends full photo album when photos option is provided', { concurrency: false }, async () => {
+  const deps = createMinimalDeps();
+  const calls = [];
+  const replies = [];
+  const photos = [
+    { file_id: 'id-a', file_unique_id: 'u-a', width: 1, height: 1, file_size: 1 },
+    { file_id: 'id-b', file_unique_id: 'u-b', width: 1, height: 1, file_size: 1 },
+    { file_id: 'id-c', file_unique_id: 'u-c', width: 1, height: 1, file_size: 1 },
+  ];
+  const ctx = {
+    message: { photo: photos },
+    from: { id: 104 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: {
+      getFileLink: async (fileId) => ({ href: `http://file-${fileId}` }),
+      editMessageText: async () => {},
+    },
+  };
+  const result = await withMockFetch(
+    {
+      'http://file-id-a': { body: Readable.from(Buffer.from('a')) },
+      'http://file-id-b': { body: Readable.from(Buffer.from('b')) },
+      'http://file-id-c': { body: Readable.from(Buffer.from('c')) },
+      [`${API_BASE}/v1/ai/diagnose`]: {
+        json: async () => ({ crop: 'apple', disease: 'scab', confidence: 0.9 }),
+      },
+    },
+    async () => analyzePhoto(deps, ctx, photos[0], { photos }),
+    calls,
+  );
+  assert.equal(result.ok, true);
+  const apiCall = calls.find((call) => call.url.endsWith('/v1/ai/diagnose'));
+  assert.ok(apiCall);
+  assert.equal(apiCall.opts.body.get('image'), null);
+  assert.equal(apiCall.opts.body.getAll('images').length, 3);
+});
+
+test('analyzePhoto returns ok=true for pending response', { concurrency: false }, async () => {
+  const deps = createMinimalDeps();
+  const replies = [];
+  const ctx = {
+    message: { photo: [{ file_id: 'id-pending', file_unique_id: 'u3', width: 1, height: 1, file_size: 1 }] },
+    from: { id: 103 },
+    reply: async (msg, opts) => replies.push({ msg, opts }),
+    telegram: {
+      getFileLink: async () => ({ href: 'http://file' }),
+      editMessageText: async () => {},
+    },
+  };
+  const result = await withMockFetch({
+    'http://file': { body: Readable.from(Buffer.from('x')) },
+    [`${API_BASE}/v1/ai/diagnose`]: {
+      json: async () => ({ status: 'pending', id: 42 }),
+      status: 202,
+    },
+  }, async () => analyzePhoto(deps, ctx, ctx.message.photo[0], { source: 'photo_album_done' }));
+  assert.equal(result.ok, true);
+  assert.equal(result.terminal, false);
+  assert.equal(result.reason, 'pending');
+  assert.equal(replies[1].msg, tr('diag_pending'));
 });
 
 test('subscribeHandler shows paywall', { concurrency: false }, async () => {
@@ -2688,8 +3739,14 @@ test('subscribeHandler logs paywall_shown', { concurrency: false }, async () => 
 
 test('startHandler logs paywall clicks', { concurrency: false }, async () => {
   const events = [];
-  const pool = { query: async (...a) => events.push(a) };
-  const db = createConsentDb();
+  const pool = {
+    query: async (...a) => events.push(a),
+    ensureUser: async (tgId) => ({ id: tgId }), // resolve tg_id -> internal users.id for analytics
+  };
+  const db = createConsentDb({
+    getUserByTgId: async (tgId) => ({ id: tgId }),
+    ensureUser: async (tgId) => ({ id: tgId }),
+  });
   await startHandler({ startPayload: 'paywall', from: { id: 8 }, reply: async () => {} }, pool, { db });
   await startHandler({ startPayload: 'faq', from: { id: 9 }, reply: async () => {} }, pool, { db });
   const clicks = events.filter(([, params]) => params?.[1]?.startsWith('paywall_click'));
@@ -2721,6 +3778,49 @@ test('startHandler saves utm from base64 payload', { concurrency: false }, async
   const ctx = { startPayload: encoded, from: { id: 11 }, reply: async () => {} };
   await startHandler(ctx, null, { db });
   assert.deepEqual(saved, { source: 'tg', medium: 'cpc', campaign: 'jan25' });
+});
+
+test('startHandler auto-enrolls beta from utm allowlist', { concurrency: false }, async () => {
+  const prevEnabled = process.env.BETA_HOUSEPLANTS_ENABLED;
+  const prevSource = process.env.BETA_UTM_SOURCE;
+  const prevMedium = process.env.BETA_UTM_MEDIUM;
+  const prevCampaigns = process.env.BETA_UTM_CAMPAIGNS;
+  process.env.BETA_HOUSEPLANTS_ENABLED = 'true';
+  process.env.BETA_UTM_SOURCE = 'rastenia_msk';
+  process.env.BETA_UTM_MEDIUM = 'post';
+  process.env.BETA_UTM_CAMPAIGNS = 'obzor,post';
+
+  const raw = 'src=rastenia_msk|med=post|cmp=obzor';
+  const encoded = Buffer.from(raw, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  const updatedCalls = [];
+  let betaEntered;
+  const db = createConsentDb({
+    ensureUser: async () => ({ id: 11, is_beta: false }),
+    getUserByTgId: async () => ({ id: 11, is_beta: false }),
+    updateUserBeta: async (_userId, patch) => {
+      updatedCalls.push(patch);
+      return { id: 11, is_beta: true };
+    },
+    getBetaEvent: async () => null,
+    logBetaEvent: async (payload) => { betaEntered = payload; return payload; },
+  });
+  const ctx = { startPayload: encoded, from: { id: 11 }, reply: async () => {} };
+  await startHandler(ctx, null, { db });
+  assert.deepEqual(updatedCalls[0], { isBeta: true });
+  assert.equal(betaEntered.eventType, 'beta_entered');
+  assert.equal(betaEntered.payload.utm_source, 'rastenia_msk');
+  assert.equal(betaEntered.payload.utm_medium, 'post');
+  assert.equal(betaEntered.payload.utm_campaign, 'obzor');
+
+  if (prevEnabled === undefined) delete process.env.BETA_HOUSEPLANTS_ENABLED; else process.env.BETA_HOUSEPLANTS_ENABLED = prevEnabled;
+  if (prevSource === undefined) delete process.env.BETA_UTM_SOURCE; else process.env.BETA_UTM_SOURCE = prevSource;
+  if (prevMedium === undefined) delete process.env.BETA_UTM_MEDIUM; else process.env.BETA_UTM_MEDIUM = prevMedium;
+  if (prevCampaigns === undefined) delete process.env.BETA_UTM_CAMPAIGNS; else process.env.BETA_UTM_CAMPAIGNS = prevCampaigns;
 });
 
 test('startHandler replies with onboarding text', { concurrency: false }, async () => {
@@ -2765,7 +3865,7 @@ test('photoTips offerHint sends hint only once', { concurrency: false }, async (
   assert.equal(replies[0].opts.reply_markup.inline_keyboard[0][0].callback_data, 'photo_tips');
 });
 
-test('photoCollector enforces min/max and picks last photo', () => {
+test('photoCollector enforces min/max and picks primary leaf frame from mandatory block', () => {
   const userId = 7777;
   clearPhotoAlbum(userId);
   let state = addPhotoToAlbum(userId, { photo: [{ file_id: 'p1', file_size: 1, width: 1, height: 1 }] });
@@ -2782,7 +3882,7 @@ test('photoCollector enforces min/max and picks last photo', () => {
   assert.equal(state.count, MAX_PHOTOS);
   assert.equal(state.overflow, true);
   const primary = pickPrimaryPhoto(userId);
-  assert.equal(primary.file_id, `p${MAX_PHOTOS}`);
+  assert.equal(primary.file_id, 'p2');
   const snapshot = getPhotoAlbumState(userId);
   assert.equal(snapshot.count, MAX_PHOTOS);
   clearPhotoAlbum(userId);
@@ -2820,6 +3920,374 @@ test('photoCollector resets expired session', () => {
   assert.equal(state.count, 0);
   assert.equal(state.ready, false);
   clearPhotoAlbum(userId);
+});
+
+test('photoCollector followup mode allows ready after first photo', () => {
+  const userId = 10001;
+  clearPhotoAlbum(userId);
+  startFollowupSession(userId, { linkedCaseId: 42, linkedObjectId: 7, sourceDiagnosisId: 55 });
+  let state = getPhotoAlbumState(userId);
+  assert.equal(state.followupMode, true);
+  assert.equal(state.linkedCaseId, 42);
+  assert.equal(state.linkedObjectId, 7);
+  assert.equal(state.sourceDiagnosisId, 55);
+  assert.equal(state.minPhotos, 1);
+  assert.equal(state.ready, false);
+  state = addPhotoToAlbum(userId, { photo: [{ file_id: 'f1', file_size: 1, width: 1, height: 1 }] });
+  assert.equal(state.ready, true);
+  clearPhotoAlbum(userId);
+});
+
+test('photoCollector followup mode respects per-session min photos override', () => {
+  const userId = 10002;
+  clearPhotoAlbum(userId);
+  startFollowupSession(userId, {
+    linkedCaseId: 52,
+    linkedObjectId: 8,
+    sourceDiagnosisId: 77,
+    minPhotos: 2,
+    followupReason: 'low_confidence_recheck',
+  });
+  let state = getPhotoAlbumState(userId);
+  assert.equal(state.followupMode, true);
+  assert.equal(state.followupReason, 'low_confidence_recheck');
+  assert.equal(state.minPhotos, 2);
+  assert.equal(state.ready, false);
+  state = addPhotoToAlbum(userId, { photo: [{ file_id: 'f2-1', file_size: 1, width: 1, height: 1 }] });
+  assert.equal(state.ready, false);
+  state = addPhotoToAlbum(userId, { photo: [{ file_id: 'f2-2', file_size: 1, width: 1, height: 1 }] });
+  assert.equal(state.ready, true);
+  clearPhotoAlbum(userId);
+});
+
+test('photoCollector restores persisted session after in-memory reset', { concurrency: false }, async () => {
+  const userId = 10003;
+  const redis = createRedisStub();
+  configurePhotoCollectorPersistence({ redis, keyPrefix: 'test:photo:' });
+  await clearPhotoAlbumAsync(userId);
+  await addPhotoToAlbumAsync(userId, {
+    photo: [{ file_id: 'persist-1', file_size: 1, width: 1, height: 1 }],
+  });
+  const sessions = require('./photoCollector').__getSessions
+    ? require('./photoCollector').__getSessions()
+    : null;
+  sessions?.delete(userId);
+  const restored = await getPhotoAlbumStateAsync(userId);
+  assert.equal(restored.count, 1);
+  assert.equal(restored.ready, false);
+  assert.equal(restored.photos[0].file_id, 'persist-1');
+  await clearPhotoAlbumAsync(userId);
+  configurePhotoCollectorPersistence({ redis: null });
+});
+
+test('photoCollector clears persisted session on reset', { concurrency: false }, async () => {
+  const userId = 10004;
+  const redis = createRedisStub();
+  configurePhotoCollectorPersistence({ redis, keyPrefix: 'test:photo-clear:' });
+  await addPhotoToAlbumAsync(userId, {
+    photo: [{ file_id: 'persist-2', file_size: 1, width: 1, height: 1 }],
+  });
+  await clearPhotoAlbumAsync(userId);
+  const restored = await getPhotoAlbumStateAsync(userId);
+  assert.equal(restored.count, 0);
+  assert.equal(redis.store.size, 0);
+  configurePhotoCollectorPersistence({ redis: null });
+});
+
+test('locationSession restores persisted request after in-memory reset', { concurrency: false }, async () => {
+  const userId = 11001;
+  const redis = createRedisStub();
+  configureLocationSessionPersistence({ redis, keyPrefix: 'test:location:' });
+  await clearLocationRequestAsync(userId);
+  await rememberLocationRequestAsync(userId, 77, 'address');
+  getLocationSessionStore().delete(userId);
+  const restored = await peekLocationRequestAsync(userId);
+  assert.equal(restored.entry.objectId, 77);
+  assert.equal(restored.entry.mode, 'address');
+  await clearLocationRequestAsync(userId);
+  configureLocationSessionPersistence({ redis: null });
+});
+
+test('planCommands.handleLocationShare applies persisted session to original object after restart', { concurrency: false }, async () => {
+  const userId = 11002;
+  const redis = createRedisStub();
+  const updates = [];
+  const replies = [];
+  configureLocationSessionPersistence({ redis, keyPrefix: 'test:location-share:' });
+  await rememberLocationRequestAsync(userId, 91, 'geo');
+  getLocationSessionStore().delete(userId);
+  const commands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: userId, last_object_id: null }),
+      getObjectById: async (objectId) => ({ id: objectId, user_id: userId, name: 'Грядка', meta: {} }),
+      updateObjectMeta: async (objectId, patch) => {
+        updates.push({ objectId, patch });
+        return { id: objectId, user_id: userId, name: 'Грядка', meta: patch };
+      },
+      updateUserLastObject: async () => {},
+    },
+    planWizard: {},
+  });
+  await commands.handleLocationShare({
+    from: { id: userId },
+    message: { location: { latitude: 55.75, longitude: 37.61 } },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(updates[0].objectId, 91);
+  assert.equal(updates[0].patch.location_source, 'manual_location');
+  assert.ok(replies.includes(msg('location_updated', { name: 'Грядка', coords: '55.7500, 37.6100' })));
+  await clearLocationRequestAsync(userId);
+  configureLocationSessionPersistence({ redis: null });
+});
+
+test('planCommands.handleLocationText stops on expired persisted request', { concurrency: false }, async () => {
+  const userId = 11003;
+  const redis = createRedisStub();
+  const replies = [];
+  configureLocationSessionPersistence({ redis, keyPrefix: 'test:location-expired:' });
+  await redis.set(
+    'test:location-expired:11003',
+    JSON.stringify({
+      userId,
+      objectId: 55,
+      mode: 'address',
+      retries: 1,
+      expiresAt: Date.now() - 1000,
+      cooldownUntil: Date.now() + 1000,
+    }),
+    'PX',
+    60000,
+  );
+  const commands = createPlanCommands({
+    db: {
+      ensureUser: async () => ({ id: userId }),
+    },
+    planWizard: {},
+  });
+  const handled = await commands.handleLocationText({
+    from: { id: userId },
+    message: { text: '55.75, 37.61' },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(handled, true);
+  assert.deepEqual(replies, [msg('location_request_expired')]);
+  configureLocationSessionPersistence({ redis: null });
+});
+
+test('support restores persisted session after in-memory reset', { concurrency: false }, async () => {
+  const userId = 12001;
+  const redis = createRedisStub();
+  const replies = [];
+  const forwarded = [];
+  const originalSupportChatId = process.env.SUPPORT_CHAT_ID;
+  process.env.SUPPORT_CHAT_ID = '-100500';
+  support.configurePersistence({ redis, keyPrefix: 'test:support:' });
+  support.__getPendingSupport().clear();
+  await support.start({
+    from: { id: userId, first_name: 'Иван' },
+    chat: { id: userId },
+    reply: async (text) => {
+      replies.push(text);
+      return { message_id: 701, text, from: { is_bot: true } };
+    },
+  });
+  support.__getPendingSupport().clear();
+  const handled = await support.handleSupportText({
+    from: { id: userId, first_name: 'Иван' },
+    chat: { id: userId },
+    message: { text: 'Нужна помощь' },
+    telegram: {
+      sendMessage: async (chatId, text) => forwarded.push({ chatId, text }),
+    },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(handled, true);
+  assert.equal(forwarded[0].chatId, '-100500');
+  assert.ok(forwarded[0].text.includes('Нужна помощь'));
+  assert.equal(replies.at(-1), msg('support_sent'));
+  if (originalSupportChatId === undefined) {
+    delete process.env.SUPPORT_CHAT_ID;
+  } else {
+    process.env.SUPPORT_CHAT_ID = originalSupportChatId;
+  }
+  support.configurePersistence({ redis: null });
+  support.__getPendingSupport().clear();
+});
+
+test('support returns expired for lost prompt reply and does not fall through', { concurrency: false }, async () => {
+  const userId = 12002;
+  const redis = createRedisStub();
+  const replies = [];
+  const originalSupportChatId = process.env.SUPPORT_CHAT_ID;
+  process.env.SUPPORT_CHAT_ID = '-100500';
+  support.configurePersistence({ redis, keyPrefix: 'test:support-lost:' });
+  support.__getPendingSupport().clear();
+  await support.start({
+    from: { id: userId, first_name: 'Анна' },
+    chat: { id: userId },
+    reply: async (text) => ({ message_id: 702, text, from: { is_bot: true } }),
+  });
+  support.__getPendingSupport().clear();
+  await redis.del('test:support-lost:12002');
+  const handled = await support.handleSupportText({
+    from: { id: userId, first_name: 'Анна' },
+    chat: { id: userId },
+    message: {
+      text: 'Сообщение в поддержку',
+      reply_to_message: { text: msg('support_prompt'), from: { is_bot: true } },
+    },
+    reply: async (text) => replies.push(text),
+    telegram: { sendMessage: async () => {} },
+  });
+  assert.equal(handled, true);
+  assert.deepEqual(replies, [msg('support_expired')]);
+  if (originalSupportChatId === undefined) {
+    delete process.env.SUPPORT_CHAT_ID;
+  } else {
+    process.env.SUPPORT_CHAT_ID = originalSupportChatId;
+  }
+  support.configurePersistence({ redis: null });
+  support.__getPendingSupport().clear();
+});
+
+test('objectDetailsHandler saves reply-only input after persisted restart', { concurrency: false }, async () => {
+  const userId = 13001;
+  const redis = createRedisStub();
+  const updates = [];
+  const replies = [];
+  configureObjectDetailsPersistence({ redis, keyPrefix: 'test:obj-details:' });
+  await clearObjectDetailsSessionAsync(userId);
+  const handler = createObjectDetailsHandler({
+    db: {
+      getObjectById: async (objectId) => ({ id: objectId, user_id: userId, name: 'Яблоня', meta: {} }),
+      updateObjectMeta: async (objectId, patch) => {
+        updates.push({ objectId, patch });
+        return { id: objectId, user_id: userId, name: 'Яблоня', meta: patch };
+      },
+    },
+    objectChips: { send: async () => {} },
+  });
+  await handler.startPrompt(
+    {
+      from: { id: userId },
+      reply: async (text) => ({ message_id: 801, text, from: { is_bot: true } }),
+    },
+    { field: 'variety', objectId: 501 },
+  );
+  getObjectDetailsSessions().delete(userId);
+  const handled = await handler.handleText({
+    from: { id: userId },
+    message: { text: 'Гала', reply_to_message: { message_id: 801 } },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(handled, true);
+  assert.equal(updates[0].objectId, 501);
+  assert.equal(updates[0].patch.variety, 'Гала');
+  assert.deepEqual(replies, [msg('object_details_saved_variety', { value: 'Гала' })]);
+  await clearObjectDetailsSessionAsync(userId);
+  configureObjectDetailsPersistence({ redis: null });
+});
+
+test('objectDetailsHandler requires reply to exact prompt', { concurrency: false }, async () => {
+  const userId = 13002;
+  const redis = createRedisStub();
+  const replies = [];
+  let updates = 0;
+  configureObjectDetailsPersistence({ redis, keyPrefix: 'test:obj-details-reply:' });
+  const handler = createObjectDetailsHandler({
+    db: {
+      getObjectById: async () => ({ id: 502, user_id: userId, name: 'Груша', meta: {} }),
+      updateObjectMeta: async () => {
+        updates += 1;
+      },
+    },
+  });
+  await handler.startPrompt(
+    {
+      from: { id: userId },
+      reply: async (text) => ({ message_id: 802, text, from: { is_bot: true } }),
+    },
+    { field: 'note', objectId: 502 },
+  );
+  const handled = await handler.handleText({
+    from: { id: userId },
+    message: { text: 'Ряд 3' },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(handled, true);
+  assert.equal(updates, 0);
+  assert.deepEqual(replies, [msg('object_details_reply_required')]);
+  await clearObjectDetailsSessionAsync(userId);
+  configureObjectDetailsPersistence({ redis: null });
+});
+
+test('objectDetailsHandler reports expired prompt from persisted session', { concurrency: false }, async () => {
+  const userId = 13003;
+  const redis = createRedisStub();
+  const replies = [];
+  configureObjectDetailsPersistence({ redis, keyPrefix: 'test:obj-details-expired:' });
+  getObjectDetailsSessions().clear();
+  await redis.set(
+    'test:obj-details-expired:13003',
+    JSON.stringify({
+      userId,
+      objectId: 503,
+      field: 'note',
+      promptMessageId: 803,
+      createdAt: Date.now() - 10000,
+      expiresAt: Date.now() - 1000,
+    }),
+    'PX',
+    60000,
+  );
+  const handler = createObjectDetailsHandler({
+    db: {
+      getObjectById: async () => ({ id: 503, user_id: userId, name: 'Слива', meta: {} }),
+      updateObjectMeta: async () => {
+        throw new Error('should not update expired prompt');
+      },
+    },
+  });
+  const handled = await handler.handleText({
+    from: { id: userId },
+    message: { text: 'Ряд 1', reply_to_message: { message_id: 803 } },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(handled, true);
+  assert.deepEqual(replies, [msg('object_details_expired')]);
+  configureObjectDetailsPersistence({ redis: null });
+});
+
+test('objectDetailsHandler never falls back to another object', { concurrency: false }, async () => {
+  const userId = 13004;
+  const redis = createRedisStub();
+  const replies = [];
+  let updates = 0;
+  configureObjectDetailsPersistence({ redis, keyPrefix: 'test:obj-details-missing:' });
+  await setObjectDetailsSessionAsync(userId, {
+    objectId: 999,
+    field: 'note',
+    promptMessageId: 804,
+  });
+  const handler = createObjectDetailsHandler({
+    db: {
+      getObjectById: async () => null,
+      listObjects: async () => [{ id: 504, user_id: userId, name: 'Запасной объект', meta: {} }],
+      updateObjectMeta: async () => {
+        updates += 1;
+      },
+    },
+  });
+  const handled = await handler.handleText({
+    from: { id: userId },
+    message: { text: 'Ряд 7', reply_to_message: { message_id: 804 } },
+    reply: async (text) => replies.push(text),
+  });
+  assert.equal(handled, true);
+  assert.equal(updates, 0);
+  assert.deepEqual(replies, [msg('objects_not_found')]);
+  await clearObjectDetailsSessionAsync(userId);
+  configureObjectDetailsPersistence({ redis: null });
 });
 
 test('locationThrottler limits prompts per window', () => {
@@ -3090,7 +4558,7 @@ test('retryHandler returns result', { concurrency: false }, async () => {
   });
   assert.ok(replies[0].msg.includes('📸 Диагноз'));
   const callbacks = replies[0].opts.reply_markup.inline_keyboard.flat().map((btn) => btn.callback_data);
-  assert.ok(callbacks.includes('plan_treatment'));
+  assert.ok(callbacks.some((cb) => String(cb).startsWith('plan_treatment')));
   assert.ok(callbacks.includes('ask_products'));
 });
 
@@ -3231,7 +4699,10 @@ test('helpHandler returns links', { concurrency: false }, async () => {
 test('feedbackHandler sends link and logs event', { concurrency: false }, async () => {
   const replies = [];
   const events = [];
-  const pool = { query: async (...a) => events.push(a) };
+  const pool = {
+    query: async (...a) => events.push(a),
+    ensureUser: async (tgId) => ({ id: tgId }),
+  };
   const ctx = { from: { id: 77 }, reply: async (msg, opts) => replies.push({ msg, opts }) };
   process.env.FEEDBACK_URL = 'https://fb.example/form';
   await feedbackHandler(ctx, pool);
@@ -3248,11 +4719,129 @@ test('buildAssistantText uses assistant_ru when provided', () => {
     plan_missing_reason: null,
     need_reshoot: false,
   });
-  assert.equal(text, '📸 Диагноз\nКультура готова.');
+  assert.ok(text.includes('Культура готова.'));
+  assert.ok(text.includes(msg('diagnosis.short_actions_title')));
+  assert.ok(text.includes('Уточните, пожалуйста:'));
 });
 
-test('buildAssistantText falls back to structured text', () => {
+test('buildAssistantText removes trailing "Можно спросить" block', () => {
   const text = buildAssistantText({
+    assistant_ru:
+      'Что делать сейчас:\n• Полив по просыханию.\n\nМожно спросить:\n• Какой состав грунта?\n• Есть ли запах?',
+    confidence: 0.82,
+  });
+  assert.ok(!text.includes('Можно спросить'));
+  assert.ok(!text.includes('Какой состав грунта?'));
+  assert.ok(text.includes('Полив по просыханию.'));
+});
+
+test('buildAssistantDetailsText appends water-stress clarification checklist', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru:
+      '⚙️ Возможные причины:\n- жёсткая вода вызывает засоление;\n- застой влаги в корнях.',
+    confidence: 0.82,
+    need_reshoot: false,
+  });
+  const waterHeader = msg('diagnosis.water_stress_checklist').split('\n')[0];
+  assert.ok(text.includes(waterHeader));
+  assert.ok(!text.includes(msg('diagnosis.root_rot_checklist').split('\n')[0]));
+});
+
+test('buildAssistantDetailsText appends root-rot checklist only with strong evidence', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru:
+      '⚙️ Возможные причины:\n- застой влаги в корнях.',
+    reasoning: ['Корни мягкие и тёмные, есть кислый запах'],
+    confidence: 0.84,
+    need_reshoot: false,
+  });
+  const rootHeader = msg('diagnosis.root_rot_checklist').split('\n')[0];
+  assert.ok(text.includes(rootHeader));
+});
+
+test('buildAssistantDetailsText does not duplicate water checklist when it is already present', () => {
+  const checklist = msg('diagnosis.water_stress_checklist');
+  const text = buildAssistantDetailsText({
+    assistant_ru: `Проверка:\n${checklist}\n\nДополнительно: проверьте дренаж.`,
+    confidence: 0.83,
+  });
+  const checklistHeader = checklist.split('\n')[0];
+  const occurrences = text.split(checklistHeader).length - 1;
+  assert.equal(occurrences, 1);
+});
+
+test('buildAssistantDetailsText appends leaf-spot triage checklist', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru:
+      '⚙️ Возможные причины:\n- сухие пятна по краю листа;\n- точечные пятна на верхних листьях.',
+    confidence: 0.78,
+    need_reshoot: false,
+  });
+  const leafHeader = msg('diagnosis.leaf_spot_triage_checklist').split('\n')[0];
+  assert.ok(text.includes(leafHeader));
+});
+
+test('buildAssistantDetailsText de-escalates root-rot hypothesis and removes chemistry without evidence', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru:
+      'Наиболее вероятная проблема: подозрение на корневую/прикорневую гниль.\nЧто делать: пролив системным фунгицидом (фосетил-алюминием).\nДополнительно: скорректируйте полив.',
+    confidence: 0.81,
+    need_reshoot: false,
+  });
+  assert.ok(text.includes(msg('diagnosis.root_rot_unconfirmed_line')));
+  assert.ok(text.includes(msg('diagnosis.care_priority_line')));
+  assert.ok(text.includes(msg('diagnosis.chemistry_hold_line')));
+  assert.ok(!text.toLowerCase().includes('фосетил'));
+});
+
+test('buildAssistantDetailsText keeps chemistry when strong rot evidence exists', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru:
+      'Что делать: пролив фосетил-алюминием по инструкции.',
+    reasoning: ['Корни мягкие и тёмные, есть кислый запах от грунта'],
+    confidence: 0.86,
+    need_reshoot: false,
+  });
+  assert.ok(text.toLowerCase().includes('фосетил'));
+  assert.ok(!text.includes(msg('diagnosis.root_rot_unconfirmed_line')));
+});
+
+test('buildAssistantDetailsText softens overconfident visibility claims in low-confidence mode', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru: '🔍 Что видно на фото:\n- листьев не видно, поэтому оценка ограничена.',
+    confidence: 0.52,
+    need_reshoot: true,
+  });
+  assert.ok(text.includes(msg('diagnosis.visibility_uncertain_line')));
+  assert.ok(!text.toLowerCase().includes('листьев не видно'));
+});
+
+test('buildAssistantDetailsText removes risky imperative actions in low-confidence mode', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru:
+      '🛠️ Что делать:\n- аккуратно выньте растение из горшка;\n- пересадите в другой субстрат;\n- поддерживайте умеренный полив.',
+    confidence: 0.49,
+    need_reshoot: false,
+  });
+  assert.ok(!text.toLowerCase().includes('выньте растение'));
+  assert.ok(!text.toLowerCase().includes('пересадите'));
+  assert.ok(text.includes('умеренный полив'));
+  assert.ok(text.includes(msg('diagnosis.low_confidence_safe_mode')));
+});
+
+test('buildAssistantDetailsText keeps imperative actions on confident diagnosis', () => {
+  const text = buildAssistantDetailsText({
+    assistant_ru:
+      '🛠️ Что делать:\n- аккуратно выньте растение из горшка;\n- пересадите в рыхлый субстрат.',
+    confidence: 0.88,
+    need_reshoot: false,
+  });
+  assert.ok(text.toLowerCase().includes('выньте растение'));
+  assert.ok(text.toLowerCase().includes('пересадите'));
+});
+
+test('buildAssistantDetailsText falls back to structured text', () => {
+  const text = buildAssistantDetailsText({
     crop: 'apple',
     disease: 'scab',
     confidence: 0.8,
@@ -3272,14 +4861,38 @@ test('buildAssistantText falls back to structured text', () => {
   assert.ok(text.includes('Один лист'));
 });
 
-test('buildAssistantText translates crop names', () => {
-  const text = buildAssistantText({
+test('buildAssistantDetailsText translates crop names', () => {
+  const text = buildAssistantDetailsText({
     crop: 'apple',
     disease: 'scab',
     confidence: 0.8,
     treatment_plan: { substance: 'сера', method: 'Опрыскивание', phi_days: 14 },
   });
   assert.ok(text.includes('яблоня'));
+});
+
+test('buildAssistantText returns short format with one follow-up question', () => {
+  const text = buildAssistantText({
+    assistant_ru:
+      'Это растение выглядит пересушенным.\n🛠️ Что делать:\n- Поливайте после просушки верхних 3 см.\n- Уберите от горячей батареи.\n- Осмотрите пазухи листьев.',
+    confidence: 0.72,
+  });
+  assert.ok(text.includes(msg('diagnosis.short_actions_title')));
+  assert.ok(text.includes('1)'));
+  assert.ok(text.includes('2)'));
+  assert.ok(text.includes('3)'));
+  const questions = (text.match(/\?/g) || []).length;
+  assert.ok(questions <= 1);
+  assert.ok(text.length <= 900);
+  assert.ok(text.split('\n').length <= 12);
+});
+
+test('buildAssistantText does not end with ellipsis on truncation', () => {
+  const text = buildAssistantText({
+    assistant_ru: `Описание:\n${'Очень длинная строка без явного конца '.repeat(120)}`,
+    confidence: 0.81,
+  });
+  assert.ok(!text.endsWith('…'));
 });
 
 test('buildKeyboardLayout includes clarify and reshoot buttons', () => {
@@ -3294,6 +4907,81 @@ test('buildKeyboardLayout includes clarify and reshoot buttons', () => {
   assert.ok(labels.includes(msg('cta.reshoot')));
 });
 
+test('buildKeyboardLayout adds followup button when diagnosis id is provided', () => {
+  const keyboard = buildKeyboardLayout(
+    {
+      need_clarify_crop: false,
+      need_reshoot: false,
+      confidence: 0.8,
+    },
+    { diagnosisId: 321 },
+  );
+  const callbacks = keyboard.inline_keyboard.flat().map((btn) => btn.callback_data);
+  assert.ok(callbacks.includes('plan_treatment|321'));
+  assert.ok(callbacks.includes('diag_followup|321'));
+  assert.ok(callbacks.includes('diag_details|321'));
+});
+
+test('buildKeyboardLayout keeps legacy plan_treatment callback without diagnosis id', () => {
+  const keyboard = buildKeyboardLayout({
+    need_clarify_crop: false,
+    need_reshoot: false,
+    confidence: 0.82,
+  });
+  const callbacks = keyboard.inline_keyboard.flat().map((btn) => btn.callback_data);
+  assert.ok(callbacks.includes('plan_treatment'));
+});
+
+test('extractDiagnosisIdFromReplyMessage reads diagnosis id from followup callback button', () => {
+  const id = extractDiagnosisIdFromReplyMessage({
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '📎 Дослать фото', callback_data: 'diag_followup|98765' }],
+      ],
+    },
+  });
+  assert.equal(id, 98765);
+});
+
+test('extractDiagnosisIdFromReplyMessage reads diagnosis id from plan callback button', () => {
+  const id = extractDiagnosisIdFromReplyMessage({
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '📅 Запланировать', callback_data: 'plan_treatment|54321' }],
+      ],
+    },
+  });
+  assert.equal(id, 54321);
+});
+
+test('buildKeyboardLayout hides plan and products actions for low-confidence recheck', () => {
+  const keyboard = buildKeyboardLayout({
+    need_clarify_crop: false,
+    need_reshoot: true,
+    confidence: 0.62,
+  });
+  const callbacks = keyboard.inline_keyboard.flat().map((btn) => btn.callback_data);
+  assert.ok(!callbacks.includes('plan_treatment'));
+  assert.ok(!callbacks.includes('ask_products'));
+  assert.ok(callbacks.includes('assistant_entry'));
+  assert.ok(callbacks.includes('reshoot_photo'));
+});
+
+test('buildKeyboardLayout hides plan and products actions when crop must be clarified', () => {
+  const keyboard = buildKeyboardLayout({
+    need_clarify_crop: true,
+    clarify_crop_variants: ['Алоэ', 'Сансевиерия'],
+    need_reshoot: false,
+    confidence: 0.88,
+  });
+  const callbacks = keyboard.inline_keyboard.flat().map((btn) => btn.callback_data);
+  assert.ok(!callbacks.includes('plan_treatment'));
+  assert.ok(!callbacks.includes('ask_products'));
+  assert.ok(callbacks.includes('assistant_entry'));
+  assert.ok(callbacks.includes('clarify_crop|0'));
+  assert.ok(callbacks.includes('clarify_crop|1'));
+});
+
 test('resolveFollowupReply prioritizes assistant followups', () => {
   const reply = resolveFollowupReply(
     {
@@ -3304,6 +4992,17 @@ test('resolveFollowupReply prioritizes assistant followups', () => {
   assert.equal(reply, 'Курс лечения: повторите через 10 дней.');
 });
 
+test('resolveFollowupReply normalizes informal tone to formal', () => {
+  const answer = resolveFollowupReply(
+    { assistant_followups_ru: ['Дай препарату сутки и напиши, как стало.'] },
+    'Курс лечения какой?',
+  );
+  const lower = String(answer || '').toLowerCase();
+  assert.ok(lower.includes('дайте'));
+  assert.ok(lower.includes('напишите'));
+  assert.ok(!lower.includes('дай '));
+});
+
 test('resolveFollowupReply ignores assistant followups without keyword', () => {
   const reply = resolveFollowupReply(
     {
@@ -3312,6 +5011,166 @@ test('resolveFollowupReply ignores assistant followups without keyword', () => {
     'Привет',
   );
   assert.equal(reply, msg('followup_default'));
+});
+
+test('resolveFollowupReply handles short wet-status reply for water/soil context', () => {
+  const reply = resolveFollowupReply(
+    {
+      assistant_ru: 'Возможные причины: перелив и застой влаги в зоне корней.',
+      reasoning: ['Грунт долго остаётся мокрым'],
+    },
+    'Мокро',
+  );
+  assert.equal(reply, msg('diagnosis.water_soil_followup_wet'));
+});
+
+test('resolveFollowupReply handles substrate composition reply', () => {
+  const reply = resolveFollowupReply(
+    {
+      assistant_ru: 'Проверьте полив и состав грунта.',
+    },
+    'Торф + перлит',
+  );
+  assert.equal(reply, msg('diagnosis.water_soil_followup_substrate'));
+});
+
+test('resolveFollowupReply uses memory mode and asks only missing details', () => {
+  const diag = {
+    assistant_ru: 'Проверьте полив и состав грунта.',
+  };
+  const first = resolveFollowupReply(diag, 'слегка влажно', { useMemory: true });
+  assert.ok(first.includes(msg('diagnosis.water_soil_memory_ack_moist')));
+  assert.ok(first.includes(msg('diagnosis.water_soil_memory_need_substrate')));
+
+  const second = resolveFollowupReply(diag, 'торф + перлит', { useMemory: true });
+  assert.ok(second.includes(msg('diagnosis.water_soil_memory_ack_substrate')));
+  assert.ok(second.includes(msg('diagnosis.water_soil_memory_need_smell')));
+
+  const third = resolveFollowupReply(diag, 'запаха нет', { useMemory: true });
+  assert.ok(third.includes(msg('diagnosis.water_soil_memory_ready')));
+});
+
+test('resolveFollowupReply treats chernozem mix as substrate answer in memory mode', () => {
+  const diag = {
+    assistant_ru: 'Проверьте полив и состав грунта.',
+    _water_soil_memory: { status: 'wet' },
+  };
+  const reply = resolveFollowupReply(diag, 'Чернозем с перегноем и старым коровьим пометом', { useMemory: true });
+  assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ack_substrate')));
+  assert.ok(reply.includes(msg('diagnosis.water_soil_memory_need_smell')));
+});
+
+test('resolveFollowupReply treats colloquial soil descriptions as substrate answers in memory mode', () => {
+  const samples = [
+    'Обычная земля',
+    'садовая земля',
+    'земля с песком',
+    'листовой перегной',
+    'кокосовый субстрат',
+  ];
+  for (const sample of samples) {
+    const diag = {
+      assistant_ru: 'Проверьте полив и состав грунта.',
+      _water_soil_memory: { status: 'wet' },
+    };
+    const reply = resolveFollowupReply(diag, sample, { useMemory: true });
+    assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ack_substrate')), sample);
+    assert.ok(reply.includes(msg('diagnosis.water_soil_memory_need_smell')), sample);
+  }
+});
+
+test('resolveFollowupReply interprets short "Нет" as no smell when smell slot is expected', () => {
+  const diag = {
+    assistant_ru: 'Проверьте полив и состав грунта.',
+    _water_soil_memory: { status: 'moist', substrate: true },
+  };
+  const reply = resolveFollowupReply(diag, 'Нет', { useMemory: true });
+  assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ack_no_smell')));
+  assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ready')));
+});
+
+test('resolveFollowupReply interprets punctuated short smell answers when smell slot is expected', () => {
+  const noSamples = ['Нет.', 'неа!', 'нет...'];
+  for (const sample of noSamples) {
+    const diag = {
+      assistant_ru: 'Проверьте полив и состав грунта.',
+      _water_soil_memory: { status: 'moist', substrate: true },
+    };
+    const reply = resolveFollowupReply(diag, sample, { useMemory: true });
+    assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ack_no_smell')), sample);
+    assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ready')), sample);
+  }
+
+  const yesSamples = ['Да.', 'есть.', 'да, пахнет'];
+  for (const sample of yesSamples) {
+    const diag = {
+      assistant_ru: 'Проверьте полив и состав грунта.',
+      _water_soil_memory: { status: 'moist', substrate: true },
+    };
+    const reply = resolveFollowupReply(diag, sample, { useMemory: true });
+    assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ack_has_smell')), sample);
+    assert.ok(reply.includes(msg('diagnosis.water_soil_memory_ready')), sample);
+  }
+});
+
+test('resolveFollowupReply interprets natural smell phrases in memory mode', () => {
+  const noSmell = resolveFollowupReply(
+    {
+      assistant_ru: 'Проверьте полив и состав грунта.',
+      _water_soil_memory: { status: 'moist', substrate: true },
+    },
+    'нет запаха',
+    { useMemory: true },
+  );
+  assert.ok(noSmell.includes(msg('diagnosis.water_soil_memory_ack_no_smell')));
+  assert.ok(noSmell.includes(msg('diagnosis.water_soil_memory_ready')));
+
+  const hasSmell = resolveFollowupReply(
+    {
+      assistant_ru: 'Проверьте полив и состав грунта.',
+      _water_soil_memory: { status: 'moist', substrate: true },
+    },
+    'пахнет кислым',
+    { useMemory: true },
+  );
+  assert.ok(hasSmell.includes(msg('diagnosis.water_soil_memory_ack_has_smell')));
+  assert.ok(hasSmell.includes(msg('diagnosis.water_soil_memory_ready')));
+});
+
+test('resolveFollowupReply does not return chemistry after user ruled out rot', () => {
+  const diag = {
+    assistant_followups_ru: ['При сильном риске можно сделать пролив фунгицидом.'],
+  };
+  const first = resolveFollowupReply(diag, 'гнили нет, корни плотные, запаха нет', { useMemory: true });
+  assert.ok(first.includes(msg('diagnosis.root_rot_ruled_out_followup')));
+  const second = resolveFollowupReply(diag, 'а что дальше?', { useMemory: true });
+  assert.ok(second.includes(msg('diagnosis.root_rot_ruled_out_followup')));
+});
+
+test('diag_details callback returns full diagnosis details by id', async () => {
+  const replies = [];
+  const handler = createDiagDetailsHandler({
+    db: {
+      ensureUser: async () => ({ id: 10 }),
+      getRecentDiagnosisById: async () => ({
+        id: 555,
+        diagnosis_payload: {
+          assistant_ru:
+            '🛠️ Что делать:\n- Поливайте после просушки верхних 3 см.\n- Осмотрите пазухи листьев.',
+          confidence: 0.78,
+        },
+      }),
+    },
+    rememberDiagnosis: () => {},
+    safeAnswerCbQuery: async () => {},
+  });
+  await handler({
+    from: { id: 1001 },
+    match: ['diag_details|555', '555'],
+    reply: async (text) => replies.push(text),
+  });
+  assert.ok(replies[0].includes(msg('diag_details_title')));
+  assert.ok(replies[0].includes('Что делать'));
 });
 
 test('msg replaces multiple occurrences of a variable', () => {
@@ -3650,6 +5509,129 @@ test('assistantChat auto-starts on question without session', { concurrency: fal
   assert.ok(replies[0].text.includes('Поливайте'));
 });
 
+test('assistantChat sends history in metadata on follow-up messages', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const userId = 908;
+  const objectId = 89;
+  const user = {
+    id: 22,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Фикус', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    getLatestPlanSessionForUser: async () => null,
+  };
+  const assistantChat = createAssistantChat({ db });
+  let turn = 0;
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: {
+        json: async () => {
+          turn += 1;
+          return {
+            assistant_message: turn === 1 ? 'Первый ответ ассистента' : 'Второй ответ ассистента',
+            followups: [],
+            proposals: [],
+          };
+        },
+      },
+    },
+    async () => {
+      const handledFirst = await assistantChat.handleMessage({
+        from: { id: userId },
+        message: { text: 'Как поливать фикус?' },
+        reply: async (text, opts) => replies.push({ text, opts }),
+      });
+      assert.equal(handledFirst, true);
+      const handledSecond = await assistantChat.handleMessage({
+        from: { id: userId },
+        message: { text: 'А как часто опрыскивать?' },
+        reply: async (text, opts) => replies.push({ text, opts }),
+      });
+      assert.equal(handledSecond, true);
+    },
+    calls,
+  );
+  const chatCalls = calls.filter((call) => call.url === `${API_BASE}/v1/assistant/chat`);
+  assert.equal(chatCalls.length, 2);
+  const firstPayload = JSON.parse(chatCalls[0].opts.body);
+  assert.equal(firstPayload.message, 'Как поливать фикус?');
+  const secondPayload = JSON.parse(chatCalls[1].opts.body);
+  assert.equal(secondPayload.message, 'А как часто опрыскивать?');
+  assert.ok(Array.isArray(secondPayload?.metadata?.history));
+  assert.equal(secondPayload.metadata.history[0].role, 'user');
+  assert.equal(secondPayload.metadata.history[0].text, 'Как поливать фикус?');
+  assert.equal(secondPayload.metadata.history[1].role, 'assistant');
+  assert.equal(secondPayload.metadata.history[1].text, 'Первый ответ ассистента');
+  assert.ok(replies.some((entry) => String(entry.text || '').includes('Второй ответ ассистента')));
+});
+
+test('assistantChat restores history session after in-memory reset', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const redis = createRedisStub();
+  const userId = 909;
+  const objectId = 90;
+  const user = {
+    id: 23,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Фикус', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    getLatestPlanSessionForUser: async () => null,
+  };
+  const assistantChat = createAssistantChat({ db, redis, sessionKeyPrefix: 'test:assistant-history:' });
+  let turn = 0;
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: {
+        json: async () => {
+          turn += 1;
+          return {
+            assistant_message: turn === 1 ? 'Первый ответ ассистента' : 'Второй ответ ассистента',
+            followups: [],
+            proposals: [],
+          };
+        },
+      },
+    },
+    async () => {
+      const handledFirst = await assistantChat.handleMessage({
+        from: { id: userId },
+        message: { text: 'Как поливать фикус?' },
+        reply: async (text, opts) => replies.push({ text, opts }),
+      });
+      assert.equal(handledFirst, true);
+      assistantChat.__getSessions().clear();
+      const handledSecond = await assistantChat.handleMessage({
+        from: { id: userId },
+        message: { text: 'А как часто опрыскивать' },
+        reply: async (text, opts) => replies.push({ text, opts }),
+      });
+      assert.equal(handledSecond, true);
+    },
+    calls,
+  );
+  const chatCalls = calls.filter((call) => call.url === `${API_BASE}/v1/assistant/chat`);
+  assert.equal(chatCalls.length, 2);
+  const secondPayload = JSON.parse(chatCalls[1].opts.body);
+  assert.equal(secondPayload.message, 'А как часто опрыскивать');
+  assert.ok(Array.isArray(secondPayload?.metadata?.history));
+  assert.equal(secondPayload.metadata.history[0].text, 'Как поливать фикус?');
+  assert.equal(secondPayload.metadata.history[1].text, 'Первый ответ ассистента');
+});
+
 test('assistantChat prompts to switch context on topic mismatch', { concurrency: false }, async () => {
   const replies = [];
   const userId = 905;
@@ -3695,6 +5677,137 @@ test('assistantChat prompts to switch context on topic mismatch', { concurrency:
   assert.ok(replies[0].text.includes('виноград'));
   assert.ok(buttons.some((btn) => btn.callback_data === 'assistant_choose_object'));
   assert.ok(buttons.some((btn) => btn.callback_data === 'assistant_clear_context'));
+});
+
+test('assistantChat restores pending mismatch question after in-memory reset', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const redis = createRedisStub();
+  const userId = 910;
+  const objectId = 58;
+  const recentRecord = {
+    id: 7004,
+    object_id: objectId,
+    diagnosis_payload: { crop_ru: 'драцена' },
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  };
+  const user = {
+    id: 24,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Драцена', type: 'indoor', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    getLatestRecentDiagnosis: async () => recentRecord,
+    getLatestPlanSessionForUser: async () => null,
+  };
+  const assistantChat = createAssistantChat({ db, redis, sessionKeyPrefix: 'test:assistant-pending:' });
+  await assistantChat.start({ from: { id: userId }, reply: async () => {} });
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: {
+        json: async () => ({
+          assistant_message: 'Ответ без привязки после рестарта',
+          followups: [],
+          proposals: [],
+        }),
+      },
+    },
+    async () => {
+      const handled = await assistantChat.handleMessage({
+        from: { id: userId },
+        message: { text: 'Почему виноград бродит быстрее?' },
+        reply: async (text, opts) => replies.push({ text, opts }),
+      });
+      assert.equal(handled, true);
+      assistantChat.__getSessions().clear();
+      await assistantChat.clearContext({
+        from: { id: userId },
+        reply: async (text, opts) => replies.push({ text, opts }),
+        answerCbQuery: async () => {},
+      });
+    },
+    calls,
+  );
+  const req = calls.find((call) => call.url === `${API_BASE}/v1/assistant/chat`);
+  assert.ok(req);
+  const payload = JSON.parse(req.opts.body);
+  assert.equal(payload.object_id, null);
+  assert.equal(payload.message, 'Почему виноград бродит быстрее?');
+  assert.ok(replies.some((entry) => String(entry.text || '').includes('виноград')));
+  assert.ok(replies.some((entry) => String(entry.text || '').includes('Ответ без привязки после рестарта')));
+});
+
+test('assistantChat pickObject replays pending question after context mismatch', { concurrency: false }, async () => {
+  const replies = [];
+  const calls = [];
+  const userId = 907;
+  const objectId = 57;
+  const recentRecord = {
+    id: 7003,
+    object_id: objectId,
+    diagnosis_payload: { crop_ru: 'драцена' },
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  };
+  const user = {
+    id: 21,
+    api_key: 'test-api-key',
+    pro_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    last_object_id: objectId,
+  };
+  const object = { id: objectId, name: 'Драцена', type: 'indoor', user_id: user.id };
+  const db = {
+    ensureUser: async () => user,
+    listObjects: async () => [object],
+    getObjectById: async () => object,
+    getLatestRecentDiagnosis: async () => recentRecord,
+    getLatestPlanSessionForUser: async () => null,
+    updateUserLastObject: async () => ({}),
+  };
+  const assistantChat = createAssistantChat({ db });
+  const ctxStart = { from: { id: userId }, reply: async () => {} };
+  await assistantChat.start(ctxStart);
+  const ctxMessage = {
+    from: { id: userId },
+    message: { text: 'Почему виноград бродит быстрее?' },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+  const ctxPick = {
+    from: { id: userId },
+    reply: async (text, opts) => replies.push({ text, opts }),
+  };
+
+  await withMockFetch(
+    {
+      [`${API_BASE}/v1/assistant/chat`]: {
+        json: async () => ({
+          assistant_message: 'Ответ после выбора объекта',
+          followups: [],
+          proposals: [],
+        }),
+      },
+    },
+    async () => {
+      const handled = await assistantChat.handleMessage(ctxMessage);
+      assert.equal(handled, true);
+      await assistantChat.pickObject(ctxPick, String(objectId));
+    },
+    calls,
+  );
+
+  const req = calls.find((call) => call.url === `${API_BASE}/v1/assistant/chat`);
+  assert.ok(req);
+  const payload = JSON.parse(req.opts.body);
+  assert.equal(payload.object_id, objectId);
+  assert.equal(payload.message, 'Почему виноград бродит быстрее?');
+  assert.ok(replies.some((entry) => String(entry.text || '').includes('Выбрано растение')));
+  assert.ok(replies.some((entry) => String(entry.text || '').includes('Ответ после выбора объекта')));
 });
 
 test('assistantChat clearContext replays pending question', { concurrency: false }, async () => {

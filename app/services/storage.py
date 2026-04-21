@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 from asyncio import Lock
@@ -174,6 +175,40 @@ async def upload_photo(user_id: int, data: bytes) -> str:
             detail="S3 upload failed",
         ) from exc
     return key
+
+
+async def download_photo(key: str) -> bytes:
+    """Download photo bytes from S3 by object key."""
+    if not key:
+        raise ValueError("S3 key is required")
+    bucket = os.getenv(
+        "S3_BUCKET",
+        _settings.s3_bucket if _settings is not None else BUCKET,
+    )
+    try:
+        client = await get_client()
+        response = await client.get_object(Bucket=bucket, Key=key)
+        body = response.get("Body")
+        if body is None:
+            raise RuntimeError("S3 response has no body")
+        data = await body.read()
+        if hasattr(body, "close"):
+            close_result = body.close()
+            if inspect.isawaitable(close_result):
+                await close_result
+    except ClientError as exc:
+        code = str(getattr(exc, "response", {}).get("Error", {}).get("Code", "")).strip()
+        logger.exception("🔥 Ошибка при скачивании из S3: %s", exc)
+        if code == "NoSuchKey":
+            raise FileNotFoundError(f"S3 key not found: {key}") from exc
+        raise RuntimeError("S3 download failed") from exc
+    except BotoCoreError as exc:
+        logger.exception("🔥 Ошибка при скачивании из S3: %s", exc)
+        raise RuntimeError("S3 download failed") from exc
+    except Exception as exc:
+        logger.exception("🔥 Ошибка при скачивании из S3: %s", exc)
+        raise
+    return data
 
 
 def get_public_url(key: str) -> str:

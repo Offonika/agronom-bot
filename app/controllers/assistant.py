@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -46,6 +46,12 @@ class AssistantChatMetadata(BaseModel):
     recent_diagnosis_id: int | None = None
     plan_session_id: int | None = None
     locale: str | None = None
+    history: list["AssistantDialogMessage"] | None = Field(default=None, max_length=24)
+
+
+class AssistantDialogMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=1000)
 
 
 class AssistantChatRequest(BaseModel):
@@ -93,7 +99,12 @@ async def assistant_chat(
         assistant_chat_counter.labels(status="bad_request").inc()
         raise HTTPException(status_code=400, detail=err.model_dump())
 
-    ctx = await asyncio.to_thread(assistant_orchestrator.load_context, user_id, body.object_id)
+    history = (
+        [{"role": item.role, "text": item.text} for item in (body.metadata.history or [])]
+        if body.metadata
+        else None
+    )
+    ctx = await asyncio.to_thread(assistant_orchestrator.load_context, user_id, body.object_id, history)
     answer, proposals, followups = await asyncio.to_thread(
         assistant_orchestrator.build_response,
         message,

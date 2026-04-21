@@ -55,6 +55,10 @@ function createObjectChips({ bot, db, planFlow }) {
       };
     });
     const rows = chunk(chips, ROW_SIZE);
+    const followupText = msg('objects_followup_button') || msg('cta.followup');
+    if (followupText) {
+      rows.push([{ text: followupText, callback_data: 'diag_followup_active' }]);
+    }
     return { inline_keyboard: rows };
   }
 

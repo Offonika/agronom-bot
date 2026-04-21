@@ -1,0 +1,858 @@
+<!-- INF10\startRequest.cfm -->
+
+<!-- page-view-home-and-landscape\index.cfm -->
+
+<!-- ck:4696 --><!-- rp:/home-and-landscape/houseplant-problems --> 
+
+<!-- // Debug: ~infVer:10.0.0~/home-and-landscape/houseplant-problems~ck:4696~sk:9~v:0~pk:HLS~pv:01~tn:pn-qt-2x8~tv:2025~tk:1~ -->
+
+<!-- INF10\header-v5.cfm -->
+
+
+
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	
+	
+	
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700&amp;subset=latin,latin-ext" type="text/css" />
+	
+	
+	
+	<link rel="stylesheet" href="/assets_v7/styles/bootstrap-1.css" type="text/css" />
+	<link rel="icon" type="image/png" href="/assets_v7/images/favicon.ico" />
+			
+	
+	
+	
+	
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+	
+		<script src="https://unpkg.com/htmx.org@1.6.1"></script>
+	
+		<link href="/assets_v7/fontawesome7_1_0/css/fontawesome.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/brands.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/solid.min.css" rel="stylesheet">
+	
+		<!-- Google Tag Manager -->
+		<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NPR7B4');</script>
+		<!-- End Google Tag Manager -->
+	
+	
+	
+
+	<script async src="https://cse.google.com/cse.js?cx=005318318591192111806:oa2cd9kjx8k"></script>
+
+	<style>	
+		.icon-bar {
+		position: fixed;
+		z-index: 500;
+		top: calc(100vh - (100vh - 40%));
+		right: 0;
+		left: calc(100vw - 105px);
+		width: 140px;
+		-webkit-transform: translateY(-50%);
+		-ms-transform: translateY(-50%);
+		transform: translateY(-50%);
+		transform: rotate(-90deg);
+		}
+
+		.icon-bar a {
+		display: block;
+		text-align: center;
+		padding: 14px;
+		transition: all 0.3s ease;
+		color: white !important;
+		font-size: 14px;
+		border-bottom: none;
+		}
+		
+		.icon-bar a:hover {
+		background-color: #000;
+		}
+		
+		.pdf {
+		background: #bb0000;
+		color: white;
+		}
+
+		.print {
+		background: #008EAA;
+		color: white;
+		}
+		
+		.feedback {
+		background: #008EAA;
+		color: white;
+		}
+
+		@media print { 
+			.icon-bar {
+				display: none !important;
+			}
+		}
+	</style>
+	
+	
+		
+	<title>Houseplant Problems / Home and Landscape / UC Statewide IPM Program (UC IPM)</title>
+</head>
+
+<body>
+	
+		<!-- Google Tag Manager (noscript) -->
+		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NPR7B4" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+		<!-- End Google Tag Manager (noscript) -->
+	<!-- WWW03\Templates\WWW_headerNav_3_2023.cfm -->
+
+<div class="modal fade" id="notificationsModal" tabindex="-1" aria-labelledby="notificationsModal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" >
+            <div class="modal-header flex-wrap">
+                <div class="modal-title" id="notificationsModalLabel">Notifications</div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="notificationsModalContent">
+                Loading...
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<nav class="navbar navbar-expand-lg navbar-light shadow megamenu-nav" id="nav"  >
+    <div class="container-fluid">
+        
+            <a class="navbar-brand" href="/" onclick="_sz.push(['event', 'Mega Menu', 'Logo', 'UC IPM']);"><img src="/assets_v7/images/logo/header-logo-ipm.png" width="150px" alt="UC IPM logo"></a>
+            
+        <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-content" aria-label="mobile menu" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', 'Collapsed']);">
+            <div class="hamburger-toggle">
+                <div class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-content">
+            <ul class="navbar-nav mr-auto mb-2 mb-lg-0">
+                <li class="nav-item dropdown dropdown-mega position-static">
+                    <a class="nav-link dropdown-toggle toggle-animation" href="#" data-bs-toggle="dropdown" data-bs-auto-close="outside" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/houseplant-problems/']);">Manage
+                        Pests<i class="fas fa-chevron-down ms-1"></i></a>
+                    <div class="nav-dropdown dropdown-menu">
+                        <div class="mega-content">
+                            <div class="container-fluid">
+                                <div class="row">
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-1" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Home &amp; Landscape<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-1">
+
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/" class="dropdown-item">Home, Garden, Turf and Landscape Pests</a>
+                                            <a href="https://ucanr.edu/blogs/UCIPMurbanpests/" class="dropdown-item">Blog</a>
+                                            <a href="https://ucanr.edu/site/urban-community-ipm-webinars" class="dropdown-item">Webinars</a>
+                                            <a href="https://ipm.ucanr.edu/IPMPROJECT/videolibrary.html" class="dropdown-item">Video</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/" class="dropdown-item">Pesticide Active Ingredient Database</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/plant-problem-diagnostic-tool/" class="dropdown-item">Plant Problem Diagnostic Tool</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Seasonal Landscape IPM Checklist</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/wildlife-pest-identification/" class="dropdown-item">Wildlife Identification Tool</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                            <h6 class="dropdown-header mt-4">Resources</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Landscape Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-multi-unit-housing-managers/" class="dropdown-item">Multi-unit Housing Managers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/retail-nursery-and-garden-center-ipm-news/" class="dropdown-item">Retail Nurseries and Garden Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-schools-and-child-care-centers/" class="dropdown-item">Schools and Child Care Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-structural-pest-management-professionals/" class="dropdown-item">Structural Pest Management Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/master-gardeners/" class="dropdown-item">UC Master Gardeners</a>
+                                            
+                                            
+                                            
+                                            
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-2" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Agriculture<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-2">
+
+                                            <a href="https://ipm.ucanr.edu/agriculture/" class="dropdown-item">Pest Management Guidelines</a>
+
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <a href="https://ipm.ucanr.edu/GENERAL/pesticides.html" class="dropdown-item">Pesticide
+                                                Information</a>
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            <a href="https://ipm.ucanr.edu/bee-precaution-pesticide-ratings/" class="dropdown-item">Bee
+                                                Precaution Pesticide Ratings</a>
+                                            <a href="https://ipm.ucanr.edu/agriculture/decision-support-tool/" class="dropdown-item">Decision
+                                                Support</a>
+                                            <a href="https://ipm.ucanr.edu/WEATHER/" class="dropdown-item">Weather, Models and Degree
+                                                Days</a>
+                                            <span class="border-top"></span>
+                                            <h6 class="dropdown-header mt-4 mb-2">Resources</h6>
+                                            <a href="https://ipm.ucanr.edu/PMG/glossary.html" class="dropdown-item">Glossary</a>
+                                            <a href="https://ipm.ucanr.edu/mitigation/" class="dropdown-item">Mitigating Pesticides</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies
+                                                Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/GENERAL/links.html" class="dropdown-item">Pest Management
+                                                Sites</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-3" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Natural Areas<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-3">
+                                            <a href="https://ipm.ucanr.edu/natural-area-pests/" class="dropdown-item">Natural Area Pests</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/events/" onclick="_sz.push(['event', 'Mega Menu', 'Events and Trainings', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/houseplant-problems/']);">Events
+                        and Trainings</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/about/" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'About', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/houseplant-problems/']);">About</a>
+                </li>
+            </ul>
+            <ul class="navbar-nav d-flex ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#searchModal" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'Search', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/houseplant-problems/']);"><i class="fa-solid fa-magnifying-glass me-2"></i>Search</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/make-a-gift/" onclick="_sz.push(['event', 'Mega Menu', 'Donate', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/houseplant-problems/']);">Donate</a>
+                </li>
+                
+                
+                
+                
+                
+            </ul>
+        </div>
+    </div>
+</nav>
+<!-- Account Settings Modal -->
+<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content" >
+            <div class="modal-header" >
+                <div class="modal-title" id="accountSettingsModalLabel">Account Settings</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="accountSettingsModalBody">
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal" aria-label="Close">Close</button>
+                <button type="button" class="btn btn-primary float-end" hx-trigger="click" hx-post="htmx-INF-10-htmx-accountSettingsModalContent.cfm?submit=submit" hx-target="#accountSettingsModalBody" name="submit" value="submit" hx-include="[name='firstName'],[name='lastName']">
+                    Save
+                </button>
+            </div>
+		</div>
+	</div>
+</div>
+
+<script>
+    document.addEventListener('click', function (e) {
+        // Hamburger menu
+        if (e.target.classList.contains('hamburger-toggle')) {
+            e.target.children[0].classList.toggle('active');
+        }
+    })
+    var dropDownToggle = document.querySelectorAll('.toggle-animation');
+    dropDownToggle.forEach((dropdown) => {
+        dropdown.addEventListener('click', function () {
+            var icon = this.querySelector('.fas');
+            icon.classList.toggle('fa-chevron-down');
+            icon.classList.toggle('fa-chevron-up');
+        });
+    });
+    //change for medium and below
+    var adjustIconFloat = () => {
+        var breakpoint = 992;
+        var icons = document.querySelectorAll('.fa-chevron-down');
+        if (window.innerWidth <= breakpoint) {
+            icons.forEach(icon => {
+                icon.style.float = 'right';
+            });
+        } else {
+            icons.forEach(icon => {
+                icon.style.float = '';
+            });
+        }
+    }
+    window.addEventListener('resize', adjustIconFloat);
+    adjustIconFloat();
+</script>
+
+	
+
+	
+
+	<!-- Search Modal -->
+	<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-xl modal-dialog-scrollable">
+			<div class="modal-content">
+				<div class="modal-header">
+					<p class="h1 modal-title fs-5" id="searchModalLabel">Search</p>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="_sz.push(['event', 'Search Modal', 'Button', 'X']);"></button>
+				</div>
+				<div class="modal-body">
+					<form class="row g-3" onsubmit="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; return false;">
+						<div class="col">
+							<label for="searchInput" class="visually-hidden">search</label>
+							<input type="search" class="form-control" id="searchInput" placeholder="What's your pest problem?">
+						</div>
+						<div class="col-auto">
+							<button type="button" class="btn btn-primary" onclick="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; _sz.push(['event', 'Search Modal', 'Button', 'Search']);">Search</button>
+						</div>
+					</form>
+					<div class="gcse-searchresults-only"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	
+
+<!-- HLS01\Templates\HLS_pn-qt-2x8_1_2025.cfm -->
+
+<!-- INF10\inf_contents-v10.cfm -->
+
+
+
+ 
+<main>
+    <div class="content-header-wrap urban">
+       <!-- INF10\inf_breadcrumb-v10.cfm -->
+
+
+
+<div class="breadcrumb-wrapper">
+	<div class="container">
+		<div class="row justify-content-center">
+			<div class="col-md-10 col-sm-12">
+				<nav aria-label="breadcrumb">
+					<ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="/">UC IPM</a></li><li class="breadcrumb-item"><a href="/home-and-landscape">Home and Landscape</a></li>
+					</ol>
+				</nav>
+			</div>
+		</div>
+	</div>
+</div>
+
+       
+        <header>
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-10 col-sm-12">
+                        <p class="eyebrow">Home and Landscape</p>
+                        <h1>Houseplant Problems</h1>
+                        <div class="info">
+                            
+                            
+                            
+                            <!--<div>Published on January 25, 2022</div>-->
+                            <div>Updated: 08/2020</div>
+                        </div>
+                        <div class="icons">
+                            <a href="https://ipm.ucanr.edu/PDF/PESTNOTES/pnhouseplantproblems.pdf"><i class="fa-solid fa-file-pdf" aria-label="PDF file"></i></a> 
+            <a href="https://www.linkedin.com/shareArticle/?mini=true&url=https://ipm.ucanr.edu/home-and-landscape/houseplant-problems/" target="_blank"><i class="fab fa-linkedin" aria-label="LinkedIn"></i></a>
+        
+            <a href="https://bsky.app/intent/compose?text=Learn%20about%20Houseplant%20Problems%20at%20UC%20IPM%2E%20https%3A%2F%2Fipm%2Eucanr%2Eedu%2Fhome%2Dand%2Dlandscape%2Fhouseplant%2Dproblems%2F" target="_blank"><i class="fa-brands fa-square-bluesky" aria-label="Bluesky"></i></a>
+        
+            <a href="https://www.facebook.com/sharer/sharer.php?u=https://ipm.ucanr.edu/home-and-landscape/houseplant-problems/" target="_blank"><i class="fab fa-facebook-square" aria-label="FaceBook"></i></a>
+        
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+            <div class="banner mb-5">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-md-10 col-sm-12">
+                            <img class="img-fluid" src='/pmg/images/R/S-WO-RUBI-FL.001banner.jpg' width="100%" height="100%" border="0" alt='' title=''>
+                            
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-2 col-md-2 d-none d-md-block">
+                <div class="position-sticky sticky-top side-nav-wrap-scroll" style="top:30px; z-index:0;">
+                    <nav id="navbar-example3" class="side-nav">
+                        <div class="h3 mb-3">On this page</div>
+                            
+                                    <a class="nav-link" href="#INBRIEF_414_1">In Brief</a>
+                                    <a class="nav-link" href="#INTRODUCTION_65_1">Pest Notes: Introduction</a>
+                                
+                                <a class="nav-link" href="#WHAT_536_1">What Causes Houseplant Problems?</a>
+                            
+                                <a class="nav-link" href="#MANAGEMENT_52_1">Management</a>
+                            
+                                <a class="nav-link" href="#CONTROLLING_537_1">Controlling Insect and Mite Pests</a>
+                            
+                                <a class="nav-link" href="#CONTROLLING_538_1">Controlling Houseplant Diseases</a>
+                            
+                                <a class="nav-link" href="#REFERENCES_266_1">References</a>
+                            
+                            <a class="nav-link" href="#RESOURCES">Resources</a>
+                            <a class="nav-link" href="#PUBLICATIONINFORMATION">Publication Information</a>
+                    </nav>
+                </div>
+            </div>
+            <div class="col-md-8 col-lg-8 col-sm-12 content-body">
+                <span class="in-nav-mobile d-block d-md-none">
+                    <a class="heading" data-bs-toggle="collapse" href="#HeaderSection" aria-expanded="false" aria-controls="HeaderSection">On this page<i class="fas fa-chevron-down float-end"></i>
+                    </a>
+                    <ul class="collapse" id="HeaderSection">
+                        
+                                <li class="nav-item"><a href="#INBRIEF_414_1">In Brief</a></li>
+                                <li class="nav-item"><a href="#INTRODUCTION_65_1">Pest Notes: Introduction</a></li>
+                            
+                            <li class="nav-item"><a href="#WHAT_536_1">What Causes Houseplant Problems?</a></li>
+                        
+                            <li class="nav-item"><a href="#MANAGEMENT_52_1">Management</a></li>
+                        
+                            <li class="nav-item"><a href="#CONTROLLING_537_1">Controlling Insect and Mite Pests</a></li>
+                        
+                            <li class="nav-item"><a href="#CONTROLLING_538_1">Controlling Houseplant Diseases</a></li>
+                        
+                            <li class="nav-item"><a href="#REFERENCES_266_1">References</a></li>
+                        
+                        <li class="nav-item"><a href="#RESOURCES">Resources</a></li>
+                        <li class="nav-item"><a href="#PUBLICATIONINFORMATION">Publication Information</a></li>
+                    </ul>
+                </span>
+                
+                <div data-bs-spy="scroll" data-bs-target="#navbar-example3" data-bs-offset="0" tabindex="0">
+                    
+            <div class="callout">
+                <div class="callout-title">
+                    <span id="INBRIEF_414_1"></span>
+                    <p class="h3">In Brief</p>
+                </div>
+                <div class="callout-body">
+                    <ul>
+  <li>Most houseplant problems are due to improper care like not enough light or too much water.</li>
+  <li>Soft-bodied insects and mites infecting houseplants can be removed with water.</li>
+  <li>Plant diseases are usually introduced in the nursery so buy only healthy-looking plants.</li>
+  <li>Fungus gnats are common in newly purchased houseplants and can be managed with proper watering.</li>
+</ul>
+                </div>
+            </div>
+        
+                                        <h2 id="INTRODUCTION_65_1">Pest Notes: Introduction</h2>
+                                    
+                                <!-- cot:1/cse:65/muc:1-->
+                                <p>Houseplants are typically grown in enclosed and secure environments that may exclude many pests. Nonetheless, pests sometimes occur on houseplants. Decline in houseplant health is most commonly associated with improper watering (too much or too little water provided), improper fertilization amounts, root diseases, poor sanitation, and adverse environmental conditions, such as low light intensity or low relative humidity. Sometimes, however, houseplant problems may be caused by insect or mite pests. Routinely <a href="/PMG/C/S-FL-CULT-MO.004.html">check your houseplants</a> and promptly address these problems when detected. </p>
+<p>When handling or observing your plants, examine them for signs and symptoms of pests and other types of damage and problems. Table 1 provides a quick guide for diagnosing houseplant problems. </p>
+<p>In many instances, solving the problem or treating the pest will be difficult. Once a problem has been detected, it is sometimes not practical to restore a plant's health; it may be too late to solve the problem, and effective management for the pest may not be available. In these cases, it may be better to discard the plant and purchase a new one.</p> 
+                                        <h2 id="WHAT_536_1">What Causes Houseplant Problems?</h2>
+                                    
+                                <!-- cot:1/cse:536/muc:1-->
+                                <ul>
+        <li>Most houseplant problems are caused by improper care and by environmental factors in the home that are unfavorable to optimal plant growth. Understand the growing requirements of each of your houseplants. Problem symptoms are often caused by multiple factors:</li>
+        <li>Brown leaf tips or leaf margins are usually caused by overfertilization, salt buildup, or excessively dry or wet soil, but they may also result from too much sun or heat through a window, low relative humidity, or a drafty setting.</li>
+        <li>Weak growth or light green to yellow leaves may be due to nutrient deficiency (usually lack of nitrogen), root rot, exposure to too much or too little light, or sap-sucking insects and mites.</li>
+        <li>Leaves with excessively long petioles or stems with excessively long internodes (sometimes called “leggy” growth) are usually caused by inadequate light.</li>
+        <li>Yellowing and dropping leaves can be caused by inadequate light, exposure to low temperatures, overwatering, poor soil drainage, or soil-borne insect or disease pests.</li>
+        <li>Wilting is usually caused by underwatering or excessive light but may also be due to root decay from soil pathogens, often associated with overwatering or poor drainage. Inspect root systems whenever wilting occurs.</li>
+        <li>A lack of flowers on a houseplant expected to bloom may indicate improper nighttime temperatures (too low or too high) or inadequate light (duration, intensity, or both).</li>
+        <li>Soft stem bases usually are indicative of overwatering. Soggy soil can result from overwatering or poor drainage.</li>
+</ul>
+      
+<p><strong>Guide for Diagnosing Houseplant Problems. <em>Adapted from Powell and Lindquist 1983, p. 5.</em> Symptoms of common houseplant problems and their causes are listed below.</strong></p>
+ <ul class="nospc"><li>Brown or scorched leaf tips
+ <ul>
+  <li>Poor health from overwatering, excessive soil dryness (especially between waterings), excessive fertilizer or other soluble salts in the soil or water</li>
+  <li>Specific nutrient toxicities (e.g., fluoride, copper, or boron)</li>
+  <li>Low humidity</li>
+  <li>Pesticide or mechanical injury</li>
+</ul>
+    </li>
+    
+<li>Leaf spots, blotches, blemishes, blisters, or scabby spots
+ <ul>
+  <li>Excess light (sunburn) associated with a recent move of the plant</li>
+  <li>Chilling injury (below 50°F)</li>
+  <li>Chemical spray injury</li>
+  <li>Overwatering</li>
+  <li>Fungal or bacterial infections (rare unless plants have recently come from outdoors or greenhouses)</li>
+</ul>
+    </li>
+<li>Foliage yellow-green on older leaves
+ <ul>
+  <li>Insufficient fertilizer, especially nitrogen</li>
+  <li>Poor root health from pot-bound growth, compacted soil, poor drainage, overwatering</li>
+  <li>Insufficient light</li>
+  <li>Injury from sap-sucking pests such as whiteflies, soft scale insects, or spider mites</li>
+</ul>
+    </li>
+<li>Foliage yellow-green on newer leaves
+ <ul>
+  <li>Overwatering, soil pH imbalance</li>
+  <li>Micronutrient deficiency</li>
+    
+</ul>
+    </li>
+<li>Foliage yellow-green generally throughout plant
+ <ul>
+  <li>Excess light, overwatering, underwatering</li>
+  <li>Insufficient fertilization</li>
+  <li>High temperatures, especially when associated with dryness</li>
+  <li>Insect infestation</li>
+  <li>Poor root health from overwatering, excessive dryness, root disease </li>
+</ul>
+    </li>
+<li>Leaf drop; sudden wilting of foliage
+ <ul>
+  <li>Poor root health from overwatering, excessive dryness, root disease, excessive fertilizer, or other soluble salts in the soil or water</li>
+  <li>Compacted soil or pot-bound roots</li>
+  <li>Sudden change in light, temperature, or relative humidity</li>
+  <li>Toxic chemical poured into soil</li>
+</ul>
+    </li>
+<li>Roots brown, soft or rotted; associated with one or more of the symptoms noted above
+ <ul>
+  <li>Poor root health from overwatering, excessive dryness, root disease, excessive fertilizer, or other soluble salts in the soil</li>
+  <li>Compacted soil or poorly drained container</li>
+</ul>
+    </li>
+<li>Yellowed leaves with tiny speckling; leaves later bronzed and drying; webbing may be noted near growing points
+ <ul>
+  <li>Spider mite infestation</li>
+</ul>
+    </li>
+<li>Leaves covered with a sticky substance; sooty mold growing on leaves; small brown, white, or greenish objects seen on leaves or in crotches of branches; leaf drop or branch dieback; leaf or growing point distortion, ants may be present
+ <ul>
+  <li>Scale, mealybug, or aphid infestation</li>
+</ul>
+    </li>
+    </ul> 
+                                        <h2 id="MANAGEMENT_52_1">Management</h2>
+                                    
+                                <!-- cot:1/cse:52/muc:1-->
+                                <p>The best approach to long term management is to emphasize prevention through pest exclusion, proper sanitation, and cultural practices that create optimal growing conditions and plant health.</p>
+		
+      <p>Practice pest exclusion by thoroughly examining plants prior to purchasing and introducing them indoors. Do not purchase or bring home plants with possible insect, mite or disease infestations. Carefully examine all parts of the plant, including leaf surfaces, leaf bases, flower and fruit stalks, and roots, looking for evidence of possible insect pests or disease problems. Houseplants can often be removed from their containers so that roots can be examined. Reject plants that show evidence of insect or mite infestations as well as possible disease symptoms, such as discolored stems and roots or leaf spots; these blemishes are not likely to disappear. </p>
+		
+      <p>Select plants with growing requirements (especially light and temperature needs) that fit the environment found in which they will be grown. Healthy plants are less vulnerable to attack by pests and diseases, and they will recover from these attacks more quickly and successfully. </p>
+      <p>When first placed in your home, vigilantly monitor new plants weekly for pests and diseases. In many cases, early detection and removal of a pest or disease, when it is still restricted to a single leaf or part of another plant part that can be removed, might be all that is necessary for eradication and successful management. If no problems are found after several weeks of monitoring, the inspection interval can be extended to once a month. </p>
+      <p>Periodic thorough washing of leaf surfaces with water can prevent many insect pests from infesting houseplants. Be certain to wash plants when conditions favor quick drying so that foliage does not remain wet for an extended period (prolonged wetness may favor disease development). Where practical, consider periodically rotating indoor plants to protected areas outdoors or into a shadehouse or greenhouse, if available, to rejuvenate them. In such cases, inspect plants closely for pests after returning them indoors and continue to monitor them for a few weeks to assure they are pest-free.</p>
+      <p>Whenever you detect insect, mite, or disease problems on an established plant in your home or office, isolate the plant immediately to prevent the problem from spreading to other plants. As an additional precaution, wash your hands after touching infested plants.</p>
+      <p>Make sure you identify the pest or disease correctly in order to choose effective management and control options. In many instances, control of a houseplant pest is impractical or nearly impossible once the pest is established. The best course of action in these situations is to discard the plant and consider starting fresh with a new one. </p> 
+                                        <h2 id="CONTROLLING_537_1">Controlling Insect and Mite Pests</h2>
+                                    
+                                <!-- cot:1/cse:537/muc:1-->
+                                <p>Some soft-bodied insects and mites can be removed by washing plant leaves and stems with water. Management of other pests may require insecticidal soap, horticultural oil, or other pesticides available as sprays, soil drenches, or soil-applied granules. </p>
+        <p>If you choose to apply a pesticide, use an insecticide or miticide that is recommended and labeled for use indoors on your houseplant species and against the pest you have identified. Follow all the label directions and safety precautions. Pesticide use indoors is legally and practically limited. Pesticides, when warranted, should be used according to their label instructions and only when other management strategies have failed or are unavailable. Broad-spectrum, long-residual materials should be avoided. </p>
+        <p>When applying sprays, wear protective gloves and any other protective equipment that may be required by the product label. Spray stems, leaves, and leaf undersides thoroughly. If possible, spray the plant outdoors so that the spray residue will be dispersed outside, and you will not have to worry about damaging furniture surfaces or exposing others to pesticides. Consider using a soap or horticultural oil, if labeled for your plant pest, before using other types of insecticides or miticides.  Alternatively, consider using a systemic pesticide that can be applied to the soil, thus avoiding foliar sprays. Soil drenches or applications of insecticide granules may control soilborne insects; the potting medium should be well watered before applying a drench or after applying granules. Be certain to follow safety guidelines on the product’s label. </p>
+        
+      
+<p>Although not usually practical for a few plants in a home or individual office, biological control practices that employ beneficial insects and nematodes which prey on or parasitize pests have been successful in some large-scale interiorscape plantings. This approach may be a part of an integrated pest management (IPM) program targeting specific pests, such as mealybugs, spider mites, scales, fungus gnats, and aphids. </p>
+        <p>Management of the most common insect pests of houseplants is discussed below. In addition to these common pests, consider ants as occasional pests in houseplants, especially those periodically rotated outdoors. Ant control is especially critical in managing sap-sucking insects like aphids, mealybugs, and scales. These pests excrete sugary honeydew upon which ants feed. Ants “farm” these pests, moving them around to new plants and protecting them from their natural enemies. If ants are found in potted plants, remove the containers from the building and discard them. </p>
+        <h3>Aphids</h3>
+        <p>Aphids are small insects found on new growth or on the underside of leaves. They suck plant juices and excrete a shiny, sticky sap, called “honeydew,” that can attract ants and encourage growth of sooty mold. Aphid infestations are often evident by the white cast skins that are left behind when aphids molt. Aphids can attack many different houseplant species, sometimes causing leaves to curl and become distorted.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/M/I-HO-MPER-CO.007.jpg' alt='Green peach aphids and cast skins on greenhouse gardenia leaves, San Mateo Co. Credit: Jack Kelly Clark, UC IPM' title='Green peach aphids and cast skins on gardenia leaves. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Green peach aphids and cast skins on gardenia leaves. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                <!-- cot:1/cse:537/muc:2-->
+                                <p>To control aphids, wash them off plants with a spray of water, practice sanitation (remove, bag, and dispose of infested plant parts), and apply <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soap</a> or <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142">horticultural oil</a> (consult product label to ensure your plant species tolerates these materials). As a last resort, consider judicious use of a systemic soil-applied insecticide or a foliar-applied insecticide labeled for use on the plant species.</p>
+<p>For general information about aphids and aphid management, see the UC IPM <a href="/PMG/PESTNOTES/pn7404.html"><em>Pest Notes: Aphids</em></a>.</p>
+		
+        <h3>Fungus gnats</h3>
+        <p>Fungus gnats become nuisances indoors when the adult mosquitolike flies emerge from the soil of houseplants, flying around indoors. This is especially common with newly purchased or transplanted houseplants. Several fungus gnat species live outdoors in California, so houseplants can become infested when grown outside temporarily, and adult fungus gnats can easily enter homes through open windows and doors. These flies are harmless to humans, but an infestation can damage plants due to feeding on roots by fungus gnat larvae. </p>
+        <p>Adult fungus gnats are dark, delicate-looking insects, similar in appearance to mosquitoes, but usually much smaller. They are relatively weak fliers, but the adults can be considerable nuisance pests indoors when flying near people, food, or light sources. These flies generally live near potted plants and can often be observed running or resting on growing media, foliage, or plant debris. They also may leave tiny black fecal deposits on plants and surrounding areas; these may be conspicuous and unsightly on white or light-colored surfaces. Adults are attracted to lights and may be first noticed near windows, indoor lighting, or around lit electronics (such as smartphones) at night.</p>
+        <p>Adult fungus gnats are about 1/10 to 1/8-inch long, gray to black, and slender, with long, delicate legs and one pair of clear wings. Fungus gnats infest moist organic soil and container media, where their larvae feed on organic matter and roots. </p>
+        <p>Females lay tiny eggs in moist organic debris or potting soil. Larvae have a shiny black head and an elongate, whitish to clear, legless body. The life cycle takes about a month under typical indoor temperatures, and reproduction can be year-round in most homes. Adults live about 7 to 10 days.</p>
+        <p>Fungus gnat larvae feed on roots, and if populations are very high, they can stunt plant growth in African violets, carnations, cyclamens, geraniums, poinsettias, and many foliage plants. Symptoms of infestation include sudden wilting, loss of vigor, poor growth, off-colored plants, and foliage loss. In addition to larvae chewing on roots, both larvae and adults can spread plant pathogens and may promote disease.</p>
+        <p>Management of fungus gnats should focus on prevention of infestations and cultural control methods. Inspect plants carefully for signs of insect infestation before purchasing them and inspect houseplants that you have left outdoors during warm weather before bringing them back into the house. Use screens on windows and patio doors to prevent adult gnats from entering your home from outside. Always use sterile potting soil when transplanting and repotting plants. Overwatering and poor drainage may promote fungus gnat population growth. Eliminate standing water and allow soil to dry as much as possible between watering. Practice good sanitation by removing old plant material and debris in and around pots. </p>
+       <p>Use of yellow sticky traps in and around houseplants can sometimes reduce fungus gnat populations by trapping adults. Biological control of fungus gnat larvae using repeated applications of bioinsecticides containing the bacterium <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=94"><em>Bacillus thuringiensis</em> subspecies <em>israelensis</em></a> (Bti) (available as Gnatrol or other products) can provide control in many cases. </p>
+<p>Although other insecticides may be labeled for use against adults and larvae, these products are rarely warranted to control these pests in homes.</p>
+<p>For more information see UC IPM <a href="/PMG/PESTNOTES/pn7448.html"><em>Pest Notes: Fungus Gnats</em></a>.</p>
+        <h3>Mealybugs</h3>
+        <p><a href="/PMG/P/I-HO-PAFF-CO.011.html">Mealybugs</a> are small, oval, whitish sap-sucking insects that cover houseplants with a cottony, powdery, or waxy material, often along the veins of leaves or where leafstalks join stems. Typical symptoms of mealybug infestations are stunted plant growth, yellowing, and leaf wilting. Mealybugs, like aphids, excrete honeydew, attract ants, and can be controlled using similar strategies. Mealybugs are common pests of orchids, palms, and succulents and may infest plant roots as well as shoots and leaves. Check carefully for mealybugs in tight crevices on the plant, such as behind or inside leaf bases, within leaflet folds, or in flower or fruit clusters.</p>
+       <p>To control mealybugs, scrape or wash them off plants with a spray of water, dispose of infested plant parts, and consider judicious use of <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142#gsc.tab=0">horticultural oil</a> or <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50#gsc.tab=0">insecticidal soap</a> labeled for use on your plant species. </p>
+        <p>In your own home, small infestations on houseplants can sometimes be controlled with 70% (or less concentrated) isopropyl (rubbing) alcohol applied directly on the mealybugs with a cotton swab. Test the alcohol solution on a small part of the plant one to two days beforehand to make sure it does not cause damage to the plant. Take care when using rubbing alcohol since it is flammable. Isopropyl alcohol is not a registered pesticide and cannot be used by licensed professionals. </p>
+        <p>Control of mealybugs may be very difficult. If the infestation is heavy or does not respond to treatments, then the best solution may be to dispose of the plant before more plants become infested. </p>
+		<p>For more information see UC IPM <a href="/PMG/PESTNOTES/pn74174.html"><em>Pest Notes: Mealybugs</em></a>.</p>
+        <h3>Mites</h3>
+        <p>Several mite species can attack indoor plants, often causing severe injury. The low humidity typically found in most indoor situations favors mite development. Also, dusty conditions, which often occur indoors, favor mite activity. </p>
+        <p>The most common pest mite species is the two-spotted spider mite. Spider mites have a wide host range, and very few indoor plants are immune to their attack. Adult spider mites are tiny (about 0.02 inch long (0.5mm)) and are usually found on the underside of leaves. A 10X hand lens is useful in identifying these pests. Feeding injury usually appears as light-colored spots or specks, called “stipples” or “stippling” damage, on leaves. Silk webbing may also be produced. Severe spider mite infestations cause leaves to dry and fall from the plants. At 75°F, mites develop from egg to adult in about two weeks.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/T/I-AC-TSPP-CD.041.jpg' alt='Damaged almond shoots showing webbing, stippled leaves and mites; . Credit: Jack Kelly Clark, UC IPM' title='Spider mites and webbing, Tetranychus species. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Spider mites and webbing, <em>Tetranychus</em> species. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                <!-- cot:1/cse:537/muc:3-->
+                                <p>Other mites, including the broad mite and cyclamen mite, can cause problems, as well. These mites are very tiny (0.0008 inch long (0.02mm)) and nearly impossible to see without a microscope. Infestations are recognized by plant injury symptoms rather than by seeing the mites themselves. Usually, feeding injury is evident on new growth and is characterized by thickened and brittle foliage, with stunted and downward-cupped leaf margins. Some of these symptoms are also characteristic of plant injury caused by chemicals, so infestations may be misidentified. </p>
+      <p>To control mites, frequently wash leaf surfaces with water, reduce dust, dispose of infested plant parts, and, as a last resort, apply <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142">horticultural oil</a> or <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soap</a> labeled for use on your plant species. If a mite infestation persists or becomes worse, it may be best to discard the infested plant to prevent spread to other plants.</p>
+<p>For more information see UC IPM <a href="/PMG/PESTNOTES/pn7405.html"><em>Pest Notes: Spider Mites</em></a>.</p>
+		
+        <h3>Scale Insects</h3>
+        <p>Scales are small, brown or grayish, mostly stationary insects that have a waxy shell-like body or a hard protective covering. Most common on houseplants are soft scale species, such as the <a href="/PMG/C/I-HO-CHES-CO.015.html">brown soft scale</a>. Soft scales suck plant juices and excrete honeydew, initially giving leaves a shiny, sticky surface but later stunting plant growth and discoloring leaves. Scale insects can be difficult to detect on fern fronds because they resemble spore clusters. Check carefully for scales in tight crevices on the plant, such as behind or inside leaf bases, leaflet folds, or in flower or fruit clusters.</p>
+       <p>To control scales, scrape them off plants, wash crawling juvenile stages off plants with water, dispose of infested plant parts, and consider applying <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142">horticultural oil</a> or <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soap</a> labeled for use on your plant species. These materials are most effective when scales are in the small immature nymph stage. Soil application of a systemic insecticide, as a drench or granules, is effective against some soft scale species. </p>
+<p>For more information see <em>UC IPM </em><a href="/PMG/PESTNOTES/pn7408.html"><em>Pest Notes: Scales</em></a>.</p>
+        <h3>Thrips</h3>
+        <p>Thrips are small (less than 1/8 inch long (3mm)), slender insects that may feed on plant leaves and flowers, resulting in scarring and, sometimes, distorted growth. Adults have narrow, fringed wings.  They are typically found on the undersides of leaves and within tight crevices on the plant. Thrips may cause stippling damage, similar to that caused by mites, but they also may deposit shiny black dots of excrement. Infested leaves often yellow and drop. Heavy thrips infestations on some plant species result in leaves that have silvery-gray damaged areas.</p>
+       <p>To control thrips, wash them off with water, dispose of infested plant parts, and consider using <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142">horticultural oil</a> or <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soap</a>. </p>
+<p>For general information about thrips see UC IPM <a href="/PMG/PESTNOTES/pn7429.html"><em>Pest Notes: Thrips</em></a>.</p>
+        <h3>Whiteflies</h3>
+        <p>Both adult and juvenile <a href="/PMG/B/I-HO-BARG-AD.004.html">whiteflies</a> attack houseplants. The largely immobile juveniles attach to the underside of leaves, suck plant juices, and excrete honeydew. The adults are small, white to yellowish winged insects that may be seen flying around infested plants. Whiteflies commonly infest poinsettias and many other plants, causing leaves to yellow and drop.</p>
+        <p>Use of yellow sticky traps in individual pots can sometimes reduce whitefly populations by trapping adults. To control whiteflies, wash eggs and crawling juveniles off plants with water, dispose of infested plant parts, and consider making repeated applications of a <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=142">horticultural oil</a> or <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soap</a> product. If a whitefly infestation becomes large it may be best to discard the plant. </p>
+<p>For general information about whiteflies see UC IPM <a href="/PMG/PESTNOTES/pn7401.html"><em>Pest Notes: Whiteflies</em></a>.</p> 
+                                        <h2 id="CONTROLLING_538_1">Controlling Houseplant Diseases</h2>
+                                    
+                                <!-- cot:1/cse:538/muc:1-->
+                                <p>Disease only occasionally plays an important role in the indoor life of a houseplant, provided it was healthy when purchased or obtained. Foliar leaf spots and blights that occur on outdoor plants will not usually be problems in the home or office because of lower humidity and lack of splashing water. Diseases of houseplants can be caused by various pathogens, including fungi, oomycetes, bacteria, viruses, and abiotic factors.</p>
+		
+        <p>Recognizing diseases on plants is sometimes more difficult than recognizing insect or mite pests because pathogens cannot usually be viewed directly. Therefore, frequent inspection and monitoring of plants for disease symptoms are important to identify and manage problems before serious damage occurs. </p>
+		
+        <p>Root rots, though sometimes diagnosed by direct observation of the root system, are frequently characterized by wilting or discoloration of above-ground plant parts. Off-color (brownish to blackish, or dark yellowish) roots, especially at the root tips, often indicate that root rot is present. Healthy roots should be white, entirely so or at least under their outer covering. </p>
+		
+        <h3>Powdery mildews</h3>
+        <p>Fungi that cause powdery mildew are host-specific, meaning they will only attack certain plant species or groups of related plants. Powdery mildew occurs often on grape ivy, kalanchoe, begonias, and pileas. The white to gray growth appearing on leaves, flowers, and stems is the fungus and its spores growing on the surface of the tissue. Powdery mildew usually will not kill a plant. The unsightly fungal growth and eventual defoliation that may occur greatly reduce the appearance and overall aesthetic quality of the plant, however. </p>
+        <p>Fortunately, environmental control of powdery mildew can sometimes be achieved by reducing humidity, accomplished by watering early in the day, moving plants into brighter light, and moving plants away from cold drafts near windows or doors.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/E/D-FL-EEUP-FO.002.jpg' alt='Pale, powdery, irregular spots on the underside of leave. Credit: Jack Kelly Clark, UC IPM' title='Powdery mildew growth on tree poinsettia leaves. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Powdery mildew growth on tree poinsettia leaves. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                <!-- cot:1/cse:538/muc:2-->
+                                <h3>Gray Mold</h3>
+         <p>Gray mold, or Botrytis blight, is caused by <em>Botrytis</em> spp. These fungi have a wide host range and primarily infect spent flowers and <a href="/PMG/B/D-FL-BCIN-FO.001.html">older foliage</a> on houseplants. Infected tissues appear as grayish or tan areas bearing dusty gray spores. Gray mold only infects plants and produces spores if relative humidity remains high for several hours. Infections are usually not serious unless temperatures remain cool and leaves or flowers remain wet for long periods.  </p>
+        <p>Botrytis blight can be managed by increasing air circulation, reducing humidity around plants, avoiding splashing water onto foliage and flowers, and removing spent or infected flowers and foliage. Water early in the day so that plant surfaces dry as quickly as possible.</p>
+		
+        <h3>Fungal leaf spots and blights</h3>
+        <p>Fungi that cause leaf spots and blights are generally spread by splashing water containing their spores. Most notable among these fungi are<em> Cercospora, Colletotrichum, Curvularia, Fusarium, Coniothyrium, Helminthosporium, Leptosphaeria</em>, and <em>Alternaria</em> spp. Symptoms often include tan to reddish brown to black roughly circular spots or lesions that may run together to cause large irregular shaped lesions or blighting of the entire leaf.</p>
+		
+        <p>Many of these fungi require hours of continuous leaf wetness for infection to occur. Therefore, these diseases can usually be prevented by avoiding splashing water onto foliage and by watering early in the day so that plant surfaces dry as quickly as possible. Remove and discard infected leaves or other plant parts as soon as disease symptoms are observed.</p>
+        <h3>Water mold root rots</h3>
+        <p><em>Pythium</em> and <em>Phytophthora</em> species are often called “water molds” because they have a swimming spore stage that is adapted to spread within water. They are not fungi. These organisms attack a wide variety of plants, causing root rots, stem rots, and “damping off” of seedlings and cuttings. Many times, these pests will not totally kill plants but will instead partially kill the root system, resulting in poor growth, yellowing, and stunting. </p>
+		
+        <p>Root rot is often associated with poor drainage and overwatering. Drainage can become poor as potting media ages, settles, loses aeration and porosity, and becomes compacted in the bottom of containers.</p>
+		
+        <p>Prevention of root rot requires good soil aeration and drainage as well as appropriate watering frequency. Root rot may sometimes be associated with high salt levels, so ensure proper water quality and periodic leaching of container soil to avoid problems.</p>
+       
+        <h3>Systemic bacterial diseases</h3>
+        <p>Many bacterial pathogens found on indoor plants can invade the vascular tissues of the plant and spread throughout its system. If conditions are favorable, these pathogens may begin to multiply in various areas of the infected plants and cause stem rots, leaf blights, wilts, and even root rots. These systemic bacterial diseases can cause wilting and general yellowing of plants. Systemic diseases may occasionally cause rotting or cankering of the stem tissue. The cankers or rots will be soft and mushy in appearance and may have an unpleasant odor.</p>
+        <p>Commonly encountered systemic bacterial diseases include soft stem rot of <em>Aglaonema</em>, <em>Dracaena</em>, <em>Kalanchoe</em>, and <em>Syngonium</em> spp. and bacterial stem rot, leaf spot, and wilt of <em>Aglaonema</em>, <em>Dieffenbachia</em>, <em>Philodendron</em>, and <em>Syngonium</em> spp.</p>
+        <p>Control strategies for these bacterial diseases are very limited, and discarding infected plants is often the best approach. Pesticide sprays are not effective because the pathogens are distributed throughout the plant, deep within all its tissues. Common systemic bacterial diseases can be prevented through a combination of sparse watering and low fertilization. The disease organisms are most active under warm, damp conditions, on soft tissues, and in heavily fertilized plants. These bacteria do not usually proliferate under typical indoor temperatures and humidity. Prevent bacterial infections by avoiding splashing water, contaminated hands, and pruning tools.</p>
+        <h3>Localized Bacterial Diseases and Bacterial Leaf Spots </h3>
+        <p>Localized bacterial diseases sometimes appear as oily, greasy, or water-soaked spots on leaves. These are often visible when viewing from the underside of the leaf. Species of <em>Pseudomonas</em> and <em>Xanthomonas</em> bacteria cause leaf spots or leaf blights on many plants growing indoors. Common hosts of <em>Xanthomonas</em> spp. are <em>Dieffenbachia</em> spp., <em>Philodendron scandens</em> ssp. <em>oxycardium</em>, <em>Hedera helix</em>, and <em>Pilea</em> and <em>Pellionia</em> spp.<em> Pseudomonas </em>spp. are found on <em>Aglaonema, Dracaena,</em> <em>Monstera</em>, and <em>Epipremnum</em> species. These diseases are characterized by dark green, water-soaked spots that may turn tan, dark brown, or black with a yellow border. The spots can enlarge until the entire leaf blade is affected. Sometimes these lesions spread into the petioles and stems and may appear like the systemic bacterial diseases previously mentioned. </p>
+        <p>Management of these diseases generally involves lowering humidity, keeping plant surfaces dry, and prompt removal of infested plant parts. Clean hands with soap and water and disinfect pruning tools in 70% alcohol after such removal actions.</p> 
+                                            <div class="alert alert-warning mt-3">The pesticide information on this page may become out of date as products and active ingredients change or become unavailable. Some of the pesticides listed are only available for use by licensed pesticide applicators. No endorsements of named products are intended, nor is criticism implied of products not mentioned.</div>
+                                        
+                                        <h2 id="REFERENCES_266_1">References</h2>
+                                    
+                                <!-- cot:1/cse:266/muc:1-->
+                                <p>Brenzel KN. (ed.). 2012. <i>Sunset Western Garden Book</i>. 9th ed. New York: Time Home Entertainment.</p>
+      <p>Dole JM, Wilkins HF. 1999. <i>Floriculture: Principles and Species</i>. Upper Saddle River, NJ: Prentice-Hall.</p>
+      <p>Desert-Tropicals.com website, <a href="http://www.desert-tropicals.com/">desert-tropicals.com/Plants/index.html</a>.</p>
+      <p>Furuta T. 1976. <i>Plants indoors: Selections for Various Environmental Conditions</i>. UC ANR Publication 2898. Oakland, CA.</p>
+      <p>Furuta T. 1977. <i>Plants Indoors: Their Care and Feeding</i>. UC ANR Publication 2941. Oakland, CA.</p>
+      <p>Kessler JR, Behe BK. 2006. <i>Care of Fresh Flowers and Holiday Plants</i>. Alabama Cooperative Extension System Publication ANR-830.</p>
+      <p>Meyer MH. 1998. <i>Keeping Flowers and Flowering Plants</i>. Minneapolis: University of Minnesota Extension Publication WW-07355.</p>
+      <p>Missouri Botanical Garden. 2013. Tropicos. tropicos.org.</p>
+      <p>Poole HA, Pittenger DR. 1980. <i>Care of Foliage and Flowering Plants for Retail Outlets. </i>Ohio State University Cooperative Extension Service Bulletin 661.</p>
+      <p>Powell CC, Lindquist RK. 1983. <i>Pest and Disease Control on Indoor Plants</i>. Columbus: Ohio State University Cooperative Extension Bulletin 711.</p>
+      <p>UC IPM <i>Pest Notes</i>. Updated regularly. UC IPM website, <a href="/PMG/menu.homegarden.html">ipm.ucanr.edu/PMG/menu.homegarden.html</a>.</p>
+      <p>Welsh DF, Cotner SD. 1989. In DF Welsh (ed.). <i>The Texas Master Gardener Handbook.</i> College Station: Texas A&amp;M University Agricultural Extension Service.</p>
+      <p>Welsh DF, Cotner SD. 1989. In DF Welsh (ed.). 2009. Houseplants. Texas A&amp;M AgriLife Extension website, <a href="http://aggie-horticulture.tamu.edu/plantanswers/publications/houseplant/houseplant.html">aggie-horticulture.tamu.edu/plantanswers/publications/houseplant/houseplant.html</a>.</p>
+      <p>Wyman D. 1997. <i>Wyman’s Gardening Encyclopedia</i>. New York: Scribner.</p>
+<p>This publication is adapted from "Houseplants," by D. R. Pittenger and R. C. Gay, chapter 10 in D. Pittenger, ed., <i>California Master Gardener Handbook, 2nd ed</i>. 2015. UCANR Publication 3382. Oakland, CA.</p> 
+
+                    <h2 id="RESOURCES">Resources</h2>
+                    <ul>
+                        <li><a href="/IPMPROJECT/about_urban.html">About Pest Notes</a></li>
+                        <li><a href="/PMG/glossary.html">Glossary</a></li>
+                        <li><a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/compare-active-ingredients/?conKey=4696">Compare Risks from Pesticides Mentioned</a></li>
+                        <li><a href="/PMG/PESTNOTES/warning.html">WARNING ON THE USE OF PESTICIDES</a></li>
+                        <li><a href="/PMG/PESTNOTES/index.html">List of other Pest Notes</a></li>
+                    </ul>
+
+					
+
+                    <h2 id="PUBLICATIONINFORMATION">Publication Information</h2>
+                    <div class="authors bg-color-light-blue">
+                        <img src="https://ipm.ucanr.edu/assets_v7/images/uc-peer-reviewed.png" title="UC Peer Reviewed Logo" alt="UC Peer Reviewed Logo">
+                        <p><strong>Pest Notes</strong>: Houseplant Problems</p>
+                        <p><strong>UC ANR Publication 74172</strong></p>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+</main>
+
+<meta property="og:url"                content="https://ipm.ucanr.edu/home-and-landscape/houseplant-problems/" />
+<meta property="og:type"               content="website" />
+<meta property="og:title"              content="Houseplant Problems / Home and Landscape / UC Statewide IPM Program (UC IPM)" />
+<meta property="og:description"        content="Houseplants are typically grown in enclosed and secure environments that may exclude many pests. Nonetheless, pests sometimes occur on houseplants. Decline in houseplant health is most commonly associated with improper watering (too much or too little water provided), improper fertilization amounts, root diseases, poor sanitation, and adverse environmental conditions, such as low light intensity or low relative humidity. Sometimes, however, houseplant problems may be caused by insect or mite pests. Routinely check your houseplants and promptly address these problems when detected. 
+When handling or observing your plants, examine them for signs and symptoms of pests and other types of damage and problems. Table 1 provides a quick guide for diagnosing houseplant problems. 
+In many instances, solving the problem or treating the pest will be difficult. Once a problem has been detected, it is sometimes not practical to restore a plant's health; it may be too late to solve the problem, and effective management for the pest may not be available. In these cases, it may be better to discard the plant and purchase a new one." />
+<meta property="og:image"              content="https://ipm.ucanr.edu/PMG/IMAGES/T/I-AC-TSPP-CD.041.jpg" />
+
+<script>
+    //$(document).ready(function () {
+       // /*
+       // $("#collapseExample").on("hide.bs.collapse", function(){
+       //   $("#multiCollapseExampleText").html('<span class="glyphicon glyphicon-collapse-down"></span> Open');
+       // });
+       // */
+        //$("#collapseExample").on("show.bs.collapse", function () {
+            //$("#multiCollapseExampleText").html('');
+        //});
+    //}); 
+
+    const expandQuickTips = (e, contentId, expandLinkId, gradientClass) => {
+    e.preventDefault();
+    const content = document.getElementById(contentId); //content div to expand/collapse
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+
+    content.classList.remove(gradientClass); // css for gradient
+    content.style.maxHeight = 'none';
+    expandLink.style.display = 'none';
+};
+
+// intially hide content
+const setInitQuickTipsHeight = (contentId,expandLinkId) => {
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+    const content = document.getElementById(contentId); 
+    const totalHeight = content.scrollHeight; 
+    const initialHeight = totalHeight * 0.25; 
+    const threshold = 200;
+    if (totalHeight > threshold) {
+        content.style.maxHeight = initialHeight + 'px';
+        content.style.overflow = 'hidden';
+    } else {
+        content.style.maxHeight = totalHeight + 'px'; 
+        expandLink.style.display = 'none';
+    }
+};
+setInitQuickTipsHeight('calloutBody','expandContent');
+</script><!-- INF10\footer-v5.cfm -->
+
+<!-- # WWW03\Templates\WWW_footerNav_3_2023.cfm -->
+
+
+
+
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Managing Pests</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/agriculture/">Agriculture</a></li>
+          <li><a href="/home-and-landscape/">Home and Landscape</a></li>
+          <li><a href="/natural-area-pests/">Natural Area Pests</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Safety</a></li>
+          <li><a href="/invasive-and-exotic-pests/">Invasive and Exotic Pests</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">About</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/about/">About UC IPM</a></li>
+          <li><a href="/highlights/">Annual Reports</a></li>
+          <li><a href="/strategic-plan/">UC IPM Strategic Plan</a></li>
+          <li><a href="/IPMPROJECT/programs.html">UC IPM Programs</a></li>
+          <li><a href="/what-is-ipm/">What is IPM?</a></li>
+          <li><a href="/whats-new/">What's New</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Resources</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/PMG/glossary.html">Glossary</a></li>
+          <li><a href="/GENERAL/links.html">Links</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Information</a></li>
+          <li><a href="/IPMPROJECT/pubsmenu.html">Publications and Newsletter</a></li>
+          <li><a href="/IPMPROJECT/recursos-espanol.html"><span lang="es">Recursos en espa&ntilde;ol</span></a></li>
+          <li><a href="/IPMPROJECT/workshops.html">Trainings and Events</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Get In Touch</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=RE: Houseplant Problems">Contact Us</a></li>
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=Feedback: Houseplant Problems">Feedback</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</footer>
+<div class="footer-secondary">
+  <div class="container">
+    <div class="row">
+      <div class="col-12 footer-secondary-content-wrap">
+        <img src="/assets_v7/images/logo/anr.png" alt="UC IPM logo with an outline of the state of california in the back drop and the UC ANR logo below." width="500px" class="mt-3 mb-3">
+        <div>
+          <div class="footer-icons">
+            
+            <a href="https://www.linkedin.com/showcase/uc-integrated-pest-management/" aria-label="Follow UC IPM on Linkedin"><i class="fab fa-linkedin"></i></a>
+            <a href="https://www.youtube.com/user/UCIPM" aria-label="Follow UC IPM on Youtube"><i class="fab fa-youtube"></i></a>
+            <a href="https://www.instagram.com/ucipm/" aria-label="Follow UC IPM on Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="https://www.facebook.com/UCIPM/" aria-label="Follow UC IPM on Facebook"><i class="fab fa-facebook-square"></i></a>
+          </div>
+        </div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="UC IPM Home and Landscape specific social media options">
+          <span class="footer-secondary-bolded-text">Home and Landscape: </span><a href="https://www.instagram.com/ucipmurban/">Instagram</a> | <a href="https://www.facebook.com/ucipmurban/">Facebook</a></div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="Copyright, usage notices and other links.">
+          <a href="/GENERAL/copyright.html">Use Permissions and Citations</a>
+          |
+          <a href="/nondiscrimination-statements/">Nondiscrimination Statement</a>
+          |
+          <a href="/GENERAL/acknowledgments.html">Acknowledgements</a>
+          |
+          <a href="/accessibility/">Accessibility</a>
+          |
+          <a href="https://ucanr.edu/?privacyStatement">Privacy Statement</a>
+          |
+          <a href="/ADMIN/">Staff-Only Page</a>
+          
+          <p class="small fc-uc-dark-blue mt-5">&copy;1996&mdash;2026 Statewide IPM Program, Agriculture and Natural Resources, University of California Regents of the University of California unless otherwise noted.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+" crossorigin="anonymous"></script>
+
+
+<script async src="https://siteimproveanalytics.com/js/siteanalyze_8343.js"></script>
+
+
+
+</body>
+</html>

@@ -11,7 +11,7 @@ function parseBoolean(value, defaultValue = false) {
   return defaultValue;
 }
 
-const DEFAULT_STAGE_TEMPLATES = [
+const OUTDOOR_STAGE_TEMPLATES = [
   {
     title: 'До цветения',
     kind: 'season',
@@ -35,6 +35,53 @@ const DEFAULT_STAGE_TEMPLATES = [
   },
 ];
 
+const INDOOR_STAGE_TEMPLATES = [
+  {
+    title: 'При первых симптомах',
+    kind: 'adhoc',
+    phi_days: 7,
+    note: 'Используйте щадящий шаг при повторении симптомов.',
+    meta: { trigger: 'symptom_recur' },
+  },
+  {
+    title: 'Контроль через 7 дней',
+    kind: 'season',
+    phi_days: 7,
+    note: 'Проверьте динамику листа и состояние субстрата перед следующими действиями.',
+    meta: { trigger: 'followup_7d' },
+  },
+];
+
+const DEFAULT_STAGE_TEMPLATES = OUTDOOR_STAGE_TEMPLATES;
+
+function normalizeHabitat(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (
+    normalized === 'indoor' ||
+    normalized.includes('комнат') ||
+    normalized.includes('home') ||
+    normalized.includes('room')
+  ) {
+    return 'indoor';
+  }
+  if (
+    normalized === 'outdoor' ||
+    normalized.includes('улиц') ||
+    normalized.includes('сад') ||
+    normalized.includes('огород') ||
+    normalized.includes('ground') ||
+    normalized.includes('теплиц')
+  ) {
+    return 'outdoor';
+  }
+  return null;
+}
+
+function resolveHabitat({ habitat, objectType } = {}) {
+  return normalizeHabitat(habitat) || normalizeHabitat(objectType) || 'outdoor';
+}
+
 function ensurePool(pool) {
   if (pool instanceof Pool) return pool;
   throw new Error('services/catalog requires an instance of pg.Pool');
@@ -46,9 +93,11 @@ function createCatalog(poolInstance) {
   const exec =
     pool && useProductRules ? (text, params = []) => pool.query(text, params) : null;
 
-  async function suggestStages({ crop, disease } = {}) {
+  async function suggestStages({ crop, disease, habitat = null, objectType = null } = {}) {
     // На MVP используем шаблон, но оставляем возможность донастройки в meta JSON.
-    return DEFAULT_STAGE_TEMPLATES.map((stage, idx) => ({
+    const resolvedHabitat = resolveHabitat({ habitat, objectType });
+    const templates = resolvedHabitat === 'indoor' ? INDOOR_STAGE_TEMPLATES : OUTDOOR_STAGE_TEMPLATES;
+    return templates.map((stage, idx) => ({
       ...stage,
       title: stage.title,
       order: idx + 1,
@@ -56,6 +105,7 @@ function createCatalog(poolInstance) {
         ...stage.meta,
         crop: crop || null,
         disease: disease || null,
+        habitat: resolvedHabitat,
       },
     }));
   }
@@ -108,4 +158,9 @@ function createCatalog(poolInstance) {
   return { suggestStages, suggestOptions, productRulesEnabled: useProductRules };
 }
 
-module.exports = { createCatalog, DEFAULT_STAGE_TEMPLATES };
+module.exports = {
+  createCatalog,
+  DEFAULT_STAGE_TEMPLATES,
+  OUTDOOR_STAGE_TEMPLATES,
+  INDOOR_STAGE_TEMPLATES,
+};

@@ -95,11 +95,21 @@ components:
   schemas:
     DiagnoseRequestMultipart:
       type: object
-      required: [image]
+      description: |
+        Multipart payload. Передайте либо `image` (один кадр),
+        либо `images` (массив до 8 кадров). Поле `images` используется
+        для комплексного анализа подборки.
       properties:
         image:
           type: string
           format: binary
+        images:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            type: string
+            format: binary
         prompt_id:
           type: string
           enum: [v1]
@@ -137,6 +147,17 @@ components:
         crop_ru:
           type: string
           example: "яблоня"
+        crop_confidence:
+          type: number
+          format: float
+          description: "Уверенность именно в распознавании культуры (0..1)."
+          example: 0.78
+        crop_candidates:
+          type: array
+          description: "2-3 наиболее вероятные культуры (используется для выбора, если нужно уточнение)."
+          items:
+            type: string
+          example: ["сансевиерия", "алоэ"]
         object_id:
           type: integer
           description: "ID объекта, если модель или бот смогли его определить/создать."
@@ -190,13 +211,13 @@ components:
           items:
             type: string
         need_clarify_crop:
-            type: boolean
-            description: "true, если модель хочет уточнить предполагаемую культуру."
+          type: boolean
+          description: "true, если модель хочет уточнить предполагаемую культуру."
         clarify_crop_variants:
-            type: array
-            items:
-              type: string
-            description: "Список вариантов культуры на выбор пользователя."
+          type: array
+          items:
+            type: string
+          description: "Список вариантов культуры на выбор пользователя."
         assistant_ru:
           type: string
           description: "Готовый текстовый ответ на русском для пользователя."
@@ -700,6 +721,20 @@ components:
             locale:
               type: string
               example: ru
+            history:
+              type: array
+              maxItems: 24
+              items:
+                type: object
+                required: [role, text]
+                properties:
+                  role:
+                    type: string
+                    enum: [user, assistant]
+                  text:
+                    type: string
+                    minLength: 1
+                    maxLength: 1000
 
     AssistantProposal:
       type: object
@@ -1183,7 +1218,8 @@ paths:
       description: |
         Upload a leaf photo and get back the predicted crop,
         disease and confidence score. Supports multipart uploads
-        via `image` field or JSON body with `image_base64`.
+        via `image` (single) or `images[]` (album up to 8 files),
+        and JSON body with `image_base64`.
       tags: [diagnose]
       security:
         - ApiKeyAuth: []

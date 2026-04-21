@@ -7,6 +7,7 @@
 ```
 landing/
 ├── index.html           # Основная страница
+├── gpt/                 # Хаб-страница: Карманный агроном в ChatGPT (GPT Store → Telegram fallback)
 ├── plant-disease-photo/ # Пиллар-страница: болезнь по фото
 ├── green-windows/       # Пиллар-страница: зелёные окна
 ├── phi/                 # Пиллар-страница: PHI
@@ -96,6 +97,9 @@ https://t.me/AgronommAI_bot?start=c3JjPXRnfG1lZD1jcGN8Y21wPWphbjI1
     Options -Indexes
   </Directory>
 
+  # Явный редирект на "красивый" URL (на всякий случай)
+  RedirectMatch 301 ^/gpt$ /gpt/
+
   # Gzip
   <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/css application/javascript image/svg+xml
@@ -155,6 +159,12 @@ sudo certbot --apache -d agronom.offonika.ru
 | `cta_click` | Клик по CTA-кнопке | `position`, `utm_source`, `utm_medium`, `utm_campaign` |
 | `pricing_view` | Скролл до тарифов (50% видимости) | `section` |
 | `faq_open` | Открытие вопроса FAQ | `question` |
+| `gpt_page_view` | Просмотр страницы `/gpt/` | `page`, `utm_source`, `utm_medium`, `utm_campaign` |
+| `gpt_open_click` | Клик “Открыть GPT” на `/gpt/` | `position`, `href`, `utm_*` |
+| `gpt_hub_click` | Клик “Открыть в ChatGPT” на главной (переход в `/gpt/`) | `position`, `href`, `utm_*` |
+| `gpt_to_telegram_click_main` | Переход из `/gpt/` в Telegram: основная кнопка | `position`, `utm_*` |
+| `gpt_to_telegram_click_diagnosis` | Переход из `/gpt/` в Telegram: “и начать диагностику” | `position`, `utm_*` |
+| `gpt_to_telegram_click` | Переход из `/gpt/` в Telegram: fallback для иных `position` | `position`, `utm_*` |
 
 ## Тестирование UTM
 

@@ -1,0 +1,6 @@
+ID кейса,Telegram ID тестера,Дата/время (МСК),Растение,Сценарий,Кол-во фото,Эталон (ground truth),Краткий ответ бота,Уверенность,Тип ошибки,Критичность,Ожидаемое поведение,Фактическое поведение,Шаги воспроизведения,Скриншоты,Заметки
+,,,,new_diagnosis,,,,,none,S3,,,,,
+,,,,followup_photo,,,,,context_lost,S2,,,,,
+,,,,ask_products,,,,,ux_dead_end,S2,,,,,
+,,,,assistant_chat,,,,,hallucination,S1,,,,,
+,,,,pending_retry,,,,,none,S3,,,,,

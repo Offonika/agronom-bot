@@ -2,7 +2,7 @@ const { msg, botLink } = require('./utils');
 const { sendStartNotice, getDocVersion } = require('./privacyNotice');
 const { logEvent, buyProHandler, cancelAutopay } = require('./payments');
 const { buildTipsKeyboard } = require('./photoTips');
-const { ensureUserWithBeta, isBetaUser } = require('./beta');
+const { ensureUserWithBeta, isBetaUser, logBetaEventOnce } = require('./beta');
 const support = require('./support');
 
 const MAIN_MENU_COMMANDS = [
@@ -114,10 +114,48 @@ function parseUtmPayload(payload) {
   };
 }
 
+function parseListEnv(raw) {
+  if (!raw) return new Set();
+  const text = String(raw).trim();
+  if (!text) return new Set();
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return new Set(parsed.map((v) => String(v).trim()).filter(Boolean));
+    }
+  } catch {
+    // fallback to comma-separated list
+  }
+  return new Set(
+    text
+      .split(',')
+      .map((item) => String(item).trim())
+      .filter(Boolean),
+  );
+}
+
+function shouldAutoEnrollBetaFromUtm(utm) {
+  // Opt-in by providing allowlist values in env.
+  const campaigns = parseListEnv(process.env.BETA_UTM_CAMPAIGNS);
+  if (!campaigns.size) return false;
+  if (!utm || typeof utm !== 'object') return false;
+  const utmSource = utm.source ? String(utm.source).trim() : '';
+  const utmMedium = utm.medium ? String(utm.medium).trim() : '';
+  const utmCampaign = utm.campaign ? String(utm.campaign).trim() : '';
+  if (!utmCampaign) return false;
+
+  const sourceAllow = String(process.env.BETA_UTM_SOURCE || '').trim();
+  const mediumAllow = String(process.env.BETA_UTM_MEDIUM || '').trim();
+  if (sourceAllow && utmSource !== sourceAllow) return false;
+  if (mediumAllow && utmMedium !== mediumAllow) return false;
+  return campaigns.has(utmCampaign);
+}
+
 async function startHandler(ctx, pool, deps = {}) {
   const db = deps.db;
   let dbUser = null;
   const isNewUser = { value: false };
+  const utm = parseUtmPayload(ctx.startPayload);
 
   if (db && ctx.from?.id) {
     try {
@@ -139,12 +177,35 @@ async function startHandler(ctx, pool, deps = {}) {
       }
 
       // Marketing: Save UTM parameters
-      const utm = parseUtmPayload(ctx.startPayload);
       if ((utm.source || utm.medium || utm.campaign) && typeof db.saveUtm === 'function') {
         try {
           await db.saveUtm(dbUser.id, utm);
         } catch (err) {
           console.error('saveUtm failed', err);
+        }
+      }
+
+      // Beta: auto-enroll from UTM allowlist (campaign-specific).
+      if (
+        dbUser &&
+        !dbUser.is_beta &&
+        shouldAutoEnrollBetaFromUtm(utm) &&
+        typeof db.updateUserBeta === 'function'
+      ) {
+        try {
+          dbUser = (await db.updateUserBeta(dbUser.id, { isBeta: true })) || dbUser;
+        } catch (err) {
+          console.error('auto beta enrollment failed', err);
+        }
+        try {
+          await logBetaEventOnce(db, dbUser.id, 'beta_entered', {
+            source: 'utm',
+            utm_source: utm.source || null,
+            utm_medium: utm.medium || null,
+            utm_campaign: utm.campaign || null,
+          });
+        } catch (err) {
+          console.error('auto beta beta_entered log failed', err);
         }
       }
 

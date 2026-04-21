@@ -38,6 +38,11 @@ class Settings(BaseSettings):
 
     # Marketing plan v2.4: same plant check window (days)
     same_plant_check_days: int = Field(10, alias="SAME_PLANT_CHECK_DAYS")
+    crop_clarify_threshold: float = Field(
+        0.75,
+        alias="CROP_CLARIFY_THRESHOLD",
+        description="Minimum crop confidence before forcing clarify-crop flow.",
+    )
 
     paywall_enabled: bool = Field(True, alias="PAYWALL_ENABLED")
     pro_month_price_cents: int = Field(19900, alias="PRO_MONTH_PRICE_CENTS")
@@ -115,6 +120,20 @@ class Settings(BaseSettings):
         True,
         alias="ASSISTANT_ENABLE_STUB",
         description="Allow assistant persistence on non-sqlite DBs",
+    )
+    assistant_rag_enabled: bool = Field(False, alias="ASSISTANT_RAG_ENABLED")
+    assistant_rag_top_k: int = Field(4, alias="ASSISTANT_RAG_TOP_K")
+    assistant_rag_min_similarity: float = Field(0.2, alias="ASSISTANT_RAG_MIN_SIMILARITY")
+    assistant_rag_ivfflat_probes: int = Field(50, alias="ASSISTANT_RAG_IVFFLAT_PROBES")
+    openai_rag_embedding_model: str = Field(
+        "text-embedding-3-small",
+        alias="OPENAI_RAG_EMBEDDING_MODEL",
+    )
+    assistant_rag_filter_lang: str | None = Field(None, alias="ASSISTANT_RAG_FILTER_LANG")
+    assistant_rag_filter_category: str | None = Field(None, alias="ASSISTANT_RAG_FILTER_CATEGORY")
+    assistant_rag_max_chunks_per_source: int = Field(
+        2,
+        alias="ASSISTANT_RAG_MAX_CHUNKS_PER_SOURCE",
     )
 
     model_config = ConfigDict(

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agro Backend Change"
+  short_description: "Чеклист для backend-изменений в agronom-bot"
+  default_prompt: "Выполни backend-изменение в agronom-bot с миграциями, тестами и обновлением docs."

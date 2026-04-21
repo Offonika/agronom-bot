@@ -1,0 +1,808 @@
+<!-- INF10\startRequest.cfm -->
+
+<!-- page-view-home-and-landscape\index.cfm -->
+
+<!-- ck:4446 --><!-- rp:/home-and-landscape/whiteflies --> 
+
+<!-- // Debug: ~infVer:10.0.0~/home-and-landscape/whiteflies~ck:4446~sk:9~v:0~pk:HLS~pv:01~tn:pn-qt-2x8~tv:2025~tk:1~ -->
+
+<!-- INF10\header-v5.cfm -->
+
+
+
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	
+	
+	
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" />
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700&amp;subset=latin,latin-ext" type="text/css" />
+	
+	
+	
+	<link rel="stylesheet" href="/assets_v7/styles/bootstrap-1.css" type="text/css" />
+	<link rel="icon" type="image/png" href="/assets_v7/images/favicon.ico" />
+			
+	
+	
+	
+	
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+	
+		<script src="https://unpkg.com/htmx.org@1.6.1"></script>
+	
+		<link href="/assets_v7/fontawesome7_1_0/css/fontawesome.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/brands.min.css" rel="stylesheet">
+  		<link href="/assets_v7/fontawesome7_1_0/css/solid.min.css" rel="stylesheet">
+	
+		<!-- Google Tag Manager -->
+		<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-NPR7B4');</script>
+		<!-- End Google Tag Manager -->
+	
+	
+	
+
+	<script async src="https://cse.google.com/cse.js?cx=005318318591192111806:oa2cd9kjx8k"></script>
+
+	<style>	
+		.icon-bar {
+		position: fixed;
+		z-index: 500;
+		top: calc(100vh - (100vh - 40%));
+		right: 0;
+		left: calc(100vw - 105px);
+		width: 140px;
+		-webkit-transform: translateY(-50%);
+		-ms-transform: translateY(-50%);
+		transform: translateY(-50%);
+		transform: rotate(-90deg);
+		}
+
+		.icon-bar a {
+		display: block;
+		text-align: center;
+		padding: 14px;
+		transition: all 0.3s ease;
+		color: white !important;
+		font-size: 14px;
+		border-bottom: none;
+		}
+		
+		.icon-bar a:hover {
+		background-color: #000;
+		}
+		
+		.pdf {
+		background: #bb0000;
+		color: white;
+		}
+
+		.print {
+		background: #008EAA;
+		color: white;
+		}
+		
+		.feedback {
+		background: #008EAA;
+		color: white;
+		}
+
+		@media print { 
+			.icon-bar {
+				display: none !important;
+			}
+		}
+	</style>
+	
+	
+		
+	<title>Whiteflies / Home and Landscape / UC Statewide IPM Program (UC IPM)</title>
+</head>
+
+<body>
+	
+		<!-- Google Tag Manager (noscript) -->
+		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NPR7B4" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+		<!-- End Google Tag Manager (noscript) -->
+	<!-- WWW03\Templates\WWW_headerNav_3_2023.cfm -->
+
+<div class="modal fade" id="notificationsModal" tabindex="-1" aria-labelledby="notificationsModal" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" >
+            <div class="modal-header flex-wrap">
+                <div class="modal-title" id="notificationsModalLabel">Notifications</div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="notificationsModalContent">
+                Loading...
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<nav class="navbar navbar-expand-lg navbar-light shadow megamenu-nav" id="nav"  >
+    <div class="container-fluid">
+        
+            <a class="navbar-brand" href="/" onclick="_sz.push(['event', 'Mega Menu', 'Logo', 'UC IPM']);"><img src="/assets_v7/images/logo/header-logo-ipm.png" width="150px" alt="UC IPM logo"></a>
+            
+        <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-content" aria-label="mobile menu" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', 'Collapsed']);">
+            <div class="hamburger-toggle">
+                <div class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-content">
+            <ul class="navbar-nav mr-auto mb-2 mb-lg-0">
+                <li class="nav-item dropdown dropdown-mega position-static">
+                    <a class="nav-link dropdown-toggle toggle-animation" href="#" data-bs-toggle="dropdown" data-bs-auto-close="outside" onclick="_sz.push(['event', 'Mega Menu', 'Manage Pests', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/whiteflies/']);">Manage
+                        Pests<i class="fas fa-chevron-down ms-1"></i></a>
+                    <div class="nav-dropdown dropdown-menu">
+                        <div class="mega-content">
+                            <div class="container-fluid">
+                                <div class="row">
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-1" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Home &amp; Landscape<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-1">
+
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/" class="dropdown-item">Home, Garden, Turf and Landscape Pests</a>
+                                            <a href="https://ucanr.edu/blogs/UCIPMurbanpests/" class="dropdown-item">Blog</a>
+                                            <a href="https://ucanr.edu/site/urban-community-ipm-webinars" class="dropdown-item">Webinars</a>
+                                            <a href="https://ipm.ucanr.edu/IPMPROJECT/videolibrary.html" class="dropdown-item">Video</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/" class="dropdown-item">Pesticide Active Ingredient Database</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/plant-problem-diagnostic-tool/" class="dropdown-item">Plant Problem Diagnostic Tool</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Seasonal Landscape IPM Checklist</a>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/wildlife-pest-identification/" class="dropdown-item">Wildlife Identification Tool</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                            <h6 class="dropdown-header mt-4">Resources</h6>
+                                            
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/seasonal-landscape-ipm-checklist/" class="dropdown-item">Landscape Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-multi-unit-housing-managers/" class="dropdown-item">Multi-unit Housing Managers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/retail-nursery-and-garden-center-ipm-news/" class="dropdown-item">Retail Nurseries and Garden Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-schools-and-child-care-centers/" class="dropdown-item">Schools and Child Care Centers</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/resources-for-structural-pest-management-professionals/" class="dropdown-item">Structural Pest Management Professionals</a>
+                                            <a href="https://ipm.ucanr.edu/home-and-landscape/master-gardeners/" class="dropdown-item">UC Master Gardeners</a>
+                                            
+                                            
+                                            
+                                            
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-2" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Agriculture<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-2">
+
+                                            <a href="https://ipm.ucanr.edu/agriculture/" class="dropdown-item">Pest Management Guidelines</a>
+
+                                            <a href="https://ipm.ucanr.edu/invasive-and-exotic-pests/" class="dropdown-item">Invasive and Exotic Pests</a>
+
+                                            <a href="https://ipm.ucanr.edu/GENERAL/pesticides.html" class="dropdown-item">Pesticide
+                                                Information</a>
+                                            <h6 class="dropdown-header mt-4">Tools</h6>
+                                            <a href="https://ipm.ucanr.edu/bee-precaution-pesticide-ratings/" class="dropdown-item">Bee
+                                                Precaution Pesticide Ratings</a>
+                                            <a href="https://ipm.ucanr.edu/agriculture/decision-support-tool/" class="dropdown-item">Decision
+                                                Support</a>
+                                            <a href="https://ipm.ucanr.edu/WEATHER/" class="dropdown-item">Weather, Models and Degree
+                                                Days</a>
+                                            <span class="border-top"></span>
+                                            <h6 class="dropdown-header mt-4 mb-2">Resources</h6>
+                                            <a href="https://ipm.ucanr.edu/PMG/glossary.html" class="dropdown-item">Glossary</a>
+                                            <a href="https://ipm.ucanr.edu/mitigation/" class="dropdown-item">Mitigating Pesticides</a>
+                                            <a href="https://ipm.ucanr.edu/natural-enemies/" class="dropdown-item">Natural Enemies
+                                                Gallery</a>
+                                            <a href="https://ipm.ucanr.edu/GENERAL/links.html" class="dropdown-item">Pest Management
+                                                Sites</a>
+                                            <a href="https://ipm.ucanr.edu/PMG/weeds_intro.html" class="dropdown-item">Weed Gallery</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4 col-sm-12 col-md-12 mb-1 mt-1">
+                                        <p data-bs-toggle="collapse" href="#collapseExample-3" role="button" aria-expanded="false" aria-controls="collapseExample" class="toggle-animation mb-0 mt-3 mb-3 no-click">Natural Areas<i class="fas fa-chevron-down ms-1 d-inline d-lg-none"></i></p>
+                                        <div class="list-group collapse hidden-collapse" id="collapseExample-3">
+                                            <a href="https://ipm.ucanr.edu/natural-area-pests/" class="dropdown-item">Natural Area Pests</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/events/" onclick="_sz.push(['event', 'Mega Menu', 'Events and Trainings', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/whiteflies/']);">Events
+                        and Trainings</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/about/" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'About', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/whiteflies/']);">About</a>
+                </li>
+            </ul>
+            <ul class="navbar-nav d-flex ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#searchModal" aria-disabled="true" onclick="_sz.push(['event', 'Mega Menu', 'Search', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/whiteflies/']);"><i class="fa-solid fa-magnifying-glass me-2"></i>Search</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="https://ipm.ucanr.edu/make-a-gift/" onclick="_sz.push(['event', 'Mega Menu', 'Donate', '/page-view-home-and-landscape/index.cfm?requestPage=/home-and-landscape/whiteflies/']);">Donate</a>
+                </li>
+                
+                
+                
+                
+                
+            </ul>
+        </div>
+    </div>
+</nav>
+<!-- Account Settings Modal -->
+<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsModalLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content" >
+            <div class="modal-header" >
+                <div class="modal-title" id="accountSettingsModalLabel">Account Settings</div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="accountSettingsModalBody">
+
+            </div>
+            <div class="modal-footer d-block">
+                <button type="button" class="btn btn-text float-start" data-bs-dismiss="modal" aria-label="Close">Close</button>
+                <button type="button" class="btn btn-primary float-end" hx-trigger="click" hx-post="htmx-INF-10-htmx-accountSettingsModalContent.cfm?submit=submit" hx-target="#accountSettingsModalBody" name="submit" value="submit" hx-include="[name='firstName'],[name='lastName']">
+                    Save
+                </button>
+            </div>
+		</div>
+	</div>
+</div>
+
+<script>
+    document.addEventListener('click', function (e) {
+        // Hamburger menu
+        if (e.target.classList.contains('hamburger-toggle')) {
+            e.target.children[0].classList.toggle('active');
+        }
+    })
+    var dropDownToggle = document.querySelectorAll('.toggle-animation');
+    dropDownToggle.forEach((dropdown) => {
+        dropdown.addEventListener('click', function () {
+            var icon = this.querySelector('.fas');
+            icon.classList.toggle('fa-chevron-down');
+            icon.classList.toggle('fa-chevron-up');
+        });
+    });
+    //change for medium and below
+    var adjustIconFloat = () => {
+        var breakpoint = 992;
+        var icons = document.querySelectorAll('.fa-chevron-down');
+        if (window.innerWidth <= breakpoint) {
+            icons.forEach(icon => {
+                icon.style.float = 'right';
+            });
+        } else {
+            icons.forEach(icon => {
+                icon.style.float = '';
+            });
+        }
+    }
+    window.addEventListener('resize', adjustIconFloat);
+    adjustIconFloat();
+</script>
+
+	
+
+	
+
+	<!-- Search Modal -->
+	<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-xl modal-dialog-scrollable">
+			<div class="modal-content">
+				<div class="modal-header">
+					<p class="h1 modal-title fs-5" id="searchModalLabel">Search</p>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="_sz.push(['event', 'Search Modal', 'Button', 'X']);"></button>
+				</div>
+				<div class="modal-body">
+					<form class="row g-3" onsubmit="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; return false;">
+						<div class="col">
+							<label for="searchInput" class="visually-hidden">search</label>
+							<input type="search" class="form-control" id="searchInput" placeholder="What's your pest problem?">
+						</div>
+						<div class="col-auto">
+							<button type="button" class="btn btn-primary" onclick="location.href = '#gsc.tab=0&gsc.q=' + document.getElementById('searchInput').value + '&gsc.sort='; _sz.push(['event', 'Search Modal', 'Button', 'Search']);">Search</button>
+						</div>
+					</form>
+					<div class="gcse-searchresults-only"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	
+
+<!-- HLS01\Templates\HLS_pn-qt-2x8_1_2025.cfm -->
+
+<!-- INF10\inf_contents-v10.cfm -->
+
+
+
+ 
+<main>
+    <div class="content-header-wrap urban">
+       <!-- INF10\inf_breadcrumb-v10.cfm -->
+
+
+
+<div class="breadcrumb-wrapper">
+	<div class="container">
+		<div class="row justify-content-center">
+			<div class="col-md-10 col-sm-12">
+				<nav aria-label="breadcrumb">
+					<ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="/">UC IPM</a></li><li class="breadcrumb-item"><a href="/home-and-landscape">Home and Landscape</a></li>
+					</ol>
+				</nav>
+			</div>
+		</div>
+	</div>
+</div>
+
+       
+        <header>
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-md-10 col-sm-12">
+                        <p class="eyebrow">Home and Landscape</p>
+                        <h1>Whiteflies</h1>
+                        <div class="info">
+                            
+                            
+                            
+                            <!--<div>Published on January 25, 2022</div>-->
+                            <div>Updated: 09/2015</div>
+                        </div>
+                        <div class="icons">
+                            <a href="https://ipm.ucanr.edu/PDF/PESTNOTES/pnwhiteflies.pdf"><i class="fa-solid fa-file-pdf" aria-label="PDF file"></i></a> 
+            <a href="https://www.linkedin.com/shareArticle/?mini=true&url=https://ipm.ucanr.edu/home-and-landscape/whiteflies/" target="_blank"><i class="fab fa-linkedin" aria-label="LinkedIn"></i></a>
+        
+            <a href="https://bsky.app/intent/compose?text=Learn%20about%20Whiteflies%20at%20UC%20IPM%2E%20https%3A%2F%2Fipm%2Eucanr%2Eedu%2Fhome%2Dand%2Dlandscape%2Fwhiteflies%2F" target="_blank"><i class="fa-brands fa-square-bluesky" aria-label="Bluesky"></i></a>
+        
+            <a href="https://www.facebook.com/sharer/sharer.php?u=https://ipm.ucanr.edu/home-and-landscape/whiteflies/" target="_blank"><i class="fab fa-facebook-square" aria-label="FaceBook"></i></a>
+        
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+            <div class="banner mb-5">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-md-10 col-sm-12">
+                            <img class="img-fluid" src='/PMG/IMAGES/T/I-HO-TVAP-AD.021banner.jpg' width="100%" height="100%" border="0" alt='Dozens of adult greenhouse whiteflies and tiny eggs on underside of a purplish leaf.  Credit: Jack Kelly Clark, UC IPM' title='Adult greenhouse whiteflies and tiny eggs. Credit: Jack Kelly Clark, UC IPM'>
+                            
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-2 col-md-2 d-none d-md-block">
+                <div class="position-sticky sticky-top side-nav-wrap-scroll" style="top:30px; z-index:0;">
+                    <nav id="navbar-example3" class="side-nav">
+                        <div class="h3 mb-3">On this page</div>
+                            
+                                <a class="nav-link" href="#QUICK_233_1">Quick Tips</a>
+                                <a class="nav-link" href="#INTRODUCTION_65_1">Pest Notes: Introduction</a>
+                            
+                                <a class="nav-link" href="#IDENTIFICATION_433_1">Identification and Life Cycle</a>
+                            
+                                <a class="nav-link" href="#DAMAGE_51_1">Damage</a>
+                            
+                                <a class="nav-link" href="#MANAGEMENT_52_1">Management</a>
+                            
+                                <a class="nav-link" href="#REFERENCES_266_1">References</a>
+                            
+                            <a class="nav-link" href="#RESOURCES">Resources</a>
+                            <a class="nav-link" href="#PUBLICATIONINFORMATION">Publication Information</a>
+                    </nav>
+                </div>
+            </div>
+            <div class="col-md-8 col-lg-8 col-sm-12 content-body">
+                <span class="in-nav-mobile d-block d-md-none">
+                    <a class="heading" data-bs-toggle="collapse" href="#HeaderSection" aria-expanded="false" aria-controls="HeaderSection">On this page<i class="fas fa-chevron-down float-end"></i>
+                    </a>
+                    <ul class="collapse" id="HeaderSection">
+                        
+                            <li class="nav-item"><a href="#QUICK_233_1">Quick Tips</a></li>
+                            <li class="nav-item"><a href="#INTRODUCTION_65_1">Pest Notes: Introduction</a></li>
+                        
+                            <li class="nav-item"><a href="#IDENTIFICATION_433_1">Identification and Life Cycle</a></li>
+                        
+                            <li class="nav-item"><a href="#DAMAGE_51_1">Damage</a></li>
+                        
+                            <li class="nav-item"><a href="#MANAGEMENT_52_1">Management</a></li>
+                        
+                            <li class="nav-item"><a href="#REFERENCES_266_1">References</a></li>
+                        
+                        <li class="nav-item"><a href="#RESOURCES">Resources</a></li>
+                        <li class="nav-item"><a href="#PUBLICATIONINFORMATION">Publication Information</a></li>
+                    </ul>
+                </span>
+                
+                <div data-bs-spy="scroll" data-bs-target="#navbar-example3" data-bs-offset="0" tabindex="0">
+                     
+                        <div class="callout" id="item-0">
+                            <div class="callout-title">
+                                <span id="QUICK_233_1"></span>
+                                <p class="h3">Quick Tips</p>
+                            </div>
+                            <div class="callout-body" id="calloutBody">
+                                <p><b>Whiteflies are tiny, sap-sucking insects that fly around plants when disturbed. </b>Adults are white and may have darker markings on their wings, while nymphs (immature stage) are oval, legless, and don't move. Nymphs cause most of the damage. Several whitefly species occur in California. Predators and parasites often keep them under control. Prevent whitefly problems by reducing dusty conditions, choosing less susceptible plants, using reflective mulches, and avoiding pesticides that kill whitefly natural enemies. When management is needed, consider using sticky traps, spraying insecticidal soaps or oils, or removing infested plants. </p>
+<p class="h3">Signs of a whitefly infestation:</p>
+      <ul>
+        <li>Tiny      nymphs on the underside of leaves</li>
+          <li>Sticky      honeydew on leaves, fruit, or beneath plants, or a covering of black sooty      mold</li>
+          <li>Yellowing,      silvering, or drying leaves that have whitefly nymphs on them</li>
+          <li>Deposits      of white wax with certain whitefly species </li>
+      </ul>
+    
+<p class="h3">Reduce whiteflies using traps or hand removal.</p>
+<ul>
+        
+           <li>Inspect      new plants for whiteflies before bringing them into your garden.</li>
+             <li>Prune      out isolated infested leaves when you first detect them.</li>
+             <li>Hose      adults off plants with a strong stream of water.</li>
+             <li>Hang      sticky-coated yellow traps. Use one trap for every medium-size vegetable      plant.</li>
+             <li>Promptly      destroy infested annuals when the flowering or fruiting period ends.</li>
+</ul>
+
+
+   <p class="h3">Use reflective mulch to protect young plants.</p> 
+     <ul>
+        <li>Use      shiny metallic-coated construction paper or reflective plastic mulch      products. These mulches repel whiteflies while plants are small.</li>
+          <li>Lay      the product on bare soil, bury its edges with soil, and insert seedlings      or seeds into holes in the mulch.</li>
+          <li>Plastic      mulches require drip irrigation underneath them; paper mulches may be      sprinkle or furrow irrigated.</li>
+          <li>Remove      mulches when plants get large and temperatures get hot.</li>
+     </ul>
+  
+     
+        <p class="h3">Protect other insects that help reduce whitefly numbers.</p>
+        <ul>
+        
+          <li>Many      beneficials or &ldquo;natural enemies&rdquo; such as lacewings and lady beetles help      control whiteflies.</li>
+            <li>Look      for signs of parasitization by mini-wasps, such as circular holes in      nymphs or a change in color.</li>
+            <li>Prevent      dusty conditions since dust can kill or disrupt the activity of      beneficials.</li>
+       
+          <li>Keep ants out of plants since they protect whiteflies from natural enemies. Don't use pesticides if natural enemies are present.</li>
+        </ul>
+       
+      
+       
+        <p class="h3">What about pesticides?</p>
+     <ul>
+          <li>Choose products that are least harmful to natural enemies&mdash;such as insecticidal soaps and oils&mdash;and combine their use with the other practices listed above. </li>
+          <li>Good coverage, including the underside of leaves, is essential. Repeat applications might be required. </li>
+       
+          <li>Avoid using broad      spectrum pesticides such as pyrethroids, organophosphates, or neonicotinoids.      Even the most toxic insecticides are only partially effective against      whiteflies. </li>
+        </ul> <p>Download a <a href="https://ipm.ucanr.edu/PDF/QT/qtwhitefly.pdf">PDF of this Quick Tips</a>. Descargue un <a href="https://ipm.ucanr.edu/PDF/QTSP/qtspwhitefly.pdf">PDF de estos Notas Breves</a>.</p>
+                            </div>
+                            <div class="p-3 text-center">
+                                <a href="#" data-bs-toggle="collapse" data-bs-target="#collapseExample" aria-expanded="false" aria-controls="collapseExample" class="gradient-vertical" id="expandContent"  onclick="expandQuickTips(event, 'calloutBody', 'expandContent', 'gradient-vertical')">
+                                    Read more Quick Tips for this pest
+                                </a>
+                            </div>
+                        </div>
+                    
+                                        <h2 id="INTRODUCTION_65_1">Pest Notes: Introduction</h2>
+                                    
+                                <!-- cot:1/cse:65/muc:1-->
+                                <p>Whiteflies are tiny, sap-sucking insects that may become abundant in vegetable and ornamental plantings, especially during warm weather. They excrete sticky honeydew and cause yellowing or death of leaves. Outbreaks often occur when the natural biological control is disrupted. Management is difficult once populations are high.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/B/I-HO-BTAB-AD.016.jpg' alt='Adults on cotton leaf, 6X; Credit: Jack Kelly Clark, UC IPM' title='Sweetpotato whitefly adults and nymphs. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >Sweetpotato whitefly adults and nymphs. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                        <h2 id="IDENTIFICATION_433_1">Identification and Life Cycle</h2>
+                                    
+                                <!-- cot:1/cse:433/muc:1-->
+                                <p>Despite their name, whiteflies are not true flies (in the insect order Diptera) but are in the order Hemiptera, related to aphids, scales and mealybugs. They derive their name from the mealy white wax covering the adult’s wings and body. Adults are tiny insects with yellowish bodies and four whitish wings. Although adults of some species have distinctive wing markings, many species are most readily distinguished in the last nymphal (immature) stage, which is wingless and lacks visible legs. Depending on species, whitefly nymphs vary in color from almost transparent yellow or whitish to black with a white fringe (Table 1). </p>
+<p>Whiteflies develop rapidly in warm weather, and populations can build up quickly in situations where natural enemies are ineffective and when weather and host plants favor outbreaks. Large colonies often develop on the <a href="/PMG/T/I-HO-TVAP-AD.021.html">undersides of leaves</a>. The most common pest species—such as greenhouse whitefly (<em>Trialeurodes vaporariorum</em>) and sweetpotato whitefly (<em>Bemisia tabaci</em>)—have a wide host range that includes many weeds and crops. These species breed all year round in warmer parts of California, moving from one host to another as plants are harvested or dry up. </p>
+<p>Another species of whitefly with a broad host range is the giant whitefly, <em>Aleurodicus dugesii,</em> which invaded Southern California in the early 1990s. It is now found in coastal areas and interior valleys in much of the state on a number of tropical and semi-tropical ornamental species. For more information on this species, see <a href="/PMG/PESTNOTES/pn7400.html"><em>Pest Notes:</em><em> Giant Whitefly</em></a>. Other species of whiteflies, especially those on woody species, often have a more limited host range. Table 1 lists common whiteflies in California gardens and landscapes. </p>
+<p>Whiteflies normally lay their tiny oblong eggs on the undersides of leaves. The eggs hatch, and the young whiteflies gradually increase in size through four nymphal stages called instars. The first nymphal stage (crawler) is barely visible even with a hand lens. The crawlers move around for several hours before settling to begin feeding. Later nymphal stages are immobile, oval, and flattened, with greatly reduced legs and antennae, like small scale insects. The winged adult emerges from the last nymphal stage (sometimes called a pupa, although whiteflies don’t have a true complete metamorphosis). <a href="/PMG/T/I-HO-TVAP-LC.002.html">All stages</a> feed by sucking plant juices from leaves and excreting excess liquid as drops of honeydew as they feed.</p> 
+                                <!-- cot:1/cse:433/muc:2-->
+                                <table class="table table-bordered table-striped table-content-wrap">
+    <caption>Table 1. Some Common Whiteflies.</caption>
+     <thead>
+  
+  <tr>
+    <th scope="col">Species</th>
+    <th scope="col">Host plants</th>
+    <th scope="col">Characteristics</th>
+  </tr>
+         </thead>
+    <tbody>
+  <tr>
+    <td><a href="/PMG/S/I-HO-SPHI-AD.007.html">Ash whitefly</a> <em>(Siphoninus phillyreae)</em> </td>
+    <td>Many   broadleaved trees and shrubs including ash, citrus, Bradford pear and other   flowering fruit trees, pomegranate, redbud, toyon</td>
+    <td>Fourth-instar   nymphs have a very thick band of wax down the back and a fringe of tiny   tubes, each with a liquid droplet at the end. Adults are white. Ash whitefly   is now under good biological control in CA, so it is rarely seen in high   numbers.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/T/I-HO-TVAP-AD.010.html">Greenhouse whitefly</a> <em>(Trialeurodes   vaporariorum)</em> </td>
+    <td>Very broad including most   vegetables and herbaceous ornamentals. Also may occur on avocado, fuchsia,   gardenia, lantana and redbud. </td>
+    <td>Fourth-instar   nymphs have very long waxy filaments and a marginal fringe. Adults have white   wings and a yellow surface or substrate.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/T/I-HO-TABU-PU.005.html">Bandedwinged   whitefly</a> <em>(Trialeurodes   abutilonea)</em></td>
+    <td>Very broad including cotton, cucurbits, other vegetables. </td>
+    <td>Fourth-instar nymphs have short, waxy filaments around   their edges. Adults have brownish bands across the wings, and their body is   gray.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/A/I-HO-ASPI-AD.004.html">Iris whitefly</a> <em>(Aleyrodes   spiraeoides)</em></td>
+    <td>Iris, gladiolus, many vegetables, cotton and other   herbaceous plants.</td>
+    <td>Fourth-instar nymphs have no fringe or waxy filaments but   are located near distinctive circles of wax where egg laying took place.   Adults have a dot on each wing and are quite waxy.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/D/I-HO-DCIT-PU.004.html">Citrus whitefly</a> <em>(Dialeurodes   citri)</em></td>
+    <td>Citrus, gardenia, ash, ficus, pomegranate.</td>
+    <td>Fourth-instar nymphs have no fringe around their edges but   have a distinctive Y-shape on their backs. Adults are white.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/T/I-HO-TMOR-PU.002.html">Mulberry whitefly</a> <em>(Tetraleurodes mori)</em></td>
+    <td>Avocado, citrus, mulberry, other trees.</td>
+    <td>Nymphs have blackish, oval bodies with white, waxy fringe.   Adults have reddish to gray wing markings.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/A/I-HO-ACOR-NM.002.html">Crown whitefly</a> <em>(Aleuroplatus coronata)</em></td>
+    <td>Oak, chestnut.</td>
+    <td>Fourth-instar nymphs are black with large amounts of white   wax arranged in a crownlike pattern. Adults are white.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/B/I-HO-BTAB-AD.006.html">Sweetpotato whitefly</a> <em>(Bemisia tabaci)</em></td>
+    <td>Very broad including many herbaceous and some woody plants   including cole crops, cotton, cucurbits, tomatoes, peppers, crape myrtle,   lantana, roses, and hibiscus.</td>
+    <td>Fourth-instar nymphs have no waxy filaments or marginal   fringe. Adults have white wings and yellow body; they hold their wings   slightly tilted to surface or substrate. </td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/A/I-HO-ADUG-AD.003.html">Giant whitefly</a> <em>(Aleurodicus dugesii)</em></td>
+    <td>Avocado, begonia, hibiscus, giant bird of paradise, orchid   tree, banana, mulberry, vegetables, and many ornamentals.</td>
+    <td>Adults are up to 0.19 inch long. They leave spirals of wax   on leaves. Nymphs have long filaments of wax that can be up to 2 inches long   and give leaves a bearded appearance. For more information, see <em>Pest Notes: <a href="/PMG/PESTNOTES/pn7400.html">Giant Whitefly</a></em>.</td>
+  </tr>
+  <tr>
+    <td><a href="/PMG/A/I-HO-AFLO-PU.003.html" target="_self">Woolly whitefly</a> <em>(Aleurothrixus floccosus)</em></td>
+    <td>Citrus, eugenia.</td>
+    <td>Nymphs are covered with fluffy, waxy filaments. Adults are   white.</td>
+  </tr>
+        </tbody>
+</table> 
+                                        <h2 id="DAMAGE_51_1">Damage</h2>
+                                    
+                                <!-- cot:1/cse:51/muc:1-->
+                                <p>Whiteflies use their piercing, needlelike mouthparts to suck sap from phloem, the food-conducting tissues in plant stems and leaves. Large populations can cause leaves to turn yellow, appear dry, or fall off plants. Like aphids, whiteflies excrete a sugary liquid called honeydew, so leaves may be sticky or covered with black sooty mold that grows on honeydew (See <a href="/PMG/PESTNOTES/pn74108.html"><em>Pest Notes:</em><em> Sooty Mold</em></a>). The honeydew attracts ants, which interfere with the activities of natural enemies that may control whiteflies and other pests. </p>
+    <p>Feeding by the immature sweetpotato whitefly, <em>Bemisia tabaci</em>, can cause plant distortion, discoloration, or silvering of leaves, and may cause serious losses in some vegetable crops. Some whiteflies transmit viruses to certain vegetable crops. Whiteflies are not normally a problem in fruit trees although their populations can build up in citrus, pomegranate and avocado. </p>
+    <p>Several whitefly species occur on ornamental trees and shrubs (see Table 1), but most are uncommon because of natural controls such as parasites and predators. Most whiteflies on trees have limited host ranges. Low levels of whiteflies are not usually damaging. Adults by themselves will not cause significant damage unless they are transmitting a plant pathogen. Generally, plant losses do not occur unless there is a significant population of whitefly nymphs. </p> 
+                                        <h2 id="MANAGEMENT_52_1">Management</h2>
+                                    
+                                <!-- cot:1/cse:52/muc:1-->
+                                <p>Management of heavy whitefly infestations is difficult. The best strategy is to prevent problems from developing in your garden or landscape. In many situations, natural enemies will provide adequate control of whiteflies; outbreaks often occur when natural enemies are disrupted by insecticide applications, dusty conditions, or interference by ants. Avoid or remove plants that repeatedly host high populations of whiteflies. </p>
+<p>In gardens, whitefly populations in the early stages of population development can be held down by a vigilant program of removing infested leaves or hosing down with water sprays. Reflective mulches can repel whiteflies from vegetable gardens, and yellow sticky traps can be used to monitor or, at high levels, reduce whitefly numbers. If you choose to use insecticides, <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=50">insecticidal soaps</a> or oils such as <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=38">neem oil</a> may reduce but not eliminate populations. Systemic insecticides may be more effective but can have negative impacts on beneficial insects and pollinators. </p>
+<h3>Biological Control</h3>
+<p>Whiteflies have many natural enemies, and outbreaks frequently occur when these natural enemies have been disturbed or destroyed by pesticides, dust buildup, or other factors. </p>
+<p>General predators include <a href="/natural-enemies/green-lacewings/">lacewings</a>, <a href="/natural-enemies/bigeyed-bugs/">bigeyed bugs</a>, and <a href="/natural-enemies/minute-pirate-bugs/">minute pirate bugs</a>. Several small lady beetles including <a href="/PMG/C/I-CO-CARC-AD.001.html"><em>Clitostethus arcuatus</em></a> (on ash whitefly) and scale predators, such as <em>Scymnus</em> or <em>Chilocorus</em> species, and the Asian multicolored lady beetle, <a href="/PMG/H/I-CO-HAXY-CO.002.html"><em>Harmonia axyridis</em></a>, feed on whiteflies. </p>
+<p>Whiteflies have a number of naturally occurring parasites that can be very important in controlling some species. <a href="/PMG/S/I-HO-SPHI-EP.002.html"><em>Encarsia </em>spp</a>. parasites are commercially available for release in greenhouse situations; however, they are not generally recommended for outdoor use because they are not well adapted for survival in temperate zones. </p>
+<p>You can evaluate the degree of natural parasitization in your plants by checking empty whitefly pupal cases. Those that were parasitized will have round or oval exit holes and those from which a healthy adult whitefly emerged will have a T-shaped exit hole. Whitefly nymphs can sometimes be checked for parasitization before emergence by noting a <a href="/PMG/T/I-HO-TVAP-EF.012.html">darkening</a> in their color. However, some whitefly parasites do not turn hosts black; and some species of whitefly nymphs that occur on ornamentals are black in their healthy, unparasitized state.</p> 
+                <img class="img-fluid-content" src='/PMG/IMAGES/T/I-HO-TVAP-EP.004.jpg' alt='Encarsia pergandiella emergence holes in greenhouse whitefly Pupae on leaf (17x) Credit: Jack Kelly Clark, UC IPM' title='A parasite has emerged from the round hole in the whitefly nymph at the bottom. Credit: Jack Kelly Clark, UC IPM'>
+                <figcaption >A parasite has emerged from the round hole in the whitefly nymph at the bottom. Credit: Jack Kelly Clark, UC IPM</figcaption>
+            
+                                    <!-- CSE:27/2 -->
+                                
+                                <!-- cot:1/cse:52/muc:2-->
+                                <p>Avoiding the use of insecticides that kill natural enemies is a very important aspect of whitefly management. Products containing <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=111">carbaryl</a>*, pyrethroids, or <a href="/home-and-landscape/pesticide-active-ingredients-database/active-ingredient-details/?uaiKey=22">imidacloprid</a> (especially as a foliar application) can be particularly disruptive. Control of dust and ants, which protect whiteflies from their natural enemies, can also be important, especially in citrus or other trees.</p>
+<h3>Removal</h3>
+<p>Hand removal of leaves or plants heavily infested with the nonmobile nymphal and pupal stages may reduce populations to levels that natural enemies can contain. Remove and destroy whitefly-infested vegetable plants after harvest. Always inspect new plants for whiteflies and nymphs before introducing them in the greenhouse or garden. </p>
+<p>If you have evergreen perennial plants that consistently host high populations of whiteflies in the winter season, then you may wish to remove these plants to lower overwintering populations. If you have high populations of whiteflies in a greenhouse, removing all host plants from the greenhouse for at least 2 weeks (and assuring that no whiteflies can enter from outside) may eliminate problems. </p>
+<p>Water sprays (syringing) may also be useful in dislodging adults. Watering can also reduce the hot, dry dusty conditions that favor whiteflies and inhibit their natural enemies. </p>
+<h3>Reflective Mulches</h3>
+<p>Shiny metallic-coated construction paper or reflective plastic mulches can repel whiteflies, especially away from small plants. Alternatively, you can spray clear plastic mulch with silver paint. Reflective plastic mulches are available online and in some garden stores.</p>
+<p>When putting a reflective mulch in your garden, first remove all weeds. Place the mulch on the plant beds and bury the edges with soil to hold them down. After the mulch is in place, cut 3- to 4-inch diameter holes and plant several seeds or single transplants in each one. You may be able to furrow irrigate or sprinkle your beds if you use coated construction paper or other porous mulch if it is sturdy enough to tolerate sprinkling. Plastic mulches will require drip irrigation. </p>
+<p>In addition to repelling whiteflies, aphids, and leafhoppers, the mulch will enhance crop growth and control weeds. Reflective mulches have been shown to deter pests that transmit viruses in commercial vegetable crops, perhaps helping to reduce disease incidence and crop loss. When summertime temperatures get high, remove mulches to prevent overheating plants. </p>
+<h3>Traps</h3>
+<p>In vegetable gardens, <a href="/PMG/S/S-CI-SCEN-MO.010.html">yellow sticky traps</a> can be posted around the garden to trap adults. Such traps won’t eliminate damaging populations but may reduce them somewhat as a component of an integrated management program relying on multiple tactics. Whiteflies do not fly very far, so many traps may be needed. You may need as many as one trap for every two large plants, with the sticky yellow part of the trap level with the whitefly infestation. Place traps with the sticky side facing plants but out of direct sunlight.</p>
+<p>Traps are most useful for monitoring and detecting whiteflies rather than controlling them. Commercial traps or sticky cards are available in stores and online. Additionally, you can make traps out of 1/4-inch plywood or masonite board, painted bright yellow, and mounted on pointed wooden stakes. Drive stakes into the soil close to the plants that are to be protected. Although commercially available sticky materials such as Tanglefoot are commonly used as coatings for the traps, you might want to try to make your own adhesive from one-part petroleum jelly or mineral oil and one-part household detergent. This material can be easily cleaned off boards with soap and water, whereas a commercial solvent must be used to remove the other adhesives. Periodic cleaning is essential to remove insects and debris from the boards and maintain the sticky surface.</p>
+<h3>Insecticide Sprays</h3>
+<p>Whiteflies can be difficult to control with insecticides. Most less-toxic products such as insecticidal soaps, neem oil, or petroleum-based oils control only those whiteflies that are directly sprayed. Therefore, plants must be thoroughly covered with the spray solution, and repeat applications may be necessary. Be sure to cover undersides of all infested leaves; usually these are the lowest leaves and the most difficult to reach. Use soaps or oils when plants are not drought-stressed and when temperatures are under 90°F to prevent possible “burn” damage to plants. Early evening, when there is enough light to safely apply products but when the sun is not shining directly on plants, may be a good time to spray. </p>
+<p>The soil-applied systemic insecticide imidacloprid can control whitefly nymphs. Imidacloprid can have negative impacts on natural enemies, honey bees and other pollinators in the garden, especially when applied as a foliar spray or as a soil application to plants that are flowering or soon to be flowering. It can also cause outbreaks of spider mites. Reserve its use for special situations where these problems can be avoided. Avoid using other pesticides (other than soaps and oils) to control whiteflies; not only do most of them kill natural enemies, whiteflies quickly build up resistance to them, and most are not very effective in garden situations.</p>
+
+<p>*As of August 1, 2020, pesticides containing the active ingredient carbaryl are restricted use materials in California. A valid pesticide applicator’s license is required for their possession and use. For more information see the <a href="https://www.cdpr.ca.gov/docs/county/cacltrs/penfltrs/penf2020/202010.htm">California Department of Pesticide Regulation website</a>.</p> 
+                                            <div class="alert alert-warning mt-3">The pesticide information on this page may become out of date as products and active ingredients change or become unavailable. Some of the pesticides listed are only available for use by licensed pesticide applicators. No endorsements of named products are intended, nor is criticism implied of products not mentioned.</div>
+                                        
+                                        <h2 id="REFERENCES_266_1">References</h2>
+                                    
+                                <!-- cot:1/cse:266/muc:1-->
+                                <p>Redak R, Schoeller, E, Kabashima JN. 2021. <a href="/PMG/PESTNOTES/pn7400.html"><em>Pest Notes: Giant Whitefly</em></a>. UC ANR Publication 7400. Oakland, CA.</p>
+<p>Flint ML. 2018. <a href="/IPMPROJECT/ADS/manual_gardenfarms.html"><em>Pests of the Garden and Small Farm</em></a><em>.</em> 3rd ed. UC ANR Publication 3332. Oakland, CA.</p>
+<p>Windbiel-Rojas K, Messenger-Sikes B. 2020. <a href="/home-and-landscape/sooty-mold/pest-notes/"><em>Pest Notes: Sooty Mold</em></a>. UC ANR Publication 74108. Oakland, CA.</p> 
+
+                    <h2 id="RESOURCES">Resources</h2>
+                    <ul>
+                        <li><a href="/IPMPROJECT/about_urban.html">About Pest Notes</a></li>
+                        <li><a href="/PMG/glossary.html">Glossary</a></li>
+                        <li><a href="https://ipm.ucanr.edu/home-and-landscape/pesticide-active-ingredients-database/compare-active-ingredients/?conKey=4446">Compare Risks from Pesticides Mentioned</a></li>
+                        <li><a href="/PMG/PESTNOTES/warning.html">WARNING ON THE USE OF PESTICIDES</a></li>
+                        <li><a href="/PMG/PESTNOTES/index.html">List of other Pest Notes</a></li>
+                    </ul>
+
+					
+
+                    <h2 id="PUBLICATIONINFORMATION">Publication Information</h2>
+                    <div class="authors bg-color-light-blue">
+                        <img src="https://ipm.ucanr.edu/assets_v7/images/uc-peer-reviewed.png" title="UC Peer Reviewed Logo" alt="UC Peer Reviewed Logo">
+                        <p><strong>Pest Notes</strong>: Whiteflies</p>
+                        <p><strong>UC ANR Publication 7401</strong></p>
+                        
+                            <p><strong>Author(s)</strong></p>
+                            
+                                    <p>M.L. Flint (emeritus), UC IPM and Entomology, UC Davis</p>
+                                
+                    </div>
+                </div>
+            </div>
+        </div>
+</main>
+
+<meta property="og:url"                content="https://ipm.ucanr.edu/home-and-landscape/whiteflies/" />
+<meta property="og:type"               content="website" />
+<meta property="og:title"              content="Whiteflies / Home and Landscape / UC Statewide IPM Program (UC IPM)" />
+<meta property="og:description"        content="Whiteflies are tiny, sap-sucking insects that may become abundant in vegetable and ornamental plantings, especially during warm weather. They excrete sticky honeydew and cause yellowing or death of leaves. Outbreaks often occur when the natural biological control is disrupted. Management is difficult once populations are high." />
+<meta property="og:image"              content="https://ipm.ucanr.edu/PMG/IMAGES/T/I-HO-TVAP-AD.021banner.jpg" />
+
+<script>
+    //$(document).ready(function () {
+       // /*
+       // $("#collapseExample").on("hide.bs.collapse", function(){
+       //   $("#multiCollapseExampleText").html('<span class="glyphicon glyphicon-collapse-down"></span> Open');
+       // });
+       // */
+        //$("#collapseExample").on("show.bs.collapse", function () {
+            //$("#multiCollapseExampleText").html('');
+        //});
+    //}); 
+
+    const expandQuickTips = (e, contentId, expandLinkId, gradientClass) => {
+    e.preventDefault();
+    const content = document.getElementById(contentId); //content div to expand/collapse
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+
+    content.classList.remove(gradientClass); // css for gradient
+    content.style.maxHeight = 'none';
+    expandLink.style.display = 'none';
+};
+
+// intially hide content
+const setInitQuickTipsHeight = (contentId,expandLinkId) => {
+    const expandLink = document.getElementById(expandLinkId); //expand link el
+    const content = document.getElementById(contentId); 
+    const totalHeight = content.scrollHeight; 
+    const initialHeight = totalHeight * 0.25; 
+    const threshold = 200;
+    if (totalHeight > threshold) {
+        content.style.maxHeight = initialHeight + 'px';
+        content.style.overflow = 'hidden';
+    } else {
+        content.style.maxHeight = totalHeight + 'px'; 
+        expandLink.style.display = 'none';
+    }
+};
+setInitQuickTipsHeight('calloutBody','expandContent');
+</script><!-- INF10\footer-v5.cfm -->
+
+<!-- # WWW03\Templates\WWW_footerNav_3_2023.cfm -->
+
+
+
+
+
+<footer>
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Managing Pests</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/agriculture/">Agriculture</a></li>
+          <li><a href="/home-and-landscape/">Home and Landscape</a></li>
+          <li><a href="/natural-area-pests/">Natural Area Pests</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Safety</a></li>
+          <li><a href="/invasive-and-exotic-pests/">Invasive and Exotic Pests</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">About</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/about/">About UC IPM</a></li>
+          <li><a href="/highlights/">Annual Reports</a></li>
+          <li><a href="/strategic-plan/">UC IPM Strategic Plan</a></li>
+          <li><a href="/IPMPROJECT/programs.html">UC IPM Programs</a></li>
+          <li><a href="/what-is-ipm/">What is IPM?</a></li>
+          <li><a href="/whats-new/">What's New</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Resources</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="/PMG/glossary.html">Glossary</a></li>
+          <li><a href="/GENERAL/links.html">Links</a></li>
+          <li><a href="/GENERAL/pesticides.html">Pesticide Information</a></li>
+          <li><a href="/IPMPROJECT/pubsmenu.html">Publications and Newsletter</a></li>
+          <li><a href="/IPMPROJECT/recursos-espanol.html"><span lang="es">Recursos en espa&ntilde;ol</span></a></li>
+          <li><a href="/IPMPROJECT/workshops.html">Trainings and Events</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-3 col-md-3 col-sm-6">
+        <h2 class="h3">Get In Touch</h2>
+        <ul class="footer-links-wrap">
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=RE: Whiteflies">Contact Us</a></li>
+          <li><a href="mailto:ipm-webmaster@ucanr.edu?subject=Feedback: Whiteflies">Feedback</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</footer>
+<div class="footer-secondary">
+  <div class="container">
+    <div class="row">
+      <div class="col-12 footer-secondary-content-wrap">
+        <img src="/assets_v7/images/logo/anr.png" alt="UC IPM logo with an outline of the state of california in the back drop and the UC ANR logo below." width="500px" class="mt-3 mb-3">
+        <div>
+          <div class="footer-icons">
+            
+            <a href="https://www.linkedin.com/showcase/uc-integrated-pest-management/" aria-label="Follow UC IPM on Linkedin"><i class="fab fa-linkedin"></i></a>
+            <a href="https://www.youtube.com/user/UCIPM" aria-label="Follow UC IPM on Youtube"><i class="fab fa-youtube"></i></a>
+            <a href="https://www.instagram.com/ucipm/" aria-label="Follow UC IPM on Instagram"><i class="fab fa-instagram"></i></a>
+            <a href="https://www.facebook.com/UCIPM/" aria-label="Follow UC IPM on Facebook"><i class="fab fa-facebook-square"></i></a>
+          </div>
+        </div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="UC IPM Home and Landscape specific social media options">
+          <span class="footer-secondary-bolded-text">Home and Landscape: </span><a href="https://www.instagram.com/ucipmurban/">Instagram</a> | <a href="https://www.facebook.com/ucipmurban/">Facebook</a></div>
+        <div class="footer-secondary-link-wrap" role="region" aria-label="Copyright, usage notices and other links.">
+          <a href="/GENERAL/copyright.html">Use Permissions and Citations</a>
+          |
+          <a href="/nondiscrimination-statements/">Nondiscrimination Statement</a>
+          |
+          <a href="/GENERAL/acknowledgments.html">Acknowledgements</a>
+          |
+          <a href="/accessibility/">Accessibility</a>
+          |
+          <a href="https://ucanr.edu/?privacyStatement">Privacy Statement</a>
+          |
+          <a href="/ADMIN/">Staff-Only Page</a>
+          
+          <p class="small fc-uc-dark-blue mt-5">&copy;1996&mdash;2026 Statewide IPM Program, Agriculture and Natural Resources, University of California Regents of the University of California unless otherwise noted.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+" crossorigin="anonymous"></script>
+
+
+<script async src="https://siteimproveanalytics.com/js/siteanalyze_8343.js"></script>
+
+
+
+</body>
+</html>

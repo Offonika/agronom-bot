@@ -77,7 +77,7 @@
 ## 🚀 Архитектура
 
 - Backend: **FastAPI** (или Node.js)
-- DB: **PostgreSQL**
+- DB: **PostgreSQL 15 + pgvector** (`docker-compose` по умолчанию использует `pgvector/pgvector:pg15`)
 - Хранилище: **S3 (VK S3 или MinIO)**
 - Очередь: **Bull / Celery / Redis (опционально)**
 - Аналитика: **Prometheus, Grafana, Loki**
@@ -100,10 +100,11 @@
 производит воркер `usage_reset.js` по CRON `5 0 1 * *` (МСК). При получении
 ошибки 402 бот показывает paywall с предложением купить Pro.
 Глобальный rate-limit реализован через Redis (`INCR`+`EXPIRE`): 30 req/мин с одного IP и 120 req/мин на `user_id` (для Pro нет ограничений). IP берётся из `request.client.host` или первого адреса в `X-Forwarded-For`, если последний прокси указан в `TRUSTED_PROXIES`. При превышении бот получает 429 и событие фиксируется в логах.
-Очередь повторной диагностики запускается скриптом `retry_diagnosis.js`
-по CRON из переменной `RETRY_CRON` (по умолчанию `0 1 * * *`) и
-обрабатывает задачи с параллелизмом из `RETRY_CONCURRENCY` (по умолчанию `1`).
-После трёх неудачных попыток (`RETRY_LIMIT=3`) статус снимка меняется на `failed`.
+Повторная диагностика `pending/retrying` обрабатывается отдельным сервисом
+`retry_diagnosis` (`scripts/retry_diagnosis_runner.py`) в Docker Compose.
+Воркер работает циклично с интервалом `RETRY_RUN_INTERVAL_SECONDS` (по умолчанию 60 c),
+берёт по `RETRY_BATCH_SIZE` записей за цикл (по умолчанию 20) и прекращает ретраи
+после `RETRY_LIMIT` попыток (по умолчанию 3, статус `failed`).
 Ротация секретов (`DB_URL`, `BOT_TOKEN_DEV`, `S3_KEY`) выполняется раз в неделю
 скриптом `rotate_secrets.ts` (CRON `0 3 * * 0`), который после обновления
 секретов выполняет `kubectl rollout restart`.
@@ -114,7 +115,7 @@
 
 | Метод | URL                       | Описание                      |
 |-------|---------------------------|-------------------------------|
-| POST  | `/v1/ai/diagnose`         | Отправка фото на диагностику |
+| POST  | `/v1/ai/diagnose`         | Диагностика по фото (1 кадр `image` или подборка `images[]` до 8 файлов) |
 | GET   | `/v1/photos`              | История снимков               |
 | GET   | `/v1/photos/{photo_id}`   | Статус обработки фото         |
 | GET   | `/v1/limits`              | Остаток бесплатных запросов  |
@@ -229,6 +230,25 @@ agronom-bot/
 
 Перед началом убедитесь, что у вас установлен **Node.js 20+** (бот и его тесты используют optional chaining/ES2022). Если системный `node` ниже, установите LTS 20 и добавьте его в `PATH` или запустите `npm test --prefix bot` через бинарник `node20`.
 
+### Важно: Docker-окружение
+
+Если в `.env` используются хосты сервисов из `docker-compose` (например, `db`, `redis`, `minio`), запускайте миграции и интеграционные проверки **внутри контейнеров**:
+
+```bash
+docker compose up -d db redis minio api bot
+docker compose exec api alembic upgrade head
+docker compose exec api pytest
+docker compose exec bot npm test --prefix bot
+```
+
+Запуск `alembic upgrade head` из хоста с таким `.env` обычно падает из-за DNS (`could not translate host name "db"`), потому что имя `db` резолвится только внутри docker-сети.
+
+Для RAG слой `pgvector` обязателен. Быстрая проверка в БД:
+
+```sql
+SELECT extname FROM pg_extension WHERE extname='vector';
+```
+
 1. Скопируйте файл шаблона переменных окружения командой `cp .env.template .env` и укажите параметры подключения к БД и S3. Минимально нужны (обязательно задайте `POSTGRES_PASSWORD` в `.env`):
 
    ```env
@@ -246,8 +266,9 @@ API_BASE_URL=http://localhost:8010
    S3_ACCESS_KEY=minio
    S3_SECRET_KEY=minio123
    REDIS_URL=redis://localhost:6379
-   RETRY_CONCURRENCY=1
    RETRY_LIMIT=3
+   RETRY_BATCH_SIZE=20
+   RETRY_RUN_INTERVAL_SECONDS=60
    ```
 
 `DATABASE_URL` и `BOT_DATABASE_URL` поддерживают форматы `postgresql://` и
@@ -319,6 +340,36 @@ Docker и при необходимости очистите DNS‑кеш (`sudo
 **Вариант B.** Если таблицы уже совпадают с актуальной схемой, выполните `alembic stamp head`, а затем применяйте миграции.
 
 Так база синхронизируется с Alembic и дальнейшие обновления пройдут без ошибок.
+
+### 📚 RAG bootstrap (новый стенд)
+
+Порядок для нового окружения:
+
+1. Примените миграции:
+   ```bash
+   alembic upgrade head
+   ```
+2. Проверьте preflight (БД доступна, `vector` extension, таблица `knowledge_chunks`):
+   ```bash
+   python scripts/rag_preflight.py --database-url "$DATABASE_URL"
+   ```
+3. Загрузите корпус знаний:
+   ```bash
+   python scripts/load_knowledge_chunks.py \
+     --database-url "$DATABASE_URL" \
+     --manifest load/rag_houseplants_seed_2026_02_24/manifest.csv \
+     --only-new
+   ```
+   Скрипт печатает итоговый отчёт: `inserted/updated/skipped/failed`.
+4. Выполните smoke retrieval:
+   ```bash
+   python scripts/rag_smoke_check.py \
+     --database-url "$DATABASE_URL" \
+     --query "трипсы на комнатных растениях" \
+     --min-hits 1
+   ```
+
+Короткий runbook по проверке `pgvector`: `runbooks/rag_pgvector.md`.
 
 4. Запустите API:
 
@@ -412,6 +463,18 @@ await asyncio.to_thread(_db_task)
    ```bash
    spectral lint -r .spectral.yaml openapi/openapi.yaml
    ```
+
+### AI-оркестратор проверок (авто/вручную)
+
+Для автоподбора проверок по изменённым путям используйте:
+
+```bash
+./scripts/agent_orchestrator.sh        # auto: по git diff
+./scripts/agent_orchestrator.sh all    # полный прогон
+```
+
+Скрипт запускает нужные проверки для backend/bot/openapi/RAG и напоминает про синхронизацию docs.  
+В CI этот же сценарий запускается через workflow `.github/workflows/agent-orchestrator.yml`.
 
 8. Быстро поднять всю инфраструктуру можно командой `docker-compose up -d`. После запуска сервис Grafana будет доступен на [http://localhost:3000](http://localhost:3000). По умолчанию логин и пароль `admin`/`admin`. При необходимости укажите переменные `GF_SECURITY_ADMIN_USER` и `GF_SECURITY_ADMIN_PASSWORD` в `.env`.
 

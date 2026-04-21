@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -13,8 +14,29 @@ from sqlalchemy import text
 from app.db import SessionLocal
 from app.services import assistant as assistant_service
 from app.services import assistant_llm
+from app.services import knowledge_rag
 
 logger = logging.getLogger(__name__)
+
+_PLAN_ID_CTA_RE = re.compile(r"📋\s*Открыть\s+план\s*#\d+", re.IGNORECASE)
+_FOLLOWUPS_TITLE_RE = re.compile(r"^\s*можно\s+спросить[:\s]*$", re.IGNORECASE)
+_ACK_GENDER_RE = re.compile(r"\bПонял\([аa]\)\b", re.IGNORECASE)
+_CHEMISTRY_QUERY_RE = re.compile(
+    r"(фунгицид|инсектицид|мед[ьи]|медн|хими|препарат|обработ)",
+    re.IGNORECASE,
+)
+_CHEMISTRY_LINE_RE = re.compile(r"(фунгицид|инсектицид|мед[ьи]|медн|хими)", re.IGNORECASE)
+_FORMAL_REPLACEMENTS = (
+    (re.compile(r"\bты\b", re.IGNORECASE), "Вы"),
+    (re.compile(r"\bтебе\b", re.IGNORECASE), "Вам"),
+    (re.compile(r"\bтебя\b", re.IGNORECASE), "Вас"),
+    (re.compile(r"\bтобой\b", re.IGNORECASE), "Вами"),
+    (re.compile(r"\bтвой\b", re.IGNORECASE), "Ваш"),
+    (re.compile(r"\bтвоя\b", re.IGNORECASE), "Ваша"),
+    (re.compile(r"\bтвое\b", re.IGNORECASE), "Ваше"),
+    (re.compile(r"\bтвоё\b", re.IGNORECASE), "Ваше"),
+    (re.compile(r"\bтвои\b", re.IGNORECASE), "Ваши"),
+)
 
 
 @dataclass
@@ -25,9 +47,14 @@ class AssistantContext:
     recent_diagnosis: dict[str, Any] | None
     latest_plan: dict[str, Any] | None
     latest_events: list[dict[str, Any]]
+    dialog_history: list[dict[str, str]]
 
 
-def load_context(user_id: int, object_id: int | None) -> AssistantContext:
+def load_context(
+    user_id: int,
+    object_id: int | None,
+    dialog_history: list[dict[str, Any]] | None = None,
+) -> AssistantContext:
     with SessionLocal() as session:
         objects = _fetch_objects(session, user_id, object_id)
         recent_diag = _fetch_recent_diagnosis(session, user_id, object_id)
@@ -41,7 +68,32 @@ def load_context(user_id: int, object_id: int | None) -> AssistantContext:
         recent_diagnosis=recent_diag,
         latest_plan=latest_plan,
         latest_events=latest_events,
+        dialog_history=_normalize_dialog_history(dialog_history),
     )
+
+
+def _normalize_dialog_history(dialog_history: list[dict[str, Any]] | None) -> list[dict[str, str]]:
+    if not isinstance(dialog_history, list) or not dialog_history:
+        return []
+    normalized: list[dict[str, str]] = []
+    for item in dialog_history:
+        if not isinstance(item, dict):
+            continue
+        role_raw = str(item.get("role") or "").strip().lower()
+        if role_raw not in {"user", "assistant"}:
+            continue
+        text_raw = str(item.get("text") or "").strip()
+        if not text_raw:
+            continue
+        normalized.append(
+            {
+                "role": role_raw,
+                "text": text_raw[:1000],
+            }
+        )
+    if len(normalized) > 24:
+        return normalized[-24:]
+    return normalized
 
 
 def build_response(
@@ -98,16 +150,36 @@ def _maybe_use_llm(
     object_label: str,
 ) -> tuple[str, list[dict[str, Any]], list[str]]:
     if not _llm_enabled():
-        return answer, proposals, followups
+        clean_answer, clean_followups = _finalize_assistant_text(
+            answer,
+            followups,
+            user_message=message,
+        )
+        return clean_answer, proposals, clean_followups
     try:
-        context = _build_llm_context(ctx, object_label, answer, followups, proposals)
+        context = _build_llm_context(
+            ctx,
+            object_label,
+            answer,
+            followups,
+            proposals,
+            user_message=message,
+        )
         llm_answer, llm_followups = assistant_llm.build_llm_response(message, context)
-        final_answer = llm_answer or answer
-        final_followups = llm_followups or followups
+        final_answer, final_followups = _finalize_assistant_text(
+            llm_answer or answer,
+            llm_followups or followups,
+            user_message=message,
+        )
         return final_answer, proposals, final_followups
     except Exception as exc:  # pragma: no cover - network/SDK errors
         logger.warning("assistant_llm_failed: %s", exc)
-        return answer, proposals, followups
+        clean_answer, clean_followups = _finalize_assistant_text(
+            answer,
+            followups,
+            user_message=message,
+        )
+        return clean_answer, proposals, clean_followups
 
 
 def _llm_enabled() -> bool:
@@ -120,6 +192,8 @@ def _build_llm_context(
     answer: str,
     followups: list[str],
     proposals: list[dict[str, Any]],
+    *,
+    user_message: str,
 ) -> dict[str, Any]:
     plan = _plan_matches_context(ctx.latest_plan, ctx.object_id)
     stage_lines = []
@@ -141,12 +215,13 @@ def _build_llm_context(
         }
     ctas: list[str] = []
     if plan and plan.get("id"):
-        ctas.append(f"📋 Открыть план #{plan.get('id')}")
+        ctas.append("📋 Открыть план")
         ctas.append("📋 Показать дневник")
     if any(
         "pin" in (proposal.get("suggested_actions") or []) for proposal in (proposals or [])
     ):
         ctas.append("📌 Зафиксировать")
+    knowledge = knowledge_rag.build_llm_knowledge_context(user_message)
     return {
         "object_label": object_label,
         "plan": {
@@ -164,9 +239,71 @@ def _build_llm_context(
         else None,
         "recent_diagnosis": diagnosis,
         "available_ctas": ctas,
+        "dialog_history": ctx.dialog_history or None,
+        "knowledge_rag": knowledge or None,
         "fallback_answer": answer,
         "fallback_followups": followups,
     }
+
+
+def _finalize_assistant_text(
+    answer: str,
+    followups: list[str],
+    *,
+    user_message: str = "",
+) -> tuple[str, list[str]]:
+    allow_chemistry = _chemistry_requested(user_message)
+    clean_answer = _normalize_text_line(answer, allow_chemistry=allow_chemistry)
+    clean_followups: list[str] = []
+    seen: set[str] = set()
+    for item in followups or []:
+        line = _normalize_text_line(item, allow_chemistry=allow_chemistry)
+        if not line or _FOLLOWUPS_TITLE_RE.match(line):
+            continue
+        line = line.rstrip(".;:").strip()
+        if line and not line.endswith("?"):
+            line = f"{line}?"
+        key = line.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        clean_followups.append(line)
+    return clean_answer, clean_followups[:3]
+
+
+def _chemistry_requested(user_message: str | None) -> bool:
+    if not user_message:
+        return False
+    return bool(_CHEMISTRY_QUERY_RE.search(str(user_message)))
+
+
+def _normalize_text_line(text: str | None, *, allow_chemistry: bool) -> str:
+    if not text:
+        return ""
+    value = str(text).strip()
+    if not value:
+        return ""
+    value = _PLAN_ID_CTA_RE.sub("📋 Открыть план", value)
+    value = _ACK_GENDER_RE.sub("Понял", value)
+    value = value.replace("влажной салфеткой", "чистой влажной тканью")
+    for pattern, replacement in _FORMAL_REPLACEMENTS:
+        value = pattern.sub(replacement, value)
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if not lines:
+        return ""
+
+    followups_idx = None
+    for idx, line in enumerate(lines):
+        if _FOLLOWUPS_TITLE_RE.match(line):
+            followups_idx = idx
+            break
+    if followups_idx is not None:
+        lines = lines[:followups_idx]
+
+    if not allow_chemistry:
+        lines = [line for line in lines if not _CHEMISTRY_LINE_RE.search(line)]
+
+    return "\n".join(lines).strip()
 
 
 def _fetch_objects(session, user_id: int, object_id: int | None) -> list[dict[str, Any]]:

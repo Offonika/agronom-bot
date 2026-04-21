@@ -148,6 +148,7 @@ def update_last_case_id_sync(user_id: int, case_id: int) -> None:
 def get_recent_case_for_same_plant_sync(
     user_id: int,
     max_age_days: int | None = None,
+    object_id: int | None = None,
 ) -> dict | None:
     """
     Get the most recent case for user within the "same plant" window.
@@ -159,16 +160,18 @@ def get_recent_case_for_same_plant_sync(
     with db_module.SessionLocal() as db:
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
-        row = db.execute(
-            text(
-                "SELECT id, object_id, crop, disease, confidence, created_at "
-                "FROM cases "
-                "WHERE user_id = :uid AND created_at >= :cutoff "
-                "ORDER BY created_at DESC "
-                "LIMIT 1"
-            ),
-            {"uid": user_id, "cutoff": cutoff},
-        ).first()
+        query = (
+            "SELECT id, object_id, crop, disease, confidence, created_at "
+            "FROM cases "
+            "WHERE user_id = :uid AND created_at >= :cutoff "
+        )
+        params: dict[str, object] = {"uid": user_id, "cutoff": cutoff}
+        if object_id is not None:
+            query += "AND object_id = :object_id "
+            params["object_id"] = object_id
+        query += "ORDER BY created_at DESC LIMIT 1"
+
+        row = db.execute(text(query), params).first()
 
         if not row:
             return None
@@ -235,7 +238,6 @@ __all__ = [
     "set_trial_period_sync",
     "save_utm_sync",
 ]
-
 
 
 

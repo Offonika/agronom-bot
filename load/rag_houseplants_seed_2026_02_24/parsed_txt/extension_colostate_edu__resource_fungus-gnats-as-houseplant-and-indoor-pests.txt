@@ -1,0 +1,65 @@
+Home
+/
+Resources
+/
+Insects & Pests
+/
+Fungus Gnats as Houseplant and Indoor Pests
+Back to Insects & Pests
+Peer-Reviewed
+Fungus Gnats as Houseplant and Indoor Pests
+Print
+Published: March 2003
+Reviewed: August 2025
+W. Cranshaw
+R. A. Cloyd
+Reviewed by Karim Gharbi
+Table of Contents
+quick facts
+Introduction
+Life History and Habits
+Management
+Quick facts…
+Fungus gnats are small, delicate bodied flies that commonly develop in the growing medium of houseplants.
+Larvae of fungus gnats feed on algae, fungi, and plant roots in growing medium. Adults do not bite or feed.
+Fungus gnats can be controlled by allowing the growing medium to dry between watering.
+Some insecticides and biological control agents can be used to control fungus gnat larvae in growing media.
+Introduction
+Fungus gnats (Bradysia species) – also known as dark-winged fungus gnats, are small, mosquito-like insects often found in homes and offices, usually in the vicinity of houseplants. They are considered a nuisance when present in noticeable numbers, but the adults are harmless insects that do not bite. Fungus gnat larvae develop in the growing medium of houseplants and are considered minor pests of houseplants.
+Adults are 1/8 inch long, delicate, black flies with long legs and antennae. There is a distinct “Y-shaped” pattern on the forewings. The larvae are wormlike and translucent, with a black head capsule, and live in the growing medium of houseplants.
+Figure 1
+: Fungas gnat adult.
+Life History and Habits
+Fungus gnat larvae are usually in the top 2 to 3 inches of the growing medium, depending on moisture level. They primarily feed on fungi, algae, and decaying plant matter. However, the larvae will feed on plant roots and leaves resting on the growing medium surface. Larvae develop rapidly and are fully grown in two to three weeks. They then pupate in or on the growing medium.
+Adults emerge about one week later. Fungus gnat adults are weak fliers, typically flying in short, erratic patterns. In homes, they are usually seen near an infested houseplant. However, adult flies may disperse short distances and often accumulate around window frames.
+Figure 2
+: Fungus gnat life cycle. Image from
+https://www.biobee.com/pests/fungus-gnats/
+During their seven to 10-day life span, females may lay up to 200 eggs into the cracks and crevices of growing media. Moist-growing media containing high amounts of peat moss are particularly attractive to adult females. At typical room temperatures (65 F to 75 F) the life cycle (egg to adult) may be completed in three to four weeks (Figure 1) with continuous reproduction occurring year-round on indoor plants. Fungus gnat adults do not bite but may drink water residing on plant leaves and/or on the surface of growing media.
+Nuisance problems with fungus gnat adults tend to be most noticeable during late fall and winter. There are several factors that may account for this seasonal peak. First, houseplants maintained outdoors during summer will commonly be colonized by fungus gnats, and when these plants are brought indoors, populations may subsequently increase in response to the warmer temperatures encountered in homes. Second, fungus gnats may be more noticeable during cooler weather, when people spend more time indoors, thus increasing the likelihood that fungus gnat populations will be highly noticed.
+However, the primary reason why fungus gnats are abundant in homes is related to changes in moisture levels associated with the growing media of houseplants. Fungus gnat adults are highly attracted to moist-growing media. Furthermore, as the growing medium ages or degrades it tends to retain more moisture, which will also attract fungus gnat adults. In addition, decreased day length and cooler temperatures slow plant growth and water usage. If watering practices are not altered, particularly during fall and winter when plants consume less water, the growing medium will remain moist, which improves conditions for fungus gnat development.
+Management
+An effective means of detecting the presence of fungus gnat larvae is to insert 1/4 inch slices or wedges of potato into the growing medium. The larvae will migrate to the potato and start feeding within a few days. The potato slices should be turned over to look for larvae present on the underside.
+A biological control option for control of fungus gnat larvae is applications of certain insect parasitic (or entomopathogenic) nematodes as a drench to the growing medium. Insect parasitic nematodes are microscopic roundworms that enter fungus gnat larvae through natural openings such as the mouth, anus, and breathing pores. The nematodes emit a bacterium that digests the internal contents of the larvae. Fungus gnat larvae die within three to four days. The nematode species
+Steinernema feltiae
+is particularly effective against fungus gnat larvae.
+The most important strategy to minimize fungus gnat problems associated with houseplants is to allow the growing medium to dry between watering, especially the top 1 to 2 inches. The dry growing medium will decrease survival of any eggs laid and/or larvae that hatch from the eggs as well as reduce the attractiveness of the growing medium to egg-laying adult females. In addition, it is recommended to re-pot every so often, particularly when the growing medium has “broken down” and is retaining too much moisture. Furthermore, be sure to remove any containers with an abundance of decaying plant matter such as decayed bulbs and roots, which provide an excellent food source for fungus gnat larvae.
+Insecticides may be necessary if fungus gnat problems persist several weeks after watering practices have been adjusted. Direct treatments at the adults or larvae; however, different approaches are used against each life stage. Typically, when fungus gnat populations are excessive, repeat applications are required to deal with adults. Apply insecticides to the growing medium surface since this is where new adults will emerge.
+Figure 3
+: Fungus gnat on sticky card.
+The most effective treatments are those that are persistent; killing adults for up to three days. A number of pyrethroid-based insecticides, with extended persistence, are available for use on houseplants including those containing the following active ingredients: bifenthrin, cyfluthrin, permethrin, and lambdacyhalothrin. Short-persisting contact insecticides such as those containing pyrethrins, soaps, oils, and neem, do not provide sufficient long-term control of fungus gnat adults and require repeat applications at short intervals (couple of days) to exhibit effects.
+The larvae in the growing medium will not be directly affected by any insecticides applied to kill adults. An alternative approach to deal with fungus gnat adults, particularly when populations are abundant, is to strategically place yellow sticky cards (sold as Gnat Stix) underneath the plant canopy or on the edge of containers. The adults are attracted to yellow and will be captured on the sticky cards. This may be helpful in mass-trapping adult females, thus reducing the number of larvae in the next generation.
+Figure 4
+: Fungus gnat larvae on potato slice.
+Larvae may be killed by the microbial insecticide Bacillus thuringiensis subsp. israelensis (
+Bti
+) when applied as a drench to the growing medium. However, formulations of
+Bti
+sold for fungus gnat control generally are unavailable through retail outlets. The
+Bti
+product marketed as Gnatrol is used in commercial greenhouses and large interior environments.
+The systemic insecticide imidacloprid will also kill fungus gnat larvae when applied to the growing medium. This active ingredient is available in a number of houseplant insecticide formulations such as granules, slow-release “spikes,” and in combination sprays with a pyrethroid-based insecticide.
+Reference: CSU Fact Sheet 5.584
+extension.colostate.edu/usda-non-discrimination-statement
+Disclaimer:
+This publication may contain pesticide recommendations that are subject to change at any time. These recommendations are provided only as a guide. It is always the pesticide applicator's responsibility, by law, to read and follow all current label directions for the specific pesticide being used. Due to ever-changing labels and product registrations, some of the recommendations given in this writing may no longer be legal by the time you read them. If any information in these recommendations disagrees with the label, the recommendation must be disregarded. No endorsement is intended for products mentioned, nor is criticism meant for products not mentioned. The author(s), Colorado State University, and Colorado State University Extension assume no liability resulting from the use of these recommendations. Beginning July 1, 2024, pesticide products containing neonicotinoid active ingredients and do not meet the listed product type exemptions, are considered "limited - use" pesticides and may only be sold by a licensed dealer.

@@ -1,0 +1,73 @@
+name: Agent Orchestrator
+
+on:
+  pull_request:
+    branches: ["develop"]
+    paths:
+      - "app/**"
+      - "bot/**"
+      - "openapi/**"
+      - "migrations/**"
+      - "tests/**"
+      - "locales/**"
+      - "load/**"
+      - "scripts/rag_*"
+      - "scripts/load_knowledge_chunks.py"
+      - "docs/**"
+      - "CHANGELOG.md"
+  push:
+    branches: ["develop"]
+    paths:
+      - "app/**"
+      - "bot/**"
+      - "openapi/**"
+      - "migrations/**"
+      - "tests/**"
+      - "locales/**"
+      - "load/**"
+      - "scripts/rag_*"
+      - "scripts/load_knowledge_chunks.py"
+      - "docs/**"
+      - "CHANGELOG.md"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Режим: auto по diff, all для полного запуска"
+        required: false
+        default: "auto"
+
+jobs:
+  route-and-run:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///./app.db
+      BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+      HEAD_SHA: ${{ github.sha }}
+      MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || 'auto' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          ./.codex/setup.sh
+          pip install pytest-asyncio
+
+      - name: Install bot deps
+        run: npm ci --prefix bot
+
+      - name: Install Spectral CLI
+        run: npm i -g @stoplight/spectral-cli
+
+      - name: Run agent orchestrator
+        run: ./scripts/agent_orchestrator.sh "$MODE"

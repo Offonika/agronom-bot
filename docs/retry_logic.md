@@ -1,93 +1,45 @@
 Retry Logic – «Карманный агроном»
 
-Версия 1.1 — 5 августа 2025 г.(v1.0 → v1.1: добавлен счётчик attempts, новые алерты Prometheus)
+Версия 1.2 — 12 февраля 2026 г. (v1.1 → v1.2: production retry-воркер без GPT stub, запуск в Docker Compose)
 
 1 · Статусы photos.status
 
-Status
+- `pending` — снимок сохранён, диагноз не получен в первичном запросе.
+- `retrying` — выполнена хотя бы одна повторная попытка, ждём следующую.
+- `failed` — исчерпаны попытки (`retry_attempts >= RETRY_LIMIT`) или устойчивые ошибки.
+- `ok` — диагноз получен.
 
-Meaning
+2 · Retry worker
 
-pending
+- Entry point: `scripts/retry_diagnosis_runner.py`
+- Service: `retry_diagnosis` в `docker-compose.yml`
+- Модель: повторные попытки идут через тот же `call_gpt_vision`, что и основной `/v1/ai/diagnose` (без заглушки `gpt_stub`).
+- Источник фото: S3 (`photos.file_id` → `app.services.storage.download_photo`).
 
-Снимок сохранён, GPT‑Vision не ответил (таймаут)
+2.1 Алгоритм цикла
 
-retrying
-
-Повтор запущен, предыдущая попытка ошиблась
-
-failed
-
-Исчерпаны попытки (retry_attempts ≥ RETRY_LIMIT)
-
-ok
-
-Диагноз успешно получен
-
-2 · Очередь retry-diagnosis
-
-Файл: worker/retry_diagnosis.js.
-
-Библиотека: BullMQ + Redis.
-
-Cron: 0 1 * * * (01:00 MSK, ежедневно).
-
-2.1 Алгоритм
-
-SELECT photos WHERE status='pending' OR status='retrying'.
-
-Для каждой записи:
-
-If retry_attempts ≥ RETRY_LIMIT → status='failed'.
-
-Else: call GPT‑Vision →
-
-success → status='ok', retry_attempts++.
-
-error   → status='retrying', retry_attempts++.
-
-Лог: handled=N, success=M, fail=K.
+1. Выбрать batch (`status IN ('pending','retrying')`, `deleted=false`) по свежим записям.
+2. Для каждой записи:
+   - если `retry_attempts >= RETRY_LIMIT` → `failed`;
+   - если `file_id` не похож на S3 key (legacy Telegram `file_id`) → сразу `failed`;
+   - иначе скачать фото из S3 и повторно вызвать GPT;
+   - при валидном результате (`crop` + `disease`) → `ok`, заполнить `confidence/roi`;
+   - при таймауте/ошибке/пустом результате → `retrying` или `failed` (по лимиту).
+3. Лог цикла: `scanned/succeeded/retried/failed`.
 
 2.2 Переменные среды
 
-Var
-
-Default
-
-Desc
-
-RETRY_LIMIT
-
-3
-
-макс. попыток на фото
-
-RETRY_CRON
-
-0 1 * * *
-
-расписание
-
-REDIS_URL
-
-
-
-redis://
+- `RETRY_LIMIT` (default `3`) — максимум попыток.
+- `RETRY_BATCH_SIZE` (default `20`) — размер батча за цикл.
+- `RETRY_RUN_INTERVAL_SECONDS` (default `60`) — интервал между циклами.
 
 3 · Observability
 
-Prometheus metric retry_attempts_total{status}.
+- Проверка очереди: `scripts/queue_monitor.py`.
+- Рекомендованный контроль: количество `photos.status IN ('pending','retrying')` и возраст самой старой pending записи.
 
-Alert ALRT-RETRY-FAIL – rate(retry_attempts_total{status="failed"}[15m]) > 10.
+4 · QA сценарий
 
-4 · Тест‑кейс (QA)
-
-TC-110: поместить 2 файла в pending и выключить GPT mock → после 4 циклов status='failed'.
-
-5 · Схема ER изменение
-
-ALTER TABLE photos
-  ADD COLUMN retry_attempts INT DEFAULT 0 NOT NULL;
-
-Документ docs/retry_logic.md (v1.1) заменяет v1.0.
-
+- Создать запись `pending`, убедиться, что сервис `retry_diagnosis` в `docker compose ps` имеет статус `Up`.
+- Дождаться 1–2 циклов и проверить, что статус изменился на `ok/retrying/failed`.
+- При достижении лимита попыток запись должна перейти в `failed`.

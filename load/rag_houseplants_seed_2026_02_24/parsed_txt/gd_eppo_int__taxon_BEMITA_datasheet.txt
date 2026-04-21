@@ -1,0 +1,1023 @@
+EPPO Global Database
+Go!
+advanced search...
+Login
+Register
+Toggle navigation
+Home
+Standards
+PP1 - Efficacy Evaluation of Plant Protection Products
+PP2 - Good Plant Protection Practice
+PP3 - Environmental Risk Assessment of Plant Protection Products
+PM1 - General Phytosanitary Measures
+PM3 - Phytosanitary Procedures
+PM4 - Production of Healthy Plants for Planting
+PM5 - Pest Risk Analysis
+PM6 - Safe use of Biological Control
+PM7 - Diagnostics
+PM8 - Commodity-specific Phytosanitary Measures
+PM9 - National Regulatory Control Systems
+PM10 - Phytosanitary Treatments
+Photos
+Acari
+Bacteria
+Chromista
+Fungi
+Gastropoda
+Insecta
+Nematoda
+Plantae
+Rodentia
+Viruses and viroids
+Wanted photos
+Reporting Service
+Explore by
+Countries
+Regional Plant Protection Organizations / EU / EAEU
+Data Sheets
+Taxonomy explorer
+PPP uses classification
+Download user guide
+Bemisia tabaci
+(BEMITA)
+Menu
+Overview
+Distribution
+Host plants
+Host commodities
+Vector of
+BCA
+Categorization
+Reporting
+Photos
+Documents
+Datasheet →
+EPPO links
+Tools
+Save as word file
+Save as PDF file
+Custom word...
+EPPO Datasheet:
+Bemisia tabaci
+IDENTITY
+Preferred name:
+Bemisia tabaci
+Authority:
+(Gennadius)
+Taxonomic position:
+Animalia: Arthropoda: Hexapoda: Insecta: Hemiptera: Sternorrhyncha: Aleyrodidae
+Other scientific names:
+Aleurodes tabaci
+Gennadius,
+Bemisia achyranthes
+Singh,
+Bemisia argentifolii
+Bellows & Perring,
+Bemisia bahiana
+Bondar,
+Bemisia emiliae
+Corbett,
+Bemisia goldingi
+Corbett,
+Bemisia gossypiperda
+Misra & Lamba,
+Bemisia hibisci
+Takahashi,
+Bemisia inconspicua
+(Quaintance),
+Bemisia longispina
+Priesner & Hosny,
+Bemisia lonicerae
+Takahashi,
+Bemisia manihotis
+Frappa,
+Bemisia minima
+Danzig,
+Bemisia minuscula
+Danzig,
+Bemisia nigeriensis
+Corbett,
+Bemisia rhodesiaensis
+Corbett,
+Bemisia vayssieri
+Frappa
+Common names in English:
+cassava whitefly, cotton whitefly, silverleaf whitefly, sweet-potato whitefly, tobacco whitefly
+view more common names online...
+Notes on taxonomy and nomenclature
+The genus
+Bemisia
+contains 37 species and is thought to have originated from Asia (Mound & Halsey, 1978).
+B. tabaci
+, being possibly of Indian origin (Fishpool & Burban, 1994), was described under numerous names before its morphological variability was recognized. For a full list of synonyms see Mound & Halsey (1978). Three distinct groups of
+B. tabaci
+have been identified by comparing their mitochondrial 16S ribosomal subunits. These are: 1) New World, 2) India/Sudan, 3) remaining Old World (Frohlich & Brown, 1994).
+The first reports of a newly evolved biotype of
+B. tabaci
+, the B biotype, appeared in the mid-1980s (Brown
+et al.,
+1995b). Commonly referred to as the silverleaf whitefly or poinsettia strain, the B biotype has been shown to be highly polyphagous and almost twice as fecund as previously recorded strains, and has been documented as being a separate species:
+B. argentifolii
+(Bellows
+et al.,
+1994). The B biotype is able to cause phytotoxic disorders in certain plant species, e.g., silverleaf in squashes (
+Cucurbita
+sp.) and this is an irrefutable method of identification (Bedford
+et al.,
+1992, 1994a). A distinctive non-specific esterase banding pattern is also helpful in identification (Brown
+et al.,
+1995a), but not infallible (Byrne
+et al.,
+1995).
+One may note that the presence or absence of spines on the 'puparium' is known to be determined by the smoothness or hairiness of the leaves of the host plant (Bedford
+et al.,
+1994a), yet the absence of a small anterior submarginal seta on the 4th larval instar/puparium stage has been described as one of the identifying morphological features of so-called
+B. argentifolii
+. No European populations of
+B. tabaci
+studied so far can be distinguished from so-called
+B. argentifolii
+by this or other morphological features, although these populations do not induce phytotoxic disorders or exhibit B biotype esterase banding patterns. It may be noted, finally, that several other biotypes (up to K) have been described (Brown
+et al.,
+1995b), which supports the idea of a species complex, rather than of a number of distinct species such as
+B. argentifolii
+. Several important taxonomic problems exist because, as a result of morphological studies of
+Bemisia
+species and others, it appears that morphological characteristics of many whitefly species are very poorly understood (Martin, 2003). Molecular techniques appear to solve some problems in whitefly phylogenies and they should be studied in synchrony with more thorough morphological studies of at least pupae and adults. This is indeed a fruitful field for further research (Gill and Brown, 2010).
+Bemisia tabaci
+is known for its genetic diversity and is considered a complex of biotypes (Brown
+et al.,
+1995b; Perring, 2001; Xu
+et al.,
+2010) or, as suggested, a complex of distinct cryptic species (De Barro
+et al.,
+2011). Recent report suggested that
+B. tabaci
+is considered a complex of at least 40 morphologically indistinguishable species (Bertin
+et al.,
+2021). The biotypes and species are largely differentiated based on biochemical or molecular polymorphism markers and differ in their biological characteristics such as host plant range, the capacity to cause plant disorders, attraction to natural enemies, expression of resistance and plant virus-transmission capabilities (e.g., Bedford
+et al.,
+1994b; Sanchez-Campos
+et al. ,
+1999; Horowitz
+et al.,
+2005). The B biotype is the most widespread biotype on a worldwide scale (it belongs to the Middle East Asia Minor 1—MEAM1 group) and is hypothesized to originate from the Middle East–Asia Minor region (De Barro
+et al.,
+2011). The confirmation of the identity of this (previously reported) biotype occurred in the late 1980s (Costa
+et al.,
+1993), following extensive outbreaks of
+B. tabaci
+in the South-West USA. An additional common biotype Q (belonging to the Mediterranean—MED group), which possibly originated in the Iberian Peninsula, has since spread globally (Horowitz
+et al.,
+2003; Chu
+et al.,
+2010). So far, the genetic group of
+B. tabaci
+MEAM1 (biotype B) is considered the most common
+B. tabaci
+species, and it has probably been dispersed throughout the world by international trade, mainly with ornamentals.
+Early reports have indicated that invasions of a new biotype can result in the displacement of indigenous biotypes as a result of competition or possibly other reasons for example: B biotype displaced A biotype in the USA (Brown
+et al.,
+1995b); the displacement of B by non-B populations such as the Q biotype (Guirao
+et al.,
+1997); Q biotype displaced B when insecticide selection occurred (Horowitz
+et al.
+2005). Since then, many reports have shown similar changes in biotypes/species of
+B. tabaci
+elsewhere, apparently due to frequent use of insecticides and development of insecticide resistance. Since 2005, a shift of biotype B to Q occurred in many locations in China (e.g., Teng
+et al.,
+2010). The opposite phenomenon has been observed on cotton fields in Israel, where since 2009, a significant shift in the biotype ratios has been observed: the B biotype replaced the Q biotype in cotton as well as in other crops.
+EPPO Categorization:
+A2 list
+EU Categorization:
+Quarantine pest ((EU) 2019/2072 Annex II A), PZ Quarantine pest ((EU) 2019/2072 Annex III)
+view more categorizations online...
+EPPO Code:
+BEMITA
+HOSTS
+2023-01-11
+Until the 1990s,
+B. tabaci
+was mainly known as a pest of field crops in tropical and sub-tropical countries: cassava (
+Manihot esculenta
+), cotton (
+Gossypium
+sp.), sweet potatoes (
+Ipomoea batatas
+), tobacco (
+Nicotiana
+sp.) and tomatoes (
+Solanum lycopersicum
+). Its host plant range within any particular region was small, yet
+B. tabaci
+had a composite range of around 300 plant species within 63 families (Mound & Halsey, 1978). With the evolution of the highly polyphagous B biotype,
+B. tabaci
+has now become a pest of protected crops in many parts of the world, especially
+Capsicum
+sp., courgettes (
+Cucurbita pepo
+), cucumbers (
+Cucumis sativus
+),
+Hibiscus
+sp.,
+Gerbera
+sp.,
+Gloxinia
+sp.
+,
+lettuces (
+Lactuca
+sp.), poinsettia
+(Euphorbia pulcherrima
+) and tomato.
+B. tabaci
+moves readily from one host species to another and has more recently been estimated as having a host range of more than 1000 species (mainly belonging to the families
+:
+Asteraceae, Brassicaceae, Convolvulaceae, Cucurbitaceae, Euphorbiaceae, Fabaceae, Malvaceae, Solanaceae) (Basu, 1995; Oliveira
+et al.,
+2001; Simmons
+et al. ,
+2008; Li
+et al.,
+2011; EFSA, 2013).
+According to EFSA, it is often difficult to distinguish between true hosts of
+B. tabaci
+(i.e., insects feed and complete its entire life cycle) and incidental hosts. The presence of
+B. tabaci
+on a particular plant species is not proof of host suitability. Feeding behaviour or oviposition are also unreliable host indicators because whiteflies can check a plant several times before rejecting it or laying eggs. For the purpose of risk assessment, the more suitable a plant is as a host (feeding and successful nymphal development), the higher the risk it presents as a commodity.
+Various literature sources (e.g., Simmons
+et al.,
+2008; Li
+et al.,
+2011) suggest three categories of host plants of
+B. tabaci
+: (i) host plant status (full life cycle supported – confirmed by experiments); (ii) host plant status confirmed from field observations; (iii) unconfirmed data. Due to its extensive host plant range, suitable hosts for
+B. tabaci
+are found in almost every environment, including agricultural and horticultural crops and among wild plants (EFSA, 2013; CABI, 2021).
+Host list:
+Abelmoschus esculentus
+,
+Amaranthus blitoides
+,
+Amaranthus retroflexus
+,
+Arachis hypogaea
+,
+Asteraceae
+,
+Atriplex semibaccata
+,
+Borago officinalis
+,
+Brassica oleracea
+,
+Brassica rapa subsp. sylvestris
+,
+Brassicaceae
+,
+Bryonia dioica
+,
+Capsella bursa-pastoris
+,
+Capsicum annuum
+,
+Chrysanthemum x morifolium
+,
+Convolvulaceae
+,
+Cucumis melo subsp. melo var. cantaloupensis
+,
+Cucumis sativus
+,
+Cucurbita moschata
+,
+Cucurbita pepo
+,
+Cucurbitaceae
+,
+Erigeron canadensis
+,
+Euphorbia pulcherrima
+,
+Euphorbiaceae
+,
+Fabaceae
+,
+Gerbera jamesonii
+,
+Glycine max
+,
+Gossypium hirsutum
+,
+Hibiscus
+,
+Ipomoea batatas
+,
+Lactuca sativa
+,
+Lactuca serriola
+,
+Lantana camara
+,
+Lavandula coronopifolia
+,
+Malvaceae
+,
+Manihot esculenta
+,
+Melissa officinalis
+,
+Mentha
+,
+Nicotiana tabacum
+,
+Ocimum basilicum
+,
+Oxalis pes-caprae
+,
+Phaseolus vulgaris
+,
+Salvia officinalis
+,
+Salvia rosmarinus
+,
+Senecio vulgaris
+,
+Sinningia
+,
+Solanaceae
+,
+Solanum lycopersicum
+,
+Solanum melongena
+,
+Solanum muricatum
+,
+Solanum nigrum
+,
+Sonchus oleraceus
+,
+Stellaria media
+,
+Tagetes erecta
+,
+Thymus serpyllum
+,
+Urtica urens
+,
+Verbena
+,
+Vigna radiata
+,
+Vigna unguiculata
+,
+Zea mays
+,
+plants
+,
+vegetable plants
+GEOGRAPHICAL DISTRIBUTION
+2023-01-11
+B. tabaci
+has a global presence. However, certain areas within Europe are still free from the pest or it is transient, e.g., Finland, Sweden, Republic of Ireland and the United Kingdom (Cuthbertson and Vänninen, 2015) as they have protected zones against this invasive pest.
+In Canada,
+B. tabaci
+is a glasshouse pest; it is not established outdoors (Broadbent
+et al.,
+1989; Howard
+et al.,
+1994; CFIA Canada, 2005, per J.A. Garland).
+In the USA, the MEAM1 species is frequent outdoors and the MED species used to be found just in protected crops (McKenzie
+et al.,
+2012); however, recently, the MED species was observed especially on hibiscus plants located in residential areas in Florida (McKenzie & Osborne 2017).
+EPPO Region:
+Algeria, Austria, Azerbaijan, Belgium, Bosnia and Herzegovina, Bulgaria, Croatia, Cyprus, Czechia, Finland, France (mainland, Corse), Georgia, Germany, Gibraltar, Greece (mainland, Kriti), Hungary, Ireland, Israel, Italy (mainland, Sardegna, Sicilia), Jordan, Kyrgyzstan, Malta, Montenegro, Morocco, Netherlands, Norway, Poland, Portugal (mainland, Madeira), Romania, Russian Federation (Southern Russia), Slovenia, Spain (mainland, Islas Baleares, Islas Canárias), Sweden, Switzerland, Tunisia, Türkiye, Ukraine, United Kingdom (England), Uzbekistan
+Africa:
+Algeria, Angola, Benin, Burkina Faso, Cabo Verde, Cameroon, Central African Republic, Chad, Congo, Congo, The Democratic Republic of the, Cote d'Ivoire, Egypt, Equatorial Guinea, Eritrea, Ethiopia, Gambia, Ghana, Guinea, Guinea-Bissau, Kenya, Libya, Madagascar, Malawi, Mauritius, Mayotte, Morocco, Mozambique, Nigeria, Reunion, Rwanda, Senegal, Seychelles, Sierra Leone, Somalia, South Africa, Sudan, Tanzania, United Republic of, Togo, Tunisia, Uganda, Zimbabwe
+Asia:
+Afghanistan, Bahrain, Bangladesh, Brunei Darussalam, Cambodia, China (Anhui, Beijing, Fujian, Guangdong, Guangxi, Guizhou, Hainan, Hebei, Heilongjiang, Henan, Henan, Hubei, Hunan, Jiangsu, Jiangxi, Liaoning, Neimenggu, Shaanxi, Shandong, Shanghai, Shanxi, Sichuan, Tianjin, Xianggang (Hong Kong), Xinjiang, Yunnan, Zhejiang), India (Andaman and Nicobar Islands, Andhra Pradesh, Assam, Bihar, Delhi, Gujarat, Haryana, Himachal Pradesh, Jammu & Kashmir, Karnataka, Kerala, Lakshadweep, Madhya Pradesh, Maharashtra, Meghalaya, Odisha, Punjab, Rajasthan, Tamil Nadu, Telangana, Tripura, Uttar Pradesh, West Bengal), Indonesia (Java, Sulawesi, Sumatra), Iran, Islamic Republic of, Iraq, Israel, Japan (Honshu, Shikoku), Jordan, Korea, Republic of, Kuwait, Kyrgyzstan, Lao People's Democratic Republic, Lebanon, Malaysia (Sarawak, West), Maldives, Myanmar, Nepal, Oman, Pakistan, Philippines, Saudi Arabia, Singapore, Sri Lanka, Syrian Arab Republic, Taiwan, Tajikistan, Thailand, Turkmenistan, United Arab Emirates, Uzbekistan, Vietnam, Yemen
+North America:
+Canada (Alberta, British Columbia, New Brunswick, Nova Scotia, Ontario, Québec), Mexico, United States of America (Alabama, Arizona, California, Connecticut, District of Columbia, Florida, Georgia, Hawaii, Illinois, Indiana, Kentucky, Louisiana, Maine, Maryland, Massachusetts, Michigan, Mississippi, New Hampshire, New Jersey, New York, North Carolina, Ohio, Oklahoma, Oregon, Pennsylvania, South Carolina, Tennessee, Texas, Vermont, Washington, Wisconsin)
+Central America and Caribbean:
+Antigua and Barbuda, Bahamas, Barbados, Belize, Bermuda, Costa Rica, Cuba, Dominica, Dominican Republic, El Salvador, Grenada, Guadeloupe, Guatemala, Haiti, Honduras, Jamaica, Martinique, Montserrat, Netherlands Antilles, Nicaragua, Panama, Puerto Rico, Saint Kitts and Nevis, Saint Lucia, Trinidad and Tobago, Virgin Islands (British)
+South America:
+Argentina, Bolivia, Brazil (Bahia, Distrito Federal, Goias, Maranhao, Mato Grosso, Mato Grosso do Sul, Minas Gerais, Parana, Pernambuco, Rio de Janeiro, Rio Grande do Sul, Sao Paulo), Colombia, French Guiana, Guyana, Paraguay, Peru, Uruguay, Venezuela
+Oceania:
+American Samoa, Australia (New South Wales, Northern Territory, Queensland, South Australia, Tasmania, Western Australia), Cook Islands, Fiji, French Polynesia, Guam, Kiribati, Marshall Islands, Micronesia, Federated States of, Nauru, New Caledonia, New Zealand, Niue, Northern Mariana Islands, Palau, Papua New Guinea, Samoa, Solomon Islands, Tonga, Tuvalu, Vanuatu
+BIOLOGY
+2023-01-11
+Biological characteristics of
+B. tabaci
+can be summarized based on Byrne & Bellows, 1991; De Barro, 1995; Stansly & Naranjo, 2010 and EFSA, 2013.
+Eggs (pear shaped with a pedicel point at the base) are usually laid in circular groups, on the underside of leaves, touching the surface and the long axis perpendicular to the leaf. They are anchored by a pedicel which is inserted into a fine slit made by the female in the tissues, and not into stomata, as in the case of many other aleyrodids. Eggs are whitish when first laid but gradually turn brown. Hatching occurs after 5-9 days at 30°C but, like many other developmental rates, this depends very much on host species, temperature and humidity.
+On hatching, the first instar, or 'crawler', is flat, oval and scale-like. This first instar is the only larval stage of this insect which is mobile. It moves from the egg site to a suitable feeding location on the lower surface of the leaf where its legs are lost in the ensuing moult and the larva becomes sessile. It does not therefore move again throughout the remaining nymphal stages. The first three nymphal stages last 2-4 days each (this could however vary with temperature). The fourth nymphal stage, called the puparium, lasts about 6 days and it is within the latter period of this stage that the metamorphosis to adult occurs.
+The adult emerges through a 'T'-shaped rupture in the skin of the puparium and spreads its wings for several minutes before beginning to powder itself with a waxy secretion from glands on the abdomen. Copulation begins 12-20 h after emergence and takes place several times throughout the life of the adult.
+In general, the life span of the female is two to three weeks (Drost
+et al.,
+1998; Henneberry & Castle, 2001) but can extend to 60 days. The life of the male is generally much shorter, being between 9 and 17 days. Each female lays up to 300 eggs during her lifetime, although the B biotype has been shown to lay more eggs. Each group of eggs is laid in an arc or a circular around the female. Eleven to fifteen generations can occur within one year.
+Bemisia tabaci
+is a vector of more than 400 plant viruses
+(Jones, 2003; Hogenhout
+et al.,
+2008, Ghosh and Ghanim, 2021),
+and in some cases, viral diseases reduce yield and may cause total crop loss. It is a vector of viruses in the genera of Begomovirus, Crinivirus, Potyviridae, Torradovirus, Carlavirus and Cytorhabdovirus (Ghosh & Ghanim, 2021).
+The begomoviruses (formerly geminiviruses) transmitted by
+B. tabaci
+are by far the most important viruses agriculturally, causing yield losses to crops of between 20 and 100% (Brown & Bird, 1992; Cathrin and Ghanim, 2014). Begomoviruses cause a range of different symptoms which include yellow mosaics, yellow veining, leaf curling, stunting and vein thickening. Begomoviruses associated with Cotton leaf curl Disease (CLCuD) cause severe losses to cotton crop, worldwide. Five species of begomovirus complexes i.e., cotton leaf curl Multan virus (CLCuMuV), cotton leaf curl Bangalore virus (CLCuBaV), cotton leaf curl Kokhran virus (CLCu-KoV), cotton leaf curl Gezira virus (CLCuGeV) and cotton leaf curl Alabad virus (CLCuAlV) are presently associated with CLCuD (Saleem
+et al
+., 2016). Tomato crops throughout the world are particularly susceptible to many different begomoviruses, and in most cases exhibit yellow leaf curl symptoms. Most of these epidemics in the Middle East and Europe are attributed to tomato yellow leaf curl virus (TYLCV) but may also be caused by other begomoviruses (Sánchez-Campos
+et al.,
+1999). TYLCV has also recently been recorded in the Americas, but several other, exclusively American, tomato begomoviruses have now been described, e.g. tomato mottle virus (EPPO/CABI 1996). Begomoviruses also cause heavy yield losses in their respective hosts. Dual infections have also been shown to occur. Several of these viruses are now quarantine pests for the EPPO region (e.g., bean golden mosaic, squash leaf curl, tomato mottle viruses, and lettuce infectious yellows closterovirus; tomato yellow leaf curl virus (EPPO/CABI, 1996).
+The emergence of the B biotype of
+B. tabaci
+, with its ability to feed on many different host plants has given whitefly-transmitted viruses the potential to infect new plant species. This has already been shown to have occurred in the Americas.
+Five begomoviruses are known to be present in Europe. Some of them have been shown to no longer be transmissible by
+B. tabaci
+: e.g. abutilon mosaic virus (Bedford
+et al.,
+1994a, Banks
+et al.,
+1999), possibly through many years of vegetative propagation of their ornamental host plants. The others are two different transmissible TYLCVs that are causing major crop losses within the tomato industries of Spain (mainland and the Canary Islands), Portugal and Italy. Indigenous weed species such as
+Solanum nigrum
+and
+Datura stramonium
+have also been shown to be field reservoirs for these tomato viruses (Bedford
+et al.,
+1994a) and may be the source of others yet to be identified within Europe. Two
+B. tabaci
+-transmitted belong to genus Crinivirus, are also now affecting European crops, including those in the Canary Islands. Cucurbit yellow stunting disorder is causing severe damage to cucumbers and melons in southern Europe (Celix
+et al.,
+1996), along with tomato chlorosis virus (Navas-Castillo
+et al.,
+1999). There are also reports of a third Crinivirus, tomato infectious chlorosis virus, in Europe (Duffus
+et al.,
+1996) although this virus currently appears not to be of economic significance. In addition, a
+Bemisia
+-transmitted potyvirus, cucumber vein yellowing virus (CVYV), appeared in cucumber crops in southern Spain for the first time in 2000 (Cuadrado
+et al.,
+2001). Despite a crop destruction programme to eradicate this virus, it has recently spread to melon crops in the region. Protected zones (e.g., the United Kingdom and Finland) within Europe remain free from damaging begomoviruses (Cuthbertson & Vänninen, 2015).
+There is a recent knowledge of whitefly-mediated transmission (
+B. tabaci
+MEAM1) of two recombinant poleroviruses (Luteoviridae), a virus group with an ssRNA genome that was only known to be associated with aphids (Ghosh & Ghanim, 2021).
+DETECTION AND IDENTIFICATION
+2023-01-11
+Symptoms
+The feeding of adults and nymphs causes chlorotic spots to appear on the surface of the leaves. Depending on the level of infestation, these spots may coalesce until the whole of the leaf is yellow, apart from the area immediately around the veins. Such leaves are later shed. The honeydew produced by the feeding of the nymphs covers the surface of the leaves and can cause a reduction in photosynthetic potential when colonized by moulds. Honeydew can also disfigure flowers and, in the case of cotton, can cause problems in processing the lint. With heavy infestations, plant height, number of internodes and quality and quantity of yield can be affected. The larvae of the B biotype of
+B. tabaci
+are unique in their ability to cause phytotoxic responses to many plant and crop species. These include a severe silvering of courgette leaves, white stems in pumpkin, white streaking in leafy brassica crops, uneven ripening of tomato fruits, reduced growth, yellowing and stem blanching in lettuce and kai choy (
+Brassica campestris
+) and yellow veining in carrots and
+Lonicera
+spp. (Bedford
+et al.,
+1994a; 1994b).
+Morphology
+Eggs
+Pear-shaped with a pedicel spike at the base, about 0.2 mm long.
+Nymphal stages
+The early first instar, or 'crawler', is flat, oval and scale-like. Other three nymphal stages are yellow-white 'scales', 0.3-0.6 mm long.
+Puparium
+Flat, irregular oval shape, 0.7 mm long. On a smooth leaf the 'puparium' lacks enlarged dorsal setae but, if the leaf is hairy, two to eight long dorsal setae are present.
+Adult
+About 1 mm long; the male slightly smaller than the female. The body and both pairs of wings are covered with a powdery, waxy secretion, white to slightly yellowish. Differentiation of whitefly species by means of the adults is difficult, although close observation of adult eye morphology will often show differences in ommatidial arrangements between species. However, at rest
+B. tabaci
+has wings more closely pressed to the body than
+Trialeurodes vaporariorum
+which is larger and more triangular in appearance.
+The fourth instar/puparium is used to distinguish between
+B. tabaci
+and
+T. vaporariorum
+as glasshouse pests.
+T. vaporariorum
+is 'pork-pie shaped', being regularly ovoid, with straight sides (viewed laterally) and in most instances, 12 large, wax setae;
+B. tabaci
+has an irregular 'pancake- like' oval shape, oblique sides and shorter, finer setae. The numbers of enlarged setae vary with the morphology of the host plant, however, and the two caudal setae are always stout and nearly always as long as the vasiform orifice. The length of caudal setae can be used to identify some
+Bemisia
+species.
+See Martin (1987) and Gill & Brown (2010) for more information on the identification of
+B. tabaci.
+Diagnostic protocols for
+B. tabaci
+as well as some common viral diseases, which the whiteflies transmit are available. PM 7/35 (EPPO 2004) describes a diagnostic protocol for
+Bemisia tabaci.
+Bemisia tabaci
+is an unresolved species complex. The revision of the diagnostic protocol will be initiated when the taxonomy is resolved but in the meantime the experts from the EPPO Panel on Diagnostics in Entomology agreed that the current protocol was appropriate regarding morphology.
+PM 7/050 (EPPO 2005) describes a diagnostic protocol for tomato yellow leaf curl begomovirus (TYLCV) and tomato mottle begomovirus (ToMoV) and PM 7/118 (EPPO 2013) describes a diagnostic protocol for tomato chlorosis virus and tomato infectious chlorosis virus (criniviruses)
+Detection and inspection methods
+Large numbers of chlorotic spots are seen on the leaves of infested plants, which may also be stained by honeydew and associated sooty moulds. Leaf curling, yellowing, mosaics or yellowing-veins could indicate the presence of whitefly-transmitted viruses and phytotoxic responses such as a severe silvering of courgette and melon leaves indicating the presence of a B biotype
+B. tabaci
+infestation, the immature stages being mainly responsible for this symptom (Costa
+et al.,
+1993). A close observation of the underside of the leaves will show the tiny yellow/white larval instars (immature stages, nymphs) and in severe infestations, when the plant is shaken, numerous small white adult-whiteflies will flutter out and quickly resettle. These symptoms do not appreciably differ from those of
+Trialeurodes vaporariorum
+, the glasshouse whitefly, which is common throughout Europe.
+For sampling and identification, the underside of the leaves should be inspected carefully to detect different life stages of the pest (eggs, larvae, pupae) or signs of it and honeydew (see also EPPO, 2016 and CABI, 2021). In addition to direct observations on plants, the use of yellow sticky traps for whitefly monitoring is common (Gerling & Horowitz, 1984; Pinto-Zevallos & Vänninen, 2013).
+PATHWAYS FOR MOVEMENT
+2023-01-11
+Adults of
+B. tabaci
+do not fly very efficiently but, once airborne, they can be transported quite large distances by the wind (Byrne, 1999; Isaacs
+et al.,
+1999). All stages of the pest are liable to be carried on planting material and cut flowers of host species. Ornamental trade, primarily the poinsettia pathway, was considered as the main route of introduction and spread of
+B. tabaci
+MEAM1 and Med in the United States (Dalton, 2006) and New Zealand (Drayton
+et al.,
+2009). Thus, the international trade in poinsettia is considered to have been a major means of dissemination within the EPPO region of the B biotype of
+B. tabaci
+(see also EPPO 2011 and EFSA 2013).
+PEST SIGNIFICANCE
+2023-01-11
+Economic Impact
+B. tabaci
+has been known as a pest of cotton and other tropical or semi-tropical crops in Asia, Africa, South America and the warmer parts of Europe and, has been effectively controlled by insecticides. However, in the southern states of the USA in 1991, due to invasion of biotype B, it was estimated to have caused combined losses of 500 million USD to the winter vegetable crops (Perring
+et al.,
+1993). Economic losses due to
+B. tabaci
+are enormous mainly in Africa, the Americas, Australia, Asia and Middle East (Horowitz
+et al.,
+2020). Henneberry & Faust (2008) summarized some reports related to economic losses, which estimated approximately 10 billion USD during the years 1980 to 2000. In India it was estimated that the losses in 1991 to various bean crops were approximately 300 million USD (Henneberry & Faust, 2008). Nevertheless, losses due to virus diseases transmitted by
+B. tabaci
+were considered the most damaging: Briddon (2003) reported that Cotton leaf curl disease caused 5 billion USD losses to cotton in Pakistan from 1992 to 1997, and Legg
+et al.
+(2014) estimated that cassava mosaic disease (CMD) and cassava brown streak disease (CBSD) caused annual production losses of more than 1 billion USD in Africa.
+Control
+Following outbreaks of
+B. tabaci
+in fields and greenhouses, the use of insecticides has increased rapidly. However, difficulties with its effective control on many crops are now being experienced worldwide due to insecticide resistance. Insecticide resistance in
+B. tabaci
+is widespread to the most used insecticides (Horowitz
+et al.,
+2020). Among the common cryptic species, MED (biotype Q) is considered more resistant than the MEAM1 (biotype B) to insecticides such as pyriproxyfen and neonicotinoids (e.g., Horowitz
+et al.,
+2005). However, in recent years, there are other species of
+Bemisia
+including MEAM1, Asia I and Asia II-1 that have developed high resistance levels to various groups of insecticides (e.g., Naveen
+et al.,
+2017; Dângelo
+et al.,
+2018). It appears that no single control treatment can be used on a long-term basis against this pest and that the integration of a number of different control agents needs implementing for an effective Integrated Pest Management (IPM) strategy. Each area where
+B. tabaci
+is occurring needs assessing individually and an appropriate IPM programme should be specifically designed. For example, the use of biological control agents such as the entomopathogenic fungi,
+Lecanicillium lecanii, Beauveria bassiana
+; the predatory mite
+Amblyseius swirskii
+some predatory Mirid species, and parasitoids belonging to
+Eretmocerus
+and
+Encarsia
+spp) is recommended (Horowitz
+et al.,
+2020). However, these agents can never bring infestation levels of
+B. tabaci
+down to a level that stops virus transmission. The use of virus- resistant crops should be investigated. Future control methods involving a disruption of the vector-virus-host plant cycle and the use of the RNA-interference method are presently under investigation.
+Phytosanitary risk
+The risk to the EPPO region is primarily to the glasshouse industry in northern countries, and mainly concerns the B and Q biotypes (MEAM1 and Med). Since its recent introduction to several of these countries, the pest has proved particularly difficult to combat because of its polyphagy, its resistance to many insecticides and its disruption of biological control programmes (Della Giustina
+et al.,
+1989). Very few countries remain free from
+B. tabaci
+, illustrating the difficulty of preventing its movement in international trade. Furthermore, it is likely that it is already present, but unreported, as a pest of field crops, in other countries in the south of the EPPO region. In addition, the Q biotype may now displace other biotypes on outdoor crops in Southern Europe and cause much greater damage.
+PHYTOSANITARY MEASURES
+2023-01-11
+Because of the difficulty of detecting low levels of infestation in consignments, it is best to ensure that the place of production is free from the pest. Particular attention is needed for consignments from countries where certain
+B. tabaci
+transmitted viruses, listed in quarantine lists, are present.
+In EPPO Standard PM 10/13 (EPPO 2009)
+a treatment programme aimed at eradication of
+B. tabaci
+is suggested. It might be done in those parts of the EPPO region where the pest is not established, or for eradication of new and invasive biotypes (or species). It is proposed to treat ornamental production sites with insecticides and use various methods of applications (e.g., spray, fogs, space treatment, soil drench and granular). A treatment schedule is detailed in the EPPO Standard and applications of various insecticides have been found successfully in eradicating outbreaks of
+B. tabaci
+on ornamental nurseries in the United Kingdom.
+Poinsettias are imported as cuttings and this is the most common pathway for the introduction of
+B. tabaci
+to ornamental nurseries in a number of EPPO countries. An eradication programme is suggested in EPPO Standard PM 10/17 (EPPO, 2011) and treatment involves dipping the cuttings in insecticides before the cuttings are propagated. Mineral oil or other types of oils were found effective treatments against all stages of
+B. tabaci
+.
+REFERENCES
+2023-01-11
+Basu AN (1995)
+Bemisia tabaci
+(Gennadius) crop pest and the principal whitefly vector of plant viruses. First published 1995 by Westview Press; Published 2018 by Routledge, New York, USA.
+Bedford ID, Briddon RW, Markham PG, Brown JK & Rosell RC (1992)
+Bemisia tabaci
+- biotype characterisation and the threat of this whitefly species to agriculture.
+Proceedings 1992 British Crop Protection Conference - Pests and Diseases
+3
+, 1235-1240.
+Bedford,ID, Briddon RW, Brown JK, Rosell RC & Markham PG (1994a) Geminivirus transmission and biological characterisation of
+Bemisia tabaci
+(Gennadius) biotypes from different geographic regions.
+Annals of Applied Biology
+125
+, 311-325.
+Bedford ID, Pinner, M, Liu S & Markham PG (1994b)
+Bemisia tabaci
+- potential infestation, phytotoxicity and virus transmission within European agriculture.
+Proceedings 1994 British Crop Protection Conference - Pests and Diseases
+2
+, 911-916.
+Bellows TS, Perring TM, Gill RJ & Headrick DH (1994) Description of a species of
+Bemisia
+(Homoptera: Aleyrodidae).
+Annals of the Entomological Society of America
+87
+, 195-206.
+Bertin S, Parrella G, Nannini M, Guercio G, Troiano E & Tomassoli L (2021) Distribution and genetic variability of
+Bemisia tabaci
+cryptic species (Hemiptera: Aleyrodidae) in Italy.
+Insects
+12
+, 521.
+https://doi.org/10.3390/insects12060521
+Briddon RW (2003) Cotton leaf curl disease, a multicomponent begomovirus complex.
+Molecular Plant Pathology
+4
+, 427–434.
+Broadbent, A., Foottit, R., & Murphy G (1989) Sweetpotato whitefly
+B
+emisia tabaci
+(Gennadius) (Homoptera: Aleyrodidae), a potential insect pest in Canada.
+The Canadian Entomologist
+121
+(11), 1027-1028.
+https://doi.org/10.4039/Ent1211027-11
+Brown JK, & Bird J (1992) Whitefly-transmitted geminiviruses and associated disorders in the Americas and the Caribbean Basin.
+Plant Disease
+76
+, 220-225.
+Brown JK, Coats SA, Bedford ID, Markham PG, Bird J & Frohlich DR (1995a) Characterization and distribution of esterase electromorphs in the whitefly,
+Bemisia tabaci
+(Genn.) (Homoptera: Aleyrodidae).
+Biochemical Genetics
+33
+, 205-214.
+Brown JK, Frohlich DR, & Rosell RC (1995b) The sweetpotato or silverleaf whiteflies. Biotypes of
+Bemisia tabaci
+or a species complex.
+Annual Review of Entomology
+40
+, 511-534.
+Byrne DN (1999) Migration and dispersal by the sweet potato whitefly
+Bemisia tabaci
+.
+Agricultural and Forest Meteorology
+97
+, 309-316.
+Byrne DN & Bellows Jr TS (1991) Whitefly biology.
+Annual Review of Entomology
+36
+, 431-457.
+Byrne FJ, Bedford ID, Devonshire AL & Markham PG (1995) Esterase variation and squash silverleaf induction in 'B' biotype
+Bemisia tabaci
+(Homoptera; Aleyrodidae).
+Bulletin of Entomological Research
+85
+, 175-179.
+Cathrin PB & Ghanim G (2014) Recent advances on interactions between the whitefly
+Bemisia tabaci
+and begomoviruses, with emphasis on tomato yellow leaf curl virus. In Plant Virus–Host Interaction Molecular Approaches and Viral Evolution (eds Gaur RK, Hohn T & Sharma P), PP. 79-103. Academic Press, Amsterdam.
+Celix A, Lopez-Sese A, Almarza N, Gomez-Guillamon ML & Rodriguez-Cerezo E (1996) Characterization of cucurbit yellow stunting disorder virus, a
+Bemisia tabaci
+transmitted closterovirus.
+Phytopathology
+86
+, 1370-1376.
+Chu D, Wan FH, Zhang YJ & Brown JK (2010) Change in the biotype composition of
+Bemisia tabaci
+in Shandong Province of China from 2005 to 2008.
+Environmental Entomology
+39
+:1028–1036
+Costa HS, Ullman DE, Johnson MW & Tabashnik BE (1993) Squash silverleaf symptoms induced by immature, but not adult,
+Bemisia tabaci
+.
+Phytopathology
+83
+, 763-766.
+Cuadrado IM, Janssen D, Velasco L, Ruiz L & Segundo E (2001) First report of cucumber vein yellowing virus in Spain.
+Plant Disease
+85
+, 336.
+Cuthbertson AGS & Vänninen I (2015) The importance of maintaining Protected Zone status against
+Bemisia tabaci
+.
+Insects
+6
+, 432-441.
+Dalton R (2006) Whitefly infestations: the Christmas invasion.
+Nature
+443
+, 898-900.
+Dângelo RAC, Michereff-Filho M, Campos MR, da Silva PS & Guedes RNC (2018) Insecticide resistance and control failure likelihood of the whitefly
+Bemisia tabaci
+(MEAM1; B biotype): a neotropical scenario
+. Annals of Applied Biology
+172
+, 88–99.
+De Barro PJ (1995)
+Bemisia tabaci
+biotype B: a review of its biology, distribution and control.
+CSIRO Australia Division of Entomology Technical Paper
+1-55.
+De Barro PJ, Liu SS, Boykin LM & Dinsdale AB (2011)
+Bemisia tabaci
+: a statement of species status.
+Annual Review of Entomology
+56
+, 1-19.
+Della Giustina W, Martinez M & Bertaux F (1989)
+Bemisia tabaci
+: le nouvel ennemi des cultures sous serres en Europe.
+Phytoma
+406
+, 48-52.
+Drayton GM, Teulon DAJ, Workman PJ & Scott IAW (2009) The Christmas dispersal of
+Bemisia tabaci
+(Gennadius) in New Zealand.
+New Zealand Plant Protection
+62
+, 310-314.
+Drost Y, Van Lenteren J & Van Roermund H (1998) Life history parameters of different biotypes of
+Bemisia
+tabaci
+(Hemiptera, Aleyrodidae) in relation to temperature and host plant: a selective review.
+Bulletin of Entomological Research
+88
+, 219-230.
+Duffus J, Liu HY, Wisler G & Li, R (1996) Lettuce chlorosis virus: a new whitefly transmitted closterovirus.
+European Journal of Plant Pathology
+102
+, 591-596.
+EPPO (2004) EPPO Standards PM 7/35(1) Bemisia tabaci.
+EPPO Bulletin
+34
+, 281–288.
+EPPO (2005) EPPO Standards PM 7/50(1) Tomato yellow leaf curl and Tomato mottle begomoviruses.
+EPPO Bulletin
+35
+, 319–325.
+EPPO (2008) EPPO Standards PM 4/34 (1) Production of pathogen-tested herbaceous ornamentals.
+EPPO Bulletin
+38
+, 31–52.
+EPPO (2009) EPPO Standards PM 10/13 Disinfestation of production site against Bemisia tabaci.
+EPPO Bulletin
+39, 478–479.
+EPPO (2011) EPPO Standards PM 10/17 (1) Treatment of plants for planting (cuttings) of
+Euphorbia pulcherrima
+for eradication of
+Bemisia tabaci
+.
+EPPO Bulletin
+41
+, 404–405.
+EPPO (2013) EPPO Standards PM 7/118 (1) Tomato chlorosis virus and Tomato infectious chlorosis Virus.
+EPPO Bulletin
+43
+(3), 462–470
+EPPO (2016) EPPO Standards PM 3/77 (1) Vegetable plants for planting under protected conditions – inspection of places of production.
+EPPO Bulletin
+46
+(1), 40–48.
+Fishpool LDC & Burban C (1994)
+Bemisia tabaci
+the whitefly vector of African cassava mosaic geminivirus.
+Tropical Science
+34
+, 55-72.
+Frohlich DR & Brown JK (1994) Mitochondrial 16S ribosomal subunit as a molecular marker in
+Bemisia tabaci
+and implications for population variability.
+Bemisia Newsletter
+8
+, 3.
+Gerling D & Horowitz AR (1984) Yellow traps for evaluating the population levels and dispersal patterns of
+Bemisia tabaci
+(Gennadius) (Homoptera: Aleyrodidae).
+Annals of the Entomological Society of America
+77
+, 753-759.
+Gill RJ & Brown JK (2010) Systematics of
+Bemisia
+and
+Bemisia
+relatives: Can molecular techniques solve the
+Bemisia tabaci
+complex conundrum – a taxonomist's viewpoint. In
+Bemisia
+: bionomics and management of a global pest (eds Stansly PA & Naranjo SE), pp, 5– 29. Springer, Dordrecht, The Netherlands.
+Ghosh S & Ghanim M (2021) Factors determining transmission of persistent viruses by
+Bemisia tabaci
+and emergence of new virus-vector relationships.
+Viruses 13
+,
+1808.
+Guirao P, Beitia F, Cenis JL (1997) Biotype determination of Spanish populations of
+Bemisia tabaci
+(Hemiptera: Aleyrodidae)
+Bulletin of Entomological Research
+87
+(6), 587 - 593.
+Henneberry TJ & Castle SJ (2001)
+Bemisia
+: Pest status, economics, biology and population dynamics. In Virus-Insect-Plant Interactions, (eds Harris, KF, Smith, OP & Duffus, JE), pp. 247-278. Academic Press, New York.
+Henneberry TJ & Faust RM (2008) Introduction. In Classical biological control of
+Bemisia tabaci
+in the United States
+(eds Gould J, Hoelmer K & Goolsby J), pp, 1-16. Springer, Dordrecht.
+Hogenhout SA, Ammar ED, Whitfield AE & Redinbaugh MG (2008) Insect vector interactions with persistently transmitted viruses.
+Annual Review of Phytopathology
+46,
+327–359.
+Horowitz AR, Denholm I, Gorman K, Cenis JL, Kontsedalov S & Ishaaya I (2003) Biotype Q of
+Bemisia tabaci
+identified in Israel.
+Phytoparasitica
+31
+, 94–98.
+Horowitz AR, Kontsedalov S, Khasdan V & Ishaaya I (2005) Biotypes B and Q of
+Bemisia tabaci
+and their relevance to neonicotinoid and pyriproxyfen resistance.
+Archives of Insect Biochemistry and Physiology
+58,
+216-225.
+Horowitz AR, Ghanim M, Roditakis E, Nauen R &Ishaaya I (2020) Insecticide resistance and its management in
+Bemisia tabaci
+species.
+Journal of Pest Science
+93
+, 893-910.
+Isaacs R, Willis MA & Byrne DN (1999) Modulation of whitefly take-off and flight orientation by wind speed and visual cues.
+Physiological Entomology
+24
+, 311–318.
+Jones DR (2003) Plant viruses transmitted by whiteflies.
+European Journal of Plant Pathology
+109
+, 195–219.
+Legg JP, Shirima R, Tajebe LS, Guastella D, Boniface S, Jeremiah S, Nsami E, Chikoti P & Rapisarda C (2014) Biology and management of
+Bemisia
+whitefly vectors of cassava virus pandemics in Africa.
+Pest Management Science
+70
+, 1446–1453.
+Li SJ, Xue X, Ahmed MZ, Ren SX, Du YZ, Wu JH, Cuthbertson AGS & Qiu BL (2011) Host plants and natural enemies of
+Bemisia tabaci
+(Hemiptera, Aleyrodidae) in China.
+Insect Science
+18,
+101-120.
+Martin JH (1987) An identification guide to common whitefly pest species of the world (Homoptera, Aleyrodidae).
+Tropical Pest Management
+33
+, 298-322.
+Martin JH (2003) Whiteflies (Hemiptera: Aleyrodidae) - their systematic history and the resulting problems of conventional taxonomy, with special reference to descriptions of
+Aleyrodes proletella
+(Linnaeus, 1758) and
+Bemisia tabaci
+(Gennadius, 1889).
+Entomologist's Gazette
+54
+, 125–136.
+McKenzie CL & Osborne LS (2017)
+Bemisia tabaci
+MED (Q biotype) (Hemiptera: Aleyrodidae) in Florida is on the move to residential landscapes and may impact open-field agriculture.
+Florida Entomologist
+100
+, 481-484.
+McKenzie CL, Bethke JA, Byrne FJ, Chamberlin JR, Dennehy TJ, Dickey AM, Gilrein D, Hall PM, Ludwig S, Oetting RD, Osborne LS, Schmale L & Shatters Jr RG (2012) Distribution of
+Bemisia tabaci
+(Hemiptera: Aleyrodidae) biotypes in North America following the Q invasion.
+Journal of Economic Entomology
+105
+, 753–766.
+Mound LA & Halsey SH (1978) Whiteflies of the world, a systematic catalogue of the Aleyrodidae (Homoptera) with host plant and natural enemy data. British Museum (Natural History), London, UK.
+Navas-Castillo J, Sanchez-Campos S, Diaz JA, Saez-Alonso E & Moriones E (1999) Tomato yellow leaf curl virus - is causes a novel disease of common bean and severe epidemics in tomato in Spain.
+Plant Disease
+83
+, 29-32.
+Naveen NC, Chaubey R, Kumar D, Rebijith KB, Rajagopal R, Subrahmanyam B & Subramanian S (2017) Insecticide resistance status in the whitefly,
+Bemisia tabaci
+genetic groups Asia-I, Asia-II-1 and Asia-II-7 on the Indian subcontinent.
+Scientific Reports
+7
+, 40634.
+Oliveira M, Henneberry T & Anderson P (2001) History, current status and collaborative research projects for
+Bemisia tabaci
+.
+Crop Protection
+20
+, 709-723.
+Perring TM (2001) The
+Bemisia tabaci
+species complex.
+Crop Protection
+20
+, 725-737.
+Perring TM, Cooper A., Rodriguez RJ, Farrar CA & Bellows TS (1993) Identification of a whitefly species by genomic and behavioural studies.
+Science
+259
+, 74-77.
+Pinto-Zevallos DM & Vänninen I (2013) Yellow sticky traps for decision-making in whitefly management: what has been achieved?
+Crop Protection
+47
+, 74–84.
+Saleem H, Nahid N, Shakir S, Ijaz S, Murtaza G, Khan AA, Mubin M & Shah Nawaz-ul-Rehman M (2016) Diversity, mutation and recombination analysis of cotton leaf curl geminiviruses.
+PLoS ONE
+11
+(3), e0151161.
+https://doi.org/10.1371/journal.pone.0151161
+Sánchez-Campos S, Navas-Castillo J, Camero R, Soria C, Diaz J & Moriones E (1999) Displacement of tomato yellow leaf curl virus (TYLCV)-Sr by TYLCV-Is in tomato epidemics in Spain.
+Phytopathology
+89
+, 1038-1043.
+Simmons AM, Harrison HF & Ling KS (2008) Fortynine new host plant species for
+Bemisia tabaci
+(Hemiptera, Aleyrodidae).
+Entomological Science
+11
+, 385-390.
+Stansly PA & Naranjo S (2010)
+Bemisia: bionomics and management of a global pest
+. Springer, Dordrecht, Netherlands, 540 pp.
+Teng X, Wan FH & Chu D (2010)
+Bemisia tabaci
+biotype Q dominates other biotypes across China.
+Florida Entomologis
+t
+93
+, 363–368.
+Xu J, De Barro P & Liu S (2010) Reproductive incompatibility among genetic groups of
+Bemisia tabaci
+supports the proposition that the whitefly is a cryptic species complex.
+Bulletin of Entomological Research
+100
+, 359-366.
+CABI and EFSA resources used when preparing this datasheet
+CABI Datasheet on
+Bemisia tabaci
+(CABI Datasheet 12/2021).
+https://www.cabidigitallibrary.org/doi/10.1079/cabicompendium.8927
+CIE (1986) Distribution Maps of Pests, Series A No. 284. CAB International, Wallingford, UK.
+EFSA Panel on Plant Health (PLH) (2013) Scientific Opinion on the risks to plant health posed by
+Bemisia tabaci
+species complex and viruses it transmits for the EU territory.
+EFSA Journal
+11,
+3162, 302 pp.
+https://doi.org/10.2903/j.efsa.2013.3162
+EPPO/CABI (1996) Bean golden mosaic bigeminivirus; Lettuce infectious yellows closterovirus; Squash leaf curl bigeminivirus; Tomato mottle bigeminivirus; Tomato yellow leaf curl bigeminivirus. In Quarantine pests for Europe 2nd edition (ed Smith IM, McNamara DG, Scott PR & Holderness M). CAB INTERNATIONAL, Wallingford, UK.
+ACKNOWLEDGEMENTS
+2023-01-11
+This datasheet was extensively revised in 2023 by A. Rami Horowitz, Agricultural Research Organization (the Volcani Center) and Katif Research Center (Israel). His valuable contribution is gratefully acknowledged.
+How to cite this datasheet?
+EPPO (2026)
+Bemisia tabaci
+. EPPO datasheets on pests recommended for regulation.
+https://gd.eppo.int
+(accessed 2026-02-24)
+Datasheet history
+2023-01-11
+This datasheet was first published in the EPPO Bulletin in 1989 and revised in the two editions of 'Quarantine Pests for Europe' in 1992 and 1997, as well as in 2023. It is now maintained in an electronic format in the EPPO Global Database. The sections on 'Identity', ‘Hosts’, and 'Geographical distribution' are automatically updated from the database. For other sections, the date of last revision is indicated on the right.
+CABI/EPPO (1992/1997)
+Quarantine Pests for Europe
+(1
+st
+and 2
+nd
+edition).
+CABI, Wallingford (GB).
+EPPO (1989) EPPO data sheet on quarantine organisms no 178:
+Bemisia tabaci.
+EPPO Bulletin
+19
+(4), 733-738.
+https://doi.org/10.1111/j.1365-2338.1989.tb01170.x
+×
+Close
+Custom Word
+Identity
+Hosts
+Geographical distribution
+Biology
+Detection and Identification
+Pathways for movement
+Pest significance
+Phytosanitary measures
+References
+Acknowledgements
+How to cite this datasheet?
+Close
+Generate
+Contact EPPO
+EPPO Website
+EPPO Data Services
+EPPO Codes categories
+Sitemap
+About privacy
+European Union funding:
+EPPO has been awarded EU grant agreements for the further development of the EPPO Code system (agreement nb: SANTE/2018/G5/EPPO/SI2.793173 – from 2018-12-11 to 2021-12-10), and for the revision of the EPPO Datasheets (agreement nb: SANTE/2020/G1/EPPO/SI2.823766 from 2020-03-06 to 2024-09-05). The EU Commission is not responsible for any use that may be made of the information from these projects subsequently included in the EPPO Global Database.
+EPPO 2026
+All Rights Reserved
+EPPO Cloud [www2023p74a]

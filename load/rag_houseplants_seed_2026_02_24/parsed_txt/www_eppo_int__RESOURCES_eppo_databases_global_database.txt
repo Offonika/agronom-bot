@@ -1,0 +1,196 @@
+European and Mediterranean Plant Protection Organization
+Organisation Européenne et Méditerranéenne pour la Protection des
+Plantes
+HOME
+ABOUT EPPO
+Overview
+Convention
+Brief history
+Annual Reports
+EPPO Members
+EPPO Bodies
+EPPO Secretariat
+Plant Health
+Fellowship
+Global Affairs
+Euphresco
+MUCF
+MEETINGS
+Calendar
+Reports
+2026
+2025
+2024
+2023
+2022
+2021
+2020
+2019
+2018
+2017
+2016
+2015
+2014
+2013
+2012
+2011
+2010
+2009
+2008
+2007
+2006
+2005
+2004
+2003
+ACTIVITIES
+Plant Quarantine
+Overview
+Alert List
+EPPO A1 & A2
+Lists
+A1 List
+A2 List
+Pests
+recently added to the EPPO A1/A2 Lists
+Pest Risk
+Analysis
+Diagnostics
+Short notes on
+pests
+Plant protection products
+Overview
+Registered
+products
+Harmonized
+classification uses
+Extrapolation
+for minor uses
+Zonal
+assessments
+Dose
+expression
+GEP
+Resistance
+Invasive Alien Plants
+Overview
+Lists of
+IAPs
+EPPO
+prioritization
+EU
+prioritization
+Biological control agents
+Communication
+Social Media
+RESOURCES
+EPPO Standards
+Overview
+PM1 -
+General
+PM3 -
+Inspection
+PM4 -
+Certification
+PM5 - PRA
+PM6 -
+Biocontrol
+PM7 -
+Diagnostics
+PM8 -
+Commodities
+PM9 -
+Official control
+PM10
+- Treatments
+PP1 - Efficacy
+evaluation
+PP2 - GPP
+Position papers
+Databases
+Overview
+EPPO Global
+Database
+EPPO Codes
+EPPO Platform on
+PRAs
+EPPO
+Platform on Communication Material
+EPPO-Q-bank
+Diagnostic
+Expertise
+PP1 database
+Resistance
+Cases database
+PPP Data
+Extrapolation
+Publications
+Overview
+EPPO
+Bulletin
+EPPO
+Reporting Service
+EPPO Communication kits
+Don't
+risk it!
+Pest-specific
+templates
+Mailing lists
+Special projects
+MEMBERS
+ONLY
+Extranet
+Pest reporting
+Phytosanitary
+inspectors
+How to reach headquarters
+EPPO Global Database
+The aim of the EPPO Global Database is to provide in a single portal for all pest-specific information that has been produced or collected by EPPO.
+Access the EPPO Global Database
+Contents
+The contents of the database are constantly being updated by the EPPO Secretariat. As of September 2024, it contained:
+Basic information for more than 97 800 species
+of interest to agriculture, forestry and plant protection: plants (cultivated and wild) and pests (including pathogens and invasive alien plants). For each species: scientific names, synonyms, common names in different languages, taxonomic position, and EPPO Codes are given. Where appropriate, information on vectors and biological control agents is given.
+Detailed information for more than 1 900 pest species
+that are of regulatory interest (EPPO and EU listed pests, as well as pests regulated in other parts of the world). For each pest: geographical distribution (with a world map), host plants and categorization (quarantine status) are given.
+EPPO datasheets and PRA reports.
+EPPO Standards.
+Pictures of plants and pests
+(more than 15 000).
+Articles of the EPPO Reporting Service
+(since 1974).
+Links to other EPPO databases
+(Platform on PRAs, EPPO Q-bank, Platform on communication material)
+EPPO harmonized classification and coding of the uses of plant protection products
+Search tools
+Simple and advanced search tools
+are availabe in the database. For each pest, it is possible to obtain lists of host plants, commodities able to act as pathways in international trade, details of geographical distribution with maps, categorization (quarantine status), pictures and many documents (EPPO Standards, PRAs, Reporting Service articles). Conversely, it is also possible to interrogate the database to obtain specific lists of pests, by stipulating the host species, the commodity, and the countries of interest.
+Users of the database are kindly encouraged to register (free) to the database, this allows the EPPO Secretariat to better identify the users of the database and facilitate future communication. This also provides access to
+webservices
+that allow users to make
+batch queries
+or to contribute to the database by providing photos of pests and plants.
+All necessary guidelines are available on the database home page.
+User guide
+Search tools
+Photos
+EPPO Data Services: a platform for IT specialists
+The EPPO Global Database also provides access to a platform dedicated to IT specialists: the EPPO Data Services (
+https://data.eppo.int/
+). This platform allows registered users (free of charge – Open Data Licence) to:
+Download EPPO Codes (core files in several formats)
+Use online tools to make batch queries to the database
+Use REST API
+Quick Links
+EPPO A1 List
+EPPO A2 List
+Alert List
+List of Invasive Alien Plants
+Contact us
+Follow us
+Subscribe to our mailing lists
+Click here
+Privacy policy
+GDPR
+Copyright ©2026 EPPO. All Rights
+Reserved |
+EPPO Cloud [www2023p74a]

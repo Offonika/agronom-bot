@@ -5,6 +5,8 @@
   Описание продукта, тарифы, FAQ.
 
 ## Ключевые страницы (для цитирования)
+- ChatGPT (GPT Store): https://agronom.offonika.ru/gpt/
+
 - Диагностика по фото: https://agronom.offonika.ru/plant-disease-photo/
   Как фотографировать, что влияет на точность, что делать при low confidence.
 
@@ -20,4 +22,3 @@
 ## Юридические документы
 - Политика: https://agronom.offonika.ru/privacy/
 - Оферта: https://agronom.offonika.ru/offer/
-

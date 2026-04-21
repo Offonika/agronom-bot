@@ -10,7 +10,8 @@ from app.services import gpt
 
 def _fake_openai_response(payload: str | None = None) -> SimpleNamespace:
     payload = payload or (
-        '{"crop":"apple","crop_ru":"яблоня","disease":"powdery_mildew","disease_name_ru":"мучнистая роса","confidence":0.92,'
+        '{"crop":"apple","crop_ru":"яблоня","crop_confidence":0.86,"crop_candidates":["яблоня","груша"],'
+        '"disease":"powdery_mildew","disease_name_ru":"мучнистая роса","confidence":0.92,'
         '"reasoning":["Белый налёт по краям листа.","Пятна на верхних листьях"],'
         '"treatment_plan":{"product":"Топаз","substance":"Пенконазол","dosage_value":2,"dosage_unit":"мл/10л",'
         '"dosage":"2 мл/10 л","phi":"30","phi_days":30,"method":"Опрыскивание","safety_note":"Перчатки"},'
@@ -41,10 +42,37 @@ def test_call_gpt_vision_parses_response(monkeypatch):
     assert resp["disease"] == "powdery_mildew"
     assert resp["disease_name_ru"] == "мучнистая роса"
     assert resp["confidence"] == 0.92
+    assert resp["crop_confidence"] == 0.86
+    assert resp["crop_candidates"] == ["яблоня", "груша"]
     assert resp["reasoning"][0].startswith("Белый")
     assert resp["treatment_plan"]["product"] == "Топаз"
     assert resp["next_steps"]["cta"] == "Добавить обработку"
     assert resp["assistant_ru"] == "Диагноз готов."
+
+
+def test_call_gpt_vision_softens_mealybug_without_evidence(monkeypatch):
+    payload = (
+        '{"crop":"ficus","crop_ru":"фикус","disease":"mealybug","disease_name_ru":"мучнистый червец",'
+        '"confidence":0.93,"reasoning":["Пятна на листе"],'
+        '"treatment_plan":{"product":"Актеллик","substance":"пиримифос-метил","method":"Опрыскивание","phi_days":7},'
+        '"need_reshoot":false,"reshoot_tips":[],"assistant_ru":"Похоже на мучнистого червеца."}'
+    )
+
+    class _FakeCompletions:
+        def create(self, **kwargs):  # type: ignore[override]
+            return _fake_openai_response(payload)
+
+    monkeypatch.setattr(gpt, "_get_client", lambda: _fake_client(_FakeCompletions().create))
+    monkeypatch.setattr(gpt, "get_public_url", lambda key: "https://example.com/x.jpg")
+
+    resp = gpt.call_gpt_vision("photo.jpg")
+    assert resp["disease"] == "mealybug"
+    assert resp["confidence"] <= 0.58
+    assert resp["need_reshoot"] is True
+    assert any("пазух" in tip.lower() for tip in (resp.get("reshoot_tips") or []))
+    assert any("червец" in line.lower() for line in (resp.get("reasoning") or []))
+    assert resp["treatment_plan"]["product"] == ""
+    assert resp["treatment_plan"]["substance"] == ""
 
 
 def test_call_gpt_vision_sends_image_url_object(monkeypatch):
@@ -65,6 +93,30 @@ def test_call_gpt_vision_sends_image_url_object(monkeypatch):
     assert captured["timeout"] == gpt._TIMEOUT_SECONDS
     user_text = captured["messages"][1]["content"][0]["text"]
     assert "Пользователь предполагает культуру: томат" in user_text
+
+
+def test_call_gpt_vision_sends_all_album_images(monkeypatch):
+    captured: dict = {}
+
+    def _create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+        return _fake_openai_response()
+
+    monkeypatch.setattr(gpt, "_get_client", lambda: _fake_client(_create))
+    monkeypatch.setattr(gpt, "get_public_url", lambda key: f"https://example.com/{key}.jpg")
+
+    gpt.call_gpt_vision(
+        "primary",
+        crop_hint="огурец",
+        extra_images=[("extra-1", None), ("extra-2", None)],
+    )
+
+    content = captured["messages"][1]["content"]
+    image_parts = [part for part in content if part.get("type") == "image_url"]
+    assert len(image_parts) == 3
+    assert image_parts[0]["image_url"] == {"url": "https://example.com/primary.jpg"}
+    assert image_parts[1]["image_url"] == {"url": "https://example.com/extra-1.jpg"}
+    assert image_parts[2]["image_url"] == {"url": "https://example.com/extra-2.jpg"}
 
 
 def test_call_gpt_vision_retries_without_temperature(monkeypatch):
@@ -236,6 +288,41 @@ def test_get_client_recreates_after_close(monkeypatch):
 
     assert calls == 2
     assert first is not second
+
+
+def test_call_gpt_embeddings_keeps_order_for_empty_inputs(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def _create(**kwargs):
+        captured["input"] = kwargs["input"]
+        return SimpleNamespace(
+            data=[
+                {"embedding": [0.1, 0.2]},
+                {"embedding": [0.3, 0.4]},
+                {"embedding": [0.5, 0.6]},
+            ]
+        )
+
+    fake_client = SimpleNamespace(embeddings=SimpleNamespace(create=_create))
+    monkeypatch.setattr(gpt, "_get_client", lambda: fake_client)
+
+    vectors = gpt.call_gpt_embeddings(["leaf", "", "   "])
+    assert vectors == [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
+    assert captured["input"] == ["leaf", " ", " "]
+
+
+def test_call_gpt_embeddings_empty_list_returns_empty():
+    assert gpt.call_gpt_embeddings([]) == []
+
+
+def test_call_gpt_embeddings_raises_on_size_mismatch(monkeypatch):
+    def _create(**kwargs):
+        return SimpleNamespace(data=[{"embedding": [0.1, 0.2]}])
+
+    fake_client = SimpleNamespace(embeddings=SimpleNamespace(create=_create))
+    monkeypatch.setattr(gpt, "_get_client", lambda: fake_client)
+    with pytest.raises(ValueError):
+        gpt.call_gpt_embeddings(["a", "b"])
 
 
 def test_sanitize_plan_accepts_substance():

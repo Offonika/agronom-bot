@@ -7,6 +7,7 @@ import base64
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,18 @@ _ASSISTANT_MODEL = (os.environ.get("OPENAI_ASSISTANT_MODEL") or _MODEL).strip() 
 _MODEL_FALLBACK_RAW = os.environ.get("OPENAI_VISION_MODEL_FALLBACK", "").strip()
 _MODEL_FALLBACK = _MODEL_FALLBACK_RAW or None
 _OPENAI_HOST = "api.openai.com"
+_MEALYBUG_DISEASE_RE = re.compile(r"(mealy|мучнист\w*\s+червец|червец)", re.IGNORECASE)
+_MEALYBUG_EVIDENCE_RE = re.compile(
+    r"(ватн|бел\w*\s*комоч|липк|падь|колон\w*|пазух\w*|нижн\w*\s+сторон\w*|изнанк\w*)",
+    re.IGNORECASE,
+)
+_MEALYBUG_SAFE_CONFIDENCE_MAX = 0.58
+_MEALYBUG_GUARD_LINE = "Явных признаков мучнистого червеца на фото пока нет."
+_MEALYBUG_RESHOOT_TIPS = [
+    "Снимите пазухи листьев крупно при дневном свете.",
+    "Покажите нижнюю сторону листа и места прикрепления черешков.",
+    "Если есть липкость или белые комочки, пришлите их макро-планом.",
+]
 
 
 def _should_bypass_proxy(host: str) -> bool:
@@ -86,6 +99,8 @@ _PROMPT_FALLBACK = """
 {
   "crop": "англ./лат. культура",
   "crop_ru": "название по-русски",
+  "crop_confidence": 0.0-1.0,
+  "crop_candidates": ["2-3 наиболее вероятные культуры на русском"],
   "disease": "латинское или англ. название болезни",
   "disease_name_ru": "болезнь по-русски",
   "confidence": 0.0-1.0,
@@ -116,6 +131,11 @@ _PROMPT_FALLBACK = """
 3. Даже при низкой уверенности возвращай безопасный план (минимум substance + method + phi_days).
 4. Учитывай crop_hint, но проверяй по фото.
 5. Не придумывай названия препаратов — product можно оставить пустым.
+6. Не давай взаимоисключающие причины как «пересушивание или залив» без способа различить; если причин несколько, сразу добавляй короткий чек-лист проверки.
+7. Не рекомендуй «промывку грунта» как действие по умолчанию; упоминай её только условно при явных солевых корках/подтверждённом засолении.
+8. При риске перелива/подгнивания корней обязательно добавляй алгоритм проверки: признаки + просьба вынуть растение из горшка и осмотреть корни + шаги после подтверждения.
+9. Всегда возвращай crop_confidence и crop_candidates (2-3 варианта на русском). Если crop_confidence < 0.75, ставь need_clarify_crop=true.
+10. При need_clarify_crop=true не делай узкоспецифичных назначений под конкретную культуру до уточнения.
 
 Требования к `assistant_ru`:
 - Пиши дружелюбно и подробно, как в примере:
@@ -139,6 +159,9 @@ _PROMPT_FALLBACK = """
   - протирай листья…
   ```
 - Обязательно упоминание культуры, наблюдения, причин и конкретных шагов. Используй эмодзи в заголовках блоков, добавляй ободряющее завершение.
+- Если есть гипотезы по воде/грунту/корням (жёсткая вода, засоление, перелив, пересушивание), добавляй блок `🔎 Что уточнить`: фото поверхности грунта, фото дренажных отверстий/поддона, проверка влажности на глубине 2–3 см.
+- В том же блоке проси состав субстрата (торф/минеральный/перлит/вермикулит/кора и т.д.) и поведение воды после полива (вышла в поддон быстро / стоит / почти не уходит); отдельно отмечай, что по фото влагоёмкость и воздухопроницаемость оцениваются ограниченно.
+- Если есть гипотеза «перелив/застой влаги», добавляй блок `🧪 Как проверить перелив/подгнивание` с обязательным шагом осмотра корней после извлечения растения из горшка.
 
 `assistant_followups_ru` — 2–3 возможных вопроса пользователя. Если вредителей нет, честно напиши и сосредоточься на уходе. Никакого текста вне JSON.
 """.strip()
@@ -243,6 +266,24 @@ def _build_image_source(key: str, image_bytes: bytes | None) -> str:
     return get_public_url(key)
 
 
+def _build_image_parts(
+    key: str,
+    image_bytes: bytes | None,
+    extra_images: list[tuple[str, bytes | None]] | None = None,
+) -> list[dict[str, Any]]:
+    parts = [{"type": "image_url", "image_url": {"url": _build_image_source(key, image_bytes)}}]
+    if not extra_images:
+        return parts
+    for extra_key, extra_bytes in extra_images:
+        parts.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": _build_image_source(extra_key, extra_bytes)},
+            }
+        )
+    return parts
+
+
 def _request_completion(client: OpenAI, model: str, base_payload: dict[str, Any]):
     request_kwargs = dict(base_payload)
     request_kwargs["model"] = model
@@ -274,7 +315,11 @@ def _request_completion(client: OpenAI, model: str, base_payload: dict[str, Any]
 
 
 def call_gpt_vision(
-    key: str, image_bytes: bytes | None = None, *, crop_hint: str | None = None
+    key: str,
+    image_bytes: bytes | None = None,
+    *,
+    crop_hint: str | None = None,
+    extra_images: list[tuple[str, bytes | None]] | None = None,
 ) -> dict:
     """Send photo to GPT‑Vision and parse the diagnosis.
 
@@ -285,7 +330,7 @@ def call_gpt_vision(
     image_bytes: Optional bytes to inline as data URI.
     """
 
-    image_url = _build_image_source(key, image_bytes)
+    image_parts = _build_image_parts(key, image_bytes, extra_images)
 
     client = _get_client()
     hint = (crop_hint or "").strip()
@@ -306,11 +351,12 @@ def call_gpt_vision(
                         "type": "text",
                         "text": (
                             "Определи культуру, проблему и подготовь JSON по схеме выше. "
+                            "Проанализируй все приложенные фото как одну подборку: общая картина + детали. "
                             "Ответь дружелюбно, но оставь только JSON."
                             + hint_suffix
                         ),
                     },
-                    {"type": "image_url", "image_url": {"url": image_url}},
+                    *image_parts,
                 ],
             },
         ],
@@ -350,8 +396,27 @@ def call_gpt_vision(
         crop = str(data["crop"]).strip()
         disease = str(data["disease"]).strip()
         crop_ru = _clean(data.get("crop_ru"))
+        crop_confidence = _to_float(data.get("crop_confidence"))
         disease_name_ru = _clean(data.get("disease_name_ru"))
         confidence = float(data["confidence"])
+        if crop_confidence is None:
+            crop_confidence = confidence
+        crop_confidence = max(0.0, min(1.0, crop_confidence))
+        crop_candidates = _as_list(data.get("crop_candidates"))
+        if crop_ru:
+            crop_candidates.insert(0, crop_ru)
+        elif crop:
+            crop_candidates.insert(0, crop)
+        dedup_candidates: list[str] = []
+        seen_candidates: set[str] = set()
+        for candidate in crop_candidates:
+            key = candidate.casefold()
+            if key in seen_candidates:
+                continue
+            seen_candidates.add(key)
+            dedup_candidates.append(candidate)
+            if len(dedup_candidates) >= 3:
+                break
         reasoning = _as_list(data.get("reasoning"))
 
         plan = _sanitize_plan(data.get("treatment_plan"))
@@ -376,10 +441,12 @@ def call_gpt_vision(
     except (KeyError, TypeError, ValueError, json.JSONDecodeError, IndexError) as exc:
         raise ValueError("Malformed GPT response") from exc
 
-    return {
+    response_payload = {
         "crop": crop,
         "disease": disease,
         "crop_ru": crop_ru or None,
+        "crop_confidence": crop_confidence,
+        "crop_candidates": dedup_candidates or None,
         "disease_name_ru": disease_name_ru or None,
         "confidence": confidence,
         "reasoning": reasoning or None,
@@ -392,6 +459,7 @@ def call_gpt_vision(
         "assistant_ru": assistant_ru or None,
         "assistant_followups_ru": assistant_followups or None,
     }
+    return _apply_mealybug_safety_guard(response_payload)
 
 
 def call_gpt_chat(
@@ -421,6 +489,100 @@ def call_gpt_chat(
             fragments.append(str(text or ""))
         return "".join(fragments)
     return str(payload or "")
+
+
+def call_gpt_embeddings(
+    texts: list[str],
+    *,
+    model: str = "text-embedding-3-small",
+    timeout: float | None = None,
+) -> list[list[float]]:
+    """Build embeddings for input texts and return vectors in the same order."""
+
+    if not texts:
+        return []
+    normalized = [str(item or "").strip() for item in texts]
+    # Keep 1:1 ordering contract even for empty entries.
+    payload = [item if item else " " for item in normalized]
+
+    client = _get_client()
+    try:
+        response = client.embeddings.create(
+            model=model,
+            input=payload,
+            timeout=timeout or _TIMEOUT_SECONDS,
+        )
+    except APITimeoutError as exc:
+        raise TimeoutError("OpenAI embeddings request timed out") from exc
+
+    vectors: list[list[float]] = []
+    for item in response.data:
+        embedding = item.embedding if hasattr(item, "embedding") else None
+        if embedding is None and isinstance(item, dict):
+            embedding = item.get("embedding")
+        if not isinstance(embedding, list):
+            raise ValueError("Malformed OpenAI embeddings response")
+        vectors.append([float(value) for value in embedding])
+    if len(vectors) != len(payload):
+        raise ValueError("Malformed OpenAI embeddings response: size mismatch")
+    return vectors
+
+
+def _apply_mealybug_safety_guard(payload: dict[str, Any]) -> dict[str, Any]:
+    disease_text = " ".join(
+        [
+            _clean(payload.get("disease")),
+            _clean(payload.get("disease_name_ru")),
+        ]
+    ).strip()
+    if not disease_text or not _MEALYBUG_DISEASE_RE.search(disease_text):
+        return payload
+
+    evidence_text = " ".join(
+        [
+            *(_as_list(payload.get("reasoning"))),
+            _clean(payload.get("assistant_ru")),
+        ]
+    )
+    if evidence_text and _MEALYBUG_EVIDENCE_RE.search(evidence_text):
+        return payload
+
+    confidence = payload.get("confidence")
+    if isinstance(confidence, (int, float)):
+        payload["confidence"] = min(float(confidence), _MEALYBUG_SAFE_CONFIDENCE_MAX)
+
+    payload["need_reshoot"] = True
+
+    reasoning = _as_list(payload.get("reasoning"))
+    if _MEALYBUG_GUARD_LINE not in reasoning:
+        reasoning.append(_MEALYBUG_GUARD_LINE)
+    payload["reasoning"] = reasoning or None
+
+    current_tips = _as_list(payload.get("reshoot_tips"))
+    tip_keys = {tip.casefold() for tip in current_tips}
+    for tip in _MEALYBUG_RESHOOT_TIPS:
+        if tip.casefold() in tip_keys:
+            continue
+        current_tips.append(tip)
+        tip_keys.add(tip.casefold())
+    payload["reshoot_tips"] = current_tips or list(_MEALYBUG_RESHOOT_TIPS)
+
+    assistant = _clean(payload.get("assistant_ru"))
+    guard_note = (
+        "Сейчас держим нейтральный режим ухода без химических обработок. "
+        "Для подтверждения пришлите досъёмку пазух и изнанки листа."
+    )
+    payload["assistant_ru"] = f"{assistant}\n\n{guard_note}".strip() if assistant else guard_note
+
+    plan = payload.get("treatment_plan")
+    if isinstance(plan, dict):
+        plan["product"] = ""
+        plan["substance"] = ""
+        if not _clean(plan.get("method")):
+            plan["method"] = "Щадящий уход без химических обработок до уточнения признаков."
+        payload["treatment_plan"] = plan
+
+    return payload
 
 
 def _clean(value: Any) -> str:
@@ -480,4 +642,4 @@ def _sanitize_plan(plan_raw: Any) -> dict[str, Any] | None:
     return candidate if core_ok else None
 
 
-__all__ = ["call_gpt_vision", "call_gpt_chat"]
+__all__ = ["call_gpt_vision", "call_gpt_chat", "call_gpt_embeddings"]

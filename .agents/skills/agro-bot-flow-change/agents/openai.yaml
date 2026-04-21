@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agro Bot Flow Change"
+  short_description: "Чеклист для изменений Telegram bot flow и локалей"
+  default_prompt: "Внеси изменение в bot flow agronom-bot и проверь локали, тесты и связанные docs."
