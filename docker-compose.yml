@@ -180,8 +180,9 @@ services:
         max-size: "10m"
         max-file: "5"
     env_file: .env
+    # Keep Postgres reachable for host-local admin tasks, but closed to the public internet.
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test:
         [
